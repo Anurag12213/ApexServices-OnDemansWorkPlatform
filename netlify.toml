@@ -1,0 +1,22 @@
+# ==========================================
+# Netlify Configuration for ApexServices Monorepo
+# Deploys the Customer Facing Application
+# ==========================================
+
+[build]
+  base = "Frontend/customer"
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
