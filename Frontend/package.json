@@ -1,0 +1,17 @@
+{
+  "name": "instantwork-frontend-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "InstantWork Full-Stack Frontend Workspace (Customer Portal & Admin Panel)",
+  "scripts": {
+    "dev:customer": "npm --prefix customer run dev",
+    "dev:admin": "npm --prefix admin run dev",
+    "dev:partner": "npm --prefix partner run dev",
+    "dev:auth": "npm --prefix auth-portal run dev",
+    "build:customer": "npm --prefix customer run build",
+    "build:admin": "npm --prefix admin run build",
+    "build:partner": "npm --prefix partner run build",
+    "build:auth": "npm --prefix auth-portal run build",
+    "build": "npm run build:customer && npm run build:admin && npm run build:auth"
+  }
+}

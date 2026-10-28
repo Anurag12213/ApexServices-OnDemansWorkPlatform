@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans antialiased min-h-screen selection:bg-[#ff3b47] selection:text-white;
+  }
+}
+
+/* Apex Unified Design System Palette */
+:root {
+  --brand-navy: #0A2540;
+  --brand-slate: #0F172A;
+  --brand-coral: #ff3b47;
+  --brand-coral-hover: #e62e3a;
+  --brand-coral-active: #cc222e;
+}
+
+.brand-coral {
+  color: #ff3b47;
+}
+
+.bg-brand-coral {
+  background-color: #ff3b47;
+}
+
+.bg-brand-coral:hover {
+  background-color: #e62e3a;
+}
+
+.border-brand-coral {
+  border-color: #ff3b47;
+}
+
+.bg-topbar-navy {
+  background-color: #0A2540;
+}
+
+.bg-slate-navy {
+  background-color: #0A2540;
+}
