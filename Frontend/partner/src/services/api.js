@@ -170,32 +170,15 @@ class ApiClient {
   initState() {
     try {
       const stored = localStorage.getItem(this.storageKey);
-      if (!stored) {
-        this.seedDemoPartner('partner@apexservices.com', 'INDIVIDUAL');
-        this.getPartnerAuthToken();
-      } else {
+      if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.partner) {
-          if (parsed.partner.email === 'rajesh.partner@fixitpro.in') {
-            parsed.partner.email = 'partner@apexservices.com';
+          // If legacy dummy email was stored, clear it out so real login is required
+          if (parsed.partner.email === 'rajesh.partner@fixitpro.in' || parsed.partner.id === 'PRT-2041') {
+            localStorage.removeItem(this.storageKey);
+            localStorage.removeItem('apex_partner_token');
+            return;
           }
-          // Purge legacy dummy earnings and mock payout balances from partner session
-          if (parsed.partner.earnings && (parsed.partner.earnings.lifetime > 0 || parsed.partner.earnings.today > 0 || parsed.partner.walletBalance > 0)) {
-            parsed.partner.earnings = {
-              today: 0,
-              thisWeek: 0,
-              thisMonth: 0,
-              lifetime: 0,
-              pendingPayout: 0,
-              availableBalance: 0
-            };
-            parsed.partner.walletBalance = 0;
-            parsed.partner.completedJobsCount = 0;
-            parsed.partner.jobsCompleted = 0;
-            parsed.payoutMethods = [];
-            parsed.depositTransactions = [];
-          }
-          this.saveState(parsed);
           this.getPartnerAuthToken();
         }
       }
