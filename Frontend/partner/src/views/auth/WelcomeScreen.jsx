@@ -94,7 +94,7 @@ export const WelcomeScreen = ({ onGetStarted, onLogin }) => {
 
       {/* Footer Info & Legal */}
       <div className="text-center pt-6 text-xs text-slate-500 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <p>© 2026 ApexServices Technologies Private Limited. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} {brandName || 'ApexServices'} Technologies Private Limited. All rights reserved.</p>
         <div className="flex items-center gap-4">
           <a href="#terms" className="hover:text-slate-900 transition-colors">Terms of Service</a>
           <span>•</span>

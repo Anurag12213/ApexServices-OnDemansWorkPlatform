@@ -62,17 +62,40 @@ export const PartnerProvider = ({ children }) => {
       'https://apexservices-backend.onrender.com/api'
     ).replace(/\/+$/, '');
 
-    fetch(`${apiUrl}/data`)
-      .then(res => res.json())
-      .then(d => {
-        if (d?.siteBranding?.brandName) {
-          setBrandName(d.siteBranding.brandName);
-          try {
-            localStorage.setItem('apex_custom_branding', JSON.stringify(d.siteBranding));
-          } catch {}
-        }
-      })
-      .catch(() => {});
+    const fetchBranding = () => {
+      fetch(`${apiUrl}/data`, { cache: 'no-store' })
+        .then(res => res.json())
+        .then(d => {
+          const name = d?.siteBranding?.brandName || d?.publicConfig?.brandName;
+          if (name) {
+            setBrandName(name);
+            try {
+              localStorage.setItem('apex_custom_branding', JSON.stringify(d.siteBranding || { brandName: name }));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchBranding();
+
+    const handleFocus = () => fetchBranding();
+    const handleStorage = (e) => {
+      if (e.key === 'apex_custom_branding' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (parsed.brandName) setBrandName(parsed.brandName);
+        } catch {}
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   // Update browser tab title dynamically
@@ -100,12 +123,25 @@ export const PartnerProvider = ({ children }) => {
         const data = event.data;
         if (!data) return;
 
-        if (data.type === 'BRANDING_UPDATED') {
+        if (data.type === 'BRANDING_UPDATED' || data.type === 'DATA_UPDATED') {
           if (data.brandName) {
             setBrandName(data.brandName);
             try {
               localStorage.setItem('apex_custom_branding', JSON.stringify(data.siteBranding || { brandName: data.brandName }));
             } catch {}
+          } else {
+            const apiUrl = (
+              (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
+              (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+              'https://apexservices-backend.onrender.com/api'
+            ).replace(/\/+$/, '');
+            fetch(`${apiUrl}/data`, { cache: 'no-store' })
+              .then(res => res.json())
+              .then(d => {
+                const name = d?.siteBranding?.brandName || d?.publicConfig?.brandName;
+                if (name) setBrandName(name);
+              })
+              .catch(() => {});
           }
           return;
         }

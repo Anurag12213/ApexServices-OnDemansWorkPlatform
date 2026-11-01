@@ -6,7 +6,8 @@ import { isSqlSafe, isXssSafe, formatEmail, formatPhone, validateEmail, validate
 import { useToast } from '../components/Toast';
 import { API_BASE_URL } from '../utils/api';
 
-export default function AdminLoginPage({ onLogin }) {
+export default function AdminLoginPage({ onLogin, brandName = 'ApexServices' }) {
+  const displayBrand = brandName || 'ApexServices';
   const { toast } = useToast();
   const [loginTab, setLoginTab] = useState('email');
   const [username, setUsername] = useState('admin@apexservices.com');
@@ -91,7 +92,7 @@ export default function AdminLoginPage({ onLogin }) {
           <div className="flex-1 flex flex-col justify-between pr-0 md:pr-4">
             <div>
               <div className="mb-6">
-                <ApexLogo portal="admin" />
+                <ApexLogo portal="admin" brandName={displayBrand} />
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-black text-slate-900 leading-tight tracking-tight">
@@ -319,7 +320,7 @@ export default function AdminLoginPage({ onLogin }) {
       </div>
 
       <div className="text-center text-xs text-slate-400 py-3">
-        Apex Services &copy; {new Date().getFullYear()} • Platform Operations Console
+        {displayBrand} &copy; {new Date().getFullYear()} • Platform Operations Console
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import DashboardSection from './components/DashboardSection';
@@ -25,10 +25,70 @@ import ForceUpdateVersionControlSection from './components/ForceUpdateVersionCon
 import { ToastProvider } from './components/Toast';
 import { ConfirmDialogProvider } from './components/ConfirmDialog';
 import AdminLoginPage from './pages/AdminLoginPage';
+import { API_BASE_URL } from './utils/api';
 
 function AdminDashboardApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [brandName, setBrandName] = useState(() => {
+    try {
+      const cached = localStorage.getItem('apex_custom_branding');
+      return cached ? JSON.parse(cached).brandName || 'ApexServices' : 'ApexServices';
+    } catch {
+      return 'ApexServices';
+    }
+  });
+
+  // Sync brandName from backend API and listen to updates
+  useEffect(() => {
+    const fetchBranding = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          const name = data?.siteBranding?.brandName || data?.publicConfig?.brandName;
+          if (name) {
+            setBrandName(name);
+            try {
+              localStorage.setItem('apex_custom_branding', JSON.stringify(data.siteBranding || { brandName: name }));
+            } catch {}
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load branding in admin:', e);
+      }
+    };
+
+    fetchBranding();
+
+    // Cross-tab real-time sync via BroadcastChannel
+    let ch;
+    try {
+      ch = new BroadcastChannel('apex_services_sync');
+      ch.onmessage = (event) => {
+        if (event.data?.type === 'BRANDING_UPDATED' || event.data?.type === 'DATA_UPDATED') {
+          if (event.data?.brandName) {
+            setBrandName(event.data.brandName);
+          } else {
+            fetchBranding();
+          }
+        }
+      };
+    } catch (e) {}
+
+    const handleFocus = () => fetchBranding();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      try { ch?.close(); } catch {}
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Update document title dynamically
+  useEffect(() => {
+    document.title = `${brandName} Admin Panel`;
+  }, [brandName]);
 
   // Protected Admin Authentication State
   const [adminSession, setAdminSession] = useState(() => {
@@ -42,7 +102,7 @@ function AdminDashboardApp() {
 
   const handleLogout = () => {
     if (adminSession?.token) {
-      fetch('http://localhost:8080/api/auth/logout', {
+      fetch(`${API_BASE_URL}/auth/logout`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${adminSession.token}` }
       }).catch(err => console.warn('Admin logout server notification failed', err));
@@ -53,7 +113,7 @@ function AdminDashboardApp() {
 
   // If not authenticated, require Admin Login
   if (!adminSession) {
-    return <AdminLoginPage onLogin={(data) => setAdminSession(data)} />;
+    return <AdminLoginPage onLogin={(data) => setAdminSession(data)} brandName={brandName} />;
   }
 
   // Explicit, unmerged rendering for each of the 16 Founder's Admin Panel modules
@@ -146,6 +206,7 @@ function AdminDashboardApp() {
         sidebarCollapsed={sidebarCollapsed}
         setSidebarCollapsed={setSidebarCollapsed}
         onLogout={handleLogout}
+        brandName={brandName}
       />
 
       {/* Main Content Area */}

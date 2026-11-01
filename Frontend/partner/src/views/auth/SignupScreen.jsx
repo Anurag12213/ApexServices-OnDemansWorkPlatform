@@ -4,7 +4,7 @@ import { Eye, EyeOff, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
 import ApexLogo from '../../components/common/ApexLogo';
 
 export const SignupScreen = ({ accountType = 'INDIVIDUAL', onBack, onComplete }) => {
-  const { register } = usePartner();
+  const { register, brandName } = usePartner();
 
   const isOrg = accountType === 'ORGANIZATION';
 
@@ -109,7 +109,7 @@ export const SignupScreen = ({ accountType = 'INDIVIDUAL', onBack, onComplete })
         
         {/* Header */}
         <div className="mb-6 flex justify-between items-center">
-          <ApexLogo portal="partner" />
+          <ApexLogo portal="partner" brandName={brandName} />
           <button
             type="button"
             onClick={onBack}

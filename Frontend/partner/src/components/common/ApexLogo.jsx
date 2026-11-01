@@ -1,6 +1,15 @@
 import React from 'react';
 
-export const ApexLogo = ({ portal = 'partner', className = '' }) => {
+export const ApexLogo = ({ portal = 'partner', className = '', brandName }) => {
+  const resolvedBrand = brandName || (() => {
+    try {
+      const cached = localStorage.getItem('apex_custom_branding');
+      return cached ? JSON.parse(cached).brandName || 'ApexServices' : 'ApexServices';
+    } catch {
+      return 'ApexServices';
+    }
+  })();
+
   const colorMap = {
     customer: {
       primary: '#2563EB',
@@ -40,10 +49,7 @@ export const ApexLogo = ({ portal = 'partner', className = '' }) => {
 
         <div className="flex flex-col leading-none">
           <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 font-sans">
-            APEX
-          </span>
-          <span className="text-[10px] sm:text-[11px] font-bold tracking-[0.22em] text-slate-600 uppercase">
-            SERVICES
+            {resolvedBrand}
           </span>
         </div>
       </div>

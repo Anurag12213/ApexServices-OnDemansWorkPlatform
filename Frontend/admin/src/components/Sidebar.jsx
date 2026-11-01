@@ -22,7 +22,10 @@ import {
   X
 } from 'lucide-react';
 
-export default function Sidebar({ activeTab, setActiveTab, sidebarCollapsed, setSidebarCollapsed, onLogout }) {
+export default function Sidebar({ activeTab, setActiveTab, sidebarCollapsed, setSidebarCollapsed, onLogout, brandName = 'ApexServices' }) {
+  const displayBrand = brandName || 'ApexServices';
+  const initialChar = displayBrand.charAt(0).toUpperCase();
+
   // All 16 modules in strict sequence with zero numbers
   const navigationItems = [
     { id: 'users', label: 'User Management', icon: Users },
@@ -54,14 +57,14 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarCollapsed, set
       <div className="h-16 px-5 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-xs flex-shrink-0">
-            A
+            {initialChar}
           </div>
           {!sidebarCollapsed && (
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-slate-900 tracking-tight text-base">
-                ApexServices
+              <span className="font-extrabold text-slate-900 tracking-tight text-base truncate max-w-[140px]">
+                {displayBrand}
               </span>
-              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">
+              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 shrink-0">
                 Admin
               </span>
             </div>

@@ -6,7 +6,7 @@ import GoogleButton from '../../components/common/GoogleButton';
 import { isSqlSafe, isXssSafe, formatEmail, formatPhone, validateEmail, validatePhone } from '../../utils/inputValidator';
 
 export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
-  const { login, setActiveTab } = usePartner();
+  const { login, setActiveTab, brandName } = usePartner();
 
   const [loginTab, setLoginTab] = useState('email');
   const [email, setEmail] = useState('partner@apexservices.com');
@@ -117,7 +117,7 @@ export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
         <div className="flex-1 flex flex-col justify-between pr-0 md:pr-4">
           <div>
             <div className="mb-6">
-              <ApexLogo portal="partner" />
+              <ApexLogo portal="partner" brandName={brandName} />
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-black text-slate-900 leading-tight tracking-tight">
