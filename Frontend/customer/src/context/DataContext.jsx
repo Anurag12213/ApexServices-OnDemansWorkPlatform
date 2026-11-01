@@ -26,7 +26,20 @@ const initialBookingDraft = {
 };
 
 export const DataProvider = ({ children }) => {
-  const [data, setData] = useState(initialData);
+  const [data, setData] = useState(() => {
+    try {
+      const cached = localStorage.getItem('apex_cached_presentation_data');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.heroSlides) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to read cached presentation data:', e);
+    }
+    return initialData;
+  });
   const [activePage, setActivePage] = useState('home');
   const [loading, setLoading] = useState(true);
 
@@ -149,6 +162,11 @@ export const DataProvider = ({ children }) => {
         const result = await res.json();
         if (result && result.heroSlides) {
           setData(result);
+          try {
+            localStorage.setItem('apex_cached_presentation_data', JSON.stringify(result));
+          } catch (e) {
+            console.warn('Failed to cache presentation data:', e);
+          }
         }
       }
     } catch (err) {
