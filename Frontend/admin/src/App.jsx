@@ -144,6 +144,8 @@ function AdminDashboardApp() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}

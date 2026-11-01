@@ -80,9 +80,6 @@ export default function NotificationsSection() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-              Module 4 of 16
-            </span>
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Notifications & Broadcast Center</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
