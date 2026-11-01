@@ -108,16 +108,7 @@ export const Navbar = () => {
           <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             {customerUser ? (
               <div className="flex items-center space-x-2 sm:space-x-2.5">
-                {/* User Pill */}
-                <div className="hidden sm:flex items-center space-x-2 bg-slate-100 hover:bg-slate-200/80 px-2.5 sm:px-3 py-1.5 rounded-full border border-slate-200 transition-colors shrink-0">
-                  <div className="w-5 h-5 rounded-full bg-[#0A2540] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                    {customerUser.fullName?.charAt(0) || 'U'}
-                  </div>
-                  <span className="text-xs font-bold text-slate-800 max-w-[90px] md:max-w-[120px] truncate">
-                    {customerUser.fullName}
-                  </span>
-                </div>
-                
+
                 {/* My Requests (Desktop >= 1024px) */}
                 <button
                   onClick={() => handleViewAllRequests(hasLiveRequest ? 'live' : 'history')}
