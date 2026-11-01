@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ToggleLeft,
   ToggleRight,
@@ -10,12 +10,16 @@ import {
   CheckCircle2,
   RefreshCw,
   AlertTriangle,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
+import { adminFetch } from '../utils/api';
 
 export default function FeatureFlagsConfigSection() {
   const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // App Configurations & Numerical Parameters
   const [configs, setConfigs] = useState({
@@ -75,6 +79,26 @@ export default function FeatureFlagsConfigSection() {
     }
   });
 
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const res = await adminFetch('/admin/feature-flags');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.configs) setConfigs(data.configs);
+        if (data.flags) setFlags(data.flags);
+      }
+    } catch (err) {
+      console.warn('Could not fetch feature flags from backend:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const handleToggleFlag = (key) => {
     setFlags((prev) => ({
       ...prev,
@@ -83,14 +107,29 @@ export default function FeatureFlagsConfigSection() {
         enabled: !prev[key].enabled
       }
     }));
-    toast.info(`Toggled "${flags[key].name}" to ${!flags[key].enabled ? 'ON' : 'OFF'}`);
+    toast.info(`Toggled "${flags[key]?.name || key}" to ${!flags[key]?.enabled ? 'ON' : 'OFF'}`);
   };
 
-  const handleSaveConfigs = (e) => {
-    e.preventDefault();
-    localStorage.setItem('apex_app_configs', JSON.stringify(configs));
-    localStorage.setItem('apex_feature_flags', JSON.stringify(flags));
-    toast.success('App configurations and feature flags synchronized across all client applications.', 'Settings Saved');
+  const handleSaveConfigs = async (e) => {
+    if (e) e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await adminFetch('/admin/feature-flags', {
+        method: 'PUT',
+        body: JSON.stringify({ configs, flags })
+      });
+      if (res.ok) {
+        toast.success('App configurations and feature flags synchronized across all client applications.', 'Settings Saved');
+      } else {
+        toast.warning('Updated locally, server returned non-200 status.');
+      }
+    } catch (err) {
+      toast.error('Network error updating backend flags.');
+    } finally {
+      localStorage.setItem('apex_app_configs', JSON.stringify(configs));
+      localStorage.setItem('apex_feature_flags', JSON.stringify(flags));
+      setSaving(false);
+    }
   };
 
   return (
@@ -109,13 +148,25 @@ export default function FeatureFlagsConfigSection() {
           </p>
         </div>
 
-        <button
-          onClick={handleSaveConfigs}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-        >
-          <Save className="w-4 h-4" />
-          <span>Save Changes to Production</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Reload from database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <button
+            onClick={handleSaveConfigs}
+            disabled={saving}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{saving ? 'Saving...' : 'Save Changes to Production'}</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

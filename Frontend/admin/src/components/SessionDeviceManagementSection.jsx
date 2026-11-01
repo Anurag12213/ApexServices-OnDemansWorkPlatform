@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
   Laptop,
@@ -12,90 +12,42 @@ import {
   Clock,
   MapPin,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
+import { adminFetch } from '../utils/api';
 
 export default function SessionDeviceManagementSection() {
   const toast = useToast();
   const confirm = useConfirm();
 
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
+  const [sessions, setSessions] = useState([]);
 
-  const [sessions, setSessions] = useState([
-    {
-      id: 'SES-9901',
-      user: 'Anurag Founder',
-      email: 'anurag@apexservices.com',
-      role: 'ADMIN',
-      device: 'MacBook Pro 16" (macOS 15.1)',
-      browser: 'Chrome 130.0',
-      ip: '103.21.244.18',
-      location: 'New Delhi, India',
-      deviceType: 'DESKTOP',
-      lastActive: 'Active Now',
-      isCurrent: true,
-      createdAt: 'Oct 31, 2026, 09:12 AM'
-    },
-    {
-      id: 'SES-9902',
-      user: 'Sarah Jenkins',
-      email: 'sarah.jenkins@apexservices.com',
-      role: 'ADMIN',
-      device: 'ThinkPad X1 Carbon (Windows 11)',
-      browser: 'Edge 129.0',
-      ip: '49.36.18.22',
-      location: 'Gurugram, India',
-      deviceType: 'DESKTOP',
-      lastActive: '8 mins ago',
-      isCurrent: false,
-      createdAt: 'Nov 01, 2026, 08:00 AM'
-    },
-    {
-      id: 'SES-9903',
-      user: 'Rajesh Sharma',
-      email: 'rajesh.partner@apexservices.com',
-      role: 'PARTNER',
-      device: 'Samsung Galaxy S24 Ultra (Android 15)',
-      browser: 'ApexServices Partner App v1.4.2',
-      ip: '115.99.201.44',
-      location: 'Noida, Sector 62',
-      deviceType: 'MOBILE',
-      lastActive: '2 mins ago (Live GPS Broadcast)',
-      isCurrent: false,
-      createdAt: 'Oct 29, 2026, 07:45 AM'
-    },
-    {
-      id: 'SES-9904',
-      user: 'Priya Sharma',
-      email: 'priya.sharma@gmail.com',
-      role: 'CUSTOMER',
-      device: 'iPhone 15 Pro (iOS 18.1)',
-      browser: 'Mobile Safari',
-      ip: '103.44.11.89',
-      location: 'Bengaluru, India',
-      deviceType: 'MOBILE',
-      lastActive: '45 mins ago',
-      isCurrent: false,
-      createdAt: 'Nov 01, 2026, 11:30 AM'
-    },
-    {
-      id: 'SES-9905',
-      user: 'Suspicious Bot Account',
-      email: 'crawler_check@tempmail.io',
-      role: 'CUSTOMER',
-      device: 'Headless Linux (Ubuntu 22.04)',
-      browser: 'Python Requests / Scraper',
-      ip: '185.220.101.5',
-      location: 'Frankfurt, Germany (Tor Exit Node)',
-      deviceType: 'DESKTOP',
-      lastActive: '3 hours ago',
-      isCurrent: false,
-      createdAt: 'Nov 01, 2026, 04:10 AM'
+  const loadSessions = async () => {
+    setLoading(true);
+    try {
+      const res = await adminFetch('/admin/sessions');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setSessions(data);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load sessions:', err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
 
   const filteredSessions = sessions.filter((s) => {
     const matchesSearch =
@@ -123,6 +75,11 @@ export default function SessionDeviceManagementSection() {
     });
 
     if (confirmed) {
+      try {
+        await adminFetch(`/admin/sessions/${session.id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.warn('Failed to revoke session on backend:', err);
+      }
       setSessions((prev) => prev.filter((s) => s.id !== session.id));
       toast.success(`Session for ${session.user} (${session.ip}) revoked immediately.`, 'Session Terminated');
     }
@@ -137,6 +94,12 @@ export default function SessionDeviceManagementSection() {
     });
 
     if (confirmed) {
+      const targets = sessions.filter((s) => s.email === email && !s.isCurrent);
+      for (const t of targets) {
+        try {
+          await adminFetch(`/admin/sessions/${t.id}`, { method: 'DELETE' });
+        } catch (e) {}
+      }
       setSessions((prev) => prev.filter((s) => s.email !== email || s.isCurrent));
       toast.success(`All external sessions for ${email} terminated.`);
     }
@@ -160,6 +123,15 @@ export default function SessionDeviceManagementSection() {
 
         {/* Security Overview Card */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={loadSessions}
+            disabled={loading}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Reload live active sessions"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
           <div className="bg-white px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs shadow-xs">
             <span className="text-slate-400 block text-[10px] font-bold uppercase">Active Sessions</span>
             <span className="font-extrabold text-slate-900">{sessions.length} Live Logins</span>

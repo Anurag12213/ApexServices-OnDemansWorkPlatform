@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Smartphone,
   Globe,
@@ -11,12 +11,17 @@ import {
   FileCode,
   Info,
   Layers,
-  Sparkles
+  Sparkles,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
+import { adminFetch } from '../utils/api';
 
 export default function ForceUpdateVersionControlSection() {
   const toast = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [platforms, setPlatforms] = useState({
     customer_web: {
@@ -83,6 +88,27 @@ export default function ForceUpdateVersionControlSection() {
     }
   ]);
 
+  const loadVersions = async () => {
+    setLoading(true);
+    try {
+      const res = await adminFetch('/admin/version-control');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && Object.keys(data).length > 0) {
+          setPlatforms((prev) => ({ ...prev, ...data }));
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load version control:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadVersions();
+  }, []);
+
   const handleToggleForceUpdate = (platformKey) => {
     setPlatforms((prev) => ({
       ...prev,
@@ -105,10 +131,25 @@ export default function ForceUpdateVersionControlSection() {
     toast.warning(`Maintenance mode ${!platforms[platformKey].maintenanceMode ? 'ACTIVATED' : 'DEACTIVATED'} on ${platforms[platformKey].name}`);
   };
 
-  const handleSaveVersions = (e) => {
-    e.preventDefault();
-    localStorage.setItem('apex_version_control', JSON.stringify(platforms));
-    toast.success('App version policies and update gates deployed globally.', 'Version Control Synchronized');
+  const handleSaveVersions = async (e) => {
+    if (e) e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await adminFetch('/admin/version-control', {
+        method: 'PUT',
+        body: JSON.stringify(platforms)
+      });
+      if (res.ok) {
+        toast.success('App version policies and update gates deployed globally.', 'Version Control Synchronized');
+      } else {
+        toast.warning('Saved locally, server returned non-200 status.');
+      }
+    } catch (err) {
+      toast.error('Network error saving version control.');
+    } finally {
+      localStorage.setItem('apex_version_control', JSON.stringify(platforms));
+      setSaving(false);
+    }
   };
 
   return (
@@ -127,13 +168,25 @@ export default function ForceUpdateVersionControlSection() {
           </p>
         </div>
 
-        <button
-          onClick={handleSaveVersions}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-        >
-          <Save className="w-4 h-4" />
-          <span>Publish Version Rules</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadVersions}
+            disabled={loading}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Reload from database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <button
+            onClick={handleSaveVersions}
+            disabled={saving}
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{saving ? 'Publishing...' : 'Publish Version Rules'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Platform Version Gates Grid */}

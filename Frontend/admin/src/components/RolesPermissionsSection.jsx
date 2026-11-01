@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Shield,
   ShieldCheck,
@@ -12,15 +12,21 @@ import {
   UserPlus,
   Info,
   CheckCircle2,
-  Sliders
+  Sliders,
+  RefreshCw,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
+import { adminFetch } from '../utils/api';
 
 export default function RolesPermissionsSection() {
   const toast = useToast();
   const confirm = useConfirm();
 
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeRole, setActiveRole] = useState('OPERATIONS_MANAGER');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', email: '', role: 'OPERATIONS_MANAGER' });
@@ -162,6 +168,58 @@ export default function RolesPermissionsSection() {
     { id: 'ADM-05', name: 'Karan Singhal', email: 'karan.support@apexservices.com', roleId: 'SUPPORT_AGENT', lastActive: '2h ago' }
   ]);
 
+  const loadRoles = async () => {
+    setLoading(true);
+    try {
+      const res = await adminFetch('/admin/roles');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.roles) && data.roles.length > 0) {
+          // Merge permissions if any missing
+          setRoles((prev) =>
+            data.roles.map((r) => {
+              const local = prev.find((p) => p.id === r.id);
+              return {
+                ...r,
+                permissions: r.permissions || (local ? local.permissions : {})
+              };
+            })
+          );
+        }
+        if (Array.isArray(data.team) && data.team.length > 0) {
+          setTeamMembers(data.team);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load roles from backend:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
+  const saveRoles = async () => {
+    setSaving(true);
+    try {
+      const res = await adminFetch('/admin/roles', {
+        method: 'PUT',
+        body: JSON.stringify({ roles, team: teamMembers })
+      });
+      if (res.ok) {
+        toast.success('Role permissions matrix saved and enforced across all admin accounts.', 'RBAC Updated');
+      } else {
+        toast.warning('Updated locally, server returned non-200 status.');
+      }
+    } catch (err) {
+      toast.error('Network error updating roles.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const permissionLabels = {
     view_analytics: { name: 'View Live Business Analytics', category: 'Analytics' },
     manage_bookings: { name: 'Inspect & Manage Order Dispatch', category: 'Operations' },
@@ -196,39 +254,73 @@ export default function RolesPermissionsSection() {
           ...r,
           permissions: {
             ...r.permissions,
-            [permKey]: !r.permissions[permKey]
+            [permKey]: !r.permissions?.[permKey]
           }
         };
       })
     );
-    toast.success(`Updated ${permissionLabels[permKey]?.name} permission`);
+    toast.info(`Toggled ${permissionLabels[permKey]?.name || permKey} permission`);
   };
 
-  const handleInviteStaff = (e) => {
+  const handleInviteStaff = async (e) => {
     e.preventDefault();
     if (!newStaff.name || !newStaff.email) {
       toast.error('Please enter name and company email.');
       return;
     }
 
-    const newMember = {
-      id: `ADM-0${teamMembers.length + 1}`,
-      name: newStaff.name,
-      email: newStaff.email,
-      roleId: newStaff.role,
-      lastActive: 'Invitation Sent'
-    };
+    try {
+      const res = await adminFetch('/admin/roles/team', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newStaff.name,
+          email: newStaff.email,
+          roleId: newStaff.role
+        })
+      });
+      if (res.ok) {
+        const added = await res.json();
+        setTeamMembers((prev) => [...prev, added]);
+      } else {
+        const fallback = {
+          id: `ADM-0${teamMembers.length + 1}`,
+          name: newStaff.name,
+          email: newStaff.email,
+          roleId: newStaff.role,
+          lastActive: 'Invitation Sent'
+        };
+        setTeamMembers((prev) => [...prev, fallback]);
+      }
+    } catch {
+      const fallback = {
+        id: `ADM-0${teamMembers.length + 1}`,
+        name: newStaff.name,
+        email: newStaff.email,
+        roleId: newStaff.role,
+        lastActive: 'Invitation Sent'
+      };
+      setTeamMembers((prev) => [...prev, fallback]);
+    }
 
-    setTeamMembers((prev) => [...prev, newMember]);
     setRoles((prev) =>
       prev.map((r) =>
-        r.id === newStaff.role ? { ...r, memberCount: r.memberCount + 1 } : r
+        r.id === newStaff.role ? { ...r, memberCount: (r.memberCount || 0) + 1 } : r
       )
     );
 
     toast.success(`Invitation dispatched to ${newStaff.email}`, 'Team Member Added');
     setShowInviteModal(false);
     setNewStaff({ name: '', email: '', role: 'OPERATIONS_MANAGER' });
+  };
+
+  const handleRemoveStaff = async (id) => {
+    try {
+      await adminFetch(`/admin/roles/team/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Remove staff error:', err);
+    }
+    setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+    toast.info(`Staff member ${id} removed`);
   };
 
   return (
@@ -247,13 +339,32 @@ export default function RolesPermissionsSection() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowInviteModal(true)}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Invite Admin Team Member</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadRoles}
+            disabled={loading}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Reload roles matrix"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <button
+            onClick={saveRoles}
+            disabled={saving}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <span>{saving ? 'Saving...' : 'Save RBAC Policy'}</span>
+          </button>
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Invite Staff</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -301,7 +412,18 @@ export default function RolesPermissionsSection() {
                       <p className="font-bold text-slate-900">{m.name}</p>
                       <p className="text-[11px] text-slate-500">{m.email}</p>
                     </div>
-                    <span className="text-[10px] text-slate-400 font-mono">{m.lastActive}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-slate-400 font-mono">{m.lastActive}</span>
+                      {m.id !== 'ADM-01' && (
+                        <button
+                          onClick={() => handleRemoveStaff(m.id)}
+                          className="text-slate-400 hover:text-red-600 transition p-1"
+                          title="Remove team member"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
             </div>

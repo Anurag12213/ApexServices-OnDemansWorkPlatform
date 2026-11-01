@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShieldAlert,
   Star,
@@ -13,91 +13,78 @@ import {
   Wrench,
   AlertTriangle,
   Flag,
-  Trash2
+  Trash2,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
+import { adminFetch } from '../utils/api';
 
 export default function ContentModerationSection() {
   const toast = useToast();
   const confirm = useConfirm();
 
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('REVIEWS'); // REVIEWS or JOB_PHOTOS
   const [filterStatus, setFilterStatus] = useState('FLAGGED'); // FLAGGED, PENDING, APPROVED, REJECTED
   const [searchTerm, setSearchTerm] = useState('');
 
   // Customer Reviews Moderation Queue
-  const [reviews, setReviews] = useState([
-    {
-      id: 'REV-401',
-      customerName: 'Kunal Kapoor',
-      rating: 1,
-      serviceName: 'Emergency Plumbing',
-      technicianName: 'Vikram Singh (PRT-103)',
-      comment: 'Terrible attitude. Left tools behind and charged extra cash unprofessionally.',
-      status: 'FLAGGED',
-      flagReason: 'Partner flagged: Allegation of cash extortion without evidence',
-      timestamp: '2 hours ago',
-      orderId: 'ORD-8941'
-    },
-    {
-      id: 'REV-402',
-      customerName: 'Meenakshi Sundaram',
-      rating: 5,
-      serviceName: 'Deep Home Cleaning',
-      technicianName: 'Vikram Singh (PRT-102)',
-      comment: 'Exceptional perfection! Whole villa looks brand new. Very respectful team.',
-      status: 'APPROVED',
-      flagReason: null,
-      timestamp: 'Yesterday',
-      orderId: 'ORD-8910'
-    },
-    {
-      id: 'REV-403',
-      customerName: 'Anonymous Homeowner',
-      rating: 1,
-      serviceName: 'Electrical Maintenance',
-      technicianName: 'Ramesh Patel (PRT-104)',
-      comment: 'Call 9811223344 for cheap direct service without platform commission scam.',
-      status: 'FLAGGED',
-      flagReason: 'Automated filter: External contact phone number solicitation',
-      timestamp: 'Oct 30, 2026',
-      orderId: 'ORD-8876'
-    }
-  ]);
-
+  const [reviews, setReviews] = useState([]);
   // Partner Job Completion Proof Photos
-  const [proofPhotos, setProofPhotos] = useState([
-    {
-      id: 'PRF-701',
-      technicianName: 'Rajesh Sharma',
-      serviceName: 'Custom Carpentry & Shelf Fitting',
-      orderId: 'ORD-9018',
-      beforePhoto: 'https://images.unsplash.com/photo-1581783342308-f792dbdd27c5?auto=format&fit=crop&w=400&q=80',
-      afterPhoto: 'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=400&q=80',
-      status: 'PENDING',
-      timestamp: '3 hours ago'
-    },
-    {
-      id: 'PRF-702',
-      technicianName: 'Anil Kumar',
-      serviceName: 'AC Jet Wash Deep Service',
-      orderId: 'ORD-9024',
-      beforePhoto: 'https://images.unsplash.com/photo-1621905251918-48416bd8575a?auto=format&fit=crop&w=400&q=80',
-      afterPhoto: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=400&q=80',
-      status: 'APPROVED',
-      timestamp: 'Oct 31, 2026'
-    }
-  ]);
+  const [proofPhotos, setProofPhotos] = useState([]);
 
-  const handleReviewAction = (id, newStatus) => {
+  const loadModerationData = async () => {
+    setLoading(true);
+    try {
+      const [resRev, resPrf] = await Promise.all([
+        adminFetch('/admin/moderation/reviews'),
+        adminFetch('/admin/moderation/proofs')
+      ]);
+      if (resRev.ok) {
+        const revData = await resRev.json();
+        if (Array.isArray(revData)) setReviews(revData);
+      }
+      if (resPrf.ok) {
+        const prfData = await resPrf.json();
+        if (Array.isArray(prfData)) setProofPhotos(prfData);
+      }
+    } catch (err) {
+      console.warn('Could not load moderation items:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadModerationData();
+  }, []);
+
+  const handleReviewAction = async (id, newStatus) => {
+    try {
+      await adminFetch(`/admin/moderation/reviews/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (err) {
+      console.warn('Backend update error:', err);
+    }
     setReviews((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
     );
     toast.success(`Review ${id} marked as ${newStatus}`, 'Moderation Action Taken');
   };
 
-  const handlePhotoAction = (id, newStatus) => {
+  const handlePhotoAction = async (id, newStatus) => {
+    try {
+      await adminFetch(`/admin/moderation/proofs/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus })
+      });
+    } catch (err) {
+      console.warn('Backend photo update error:', err);
+    }
     setProofPhotos((prev) =>
       prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p))
     );
@@ -130,30 +117,41 @@ export default function ContentModerationSection() {
           </p>
         </div>
 
-        {/* Quick Tabs */}
-        <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setActiveTab('REVIEWS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'REVIEWS'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            onClick={loadModerationData}
+            disabled={loading}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Reload moderation queues"
           >
-            <MessageSquare className="w-3.5 h-3.5" />
-            <span>Customer Reviews ({reviews.filter((r) => r.status === 'FLAGGED').length} Flagged)</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
           </button>
-          <button
-            onClick={() => setActiveTab('JOB_PHOTOS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'JOB_PHOTOS'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ImageIcon className="w-3.5 h-3.5" />
-            <span>Job Proof Photos ({proofPhotos.filter((p) => p.status === 'PENDING').length} Pending)</span>
-          </button>
+          {/* Quick Tabs */}
+          <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-xs">
+            <button
+              onClick={() => setActiveTab('REVIEWS')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'REVIEWS'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Customer Reviews ({reviews.filter((r) => r.status === 'FLAGGED').length} Flagged)</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('JOB_PHOTOS')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                activeTab === 'JOB_PHOTOS'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>Job Proof Photos ({proofPhotos.filter((p) => p.status === 'PENDING').length} Pending)</span>
+            </button>
+          </div>
         </div>
       </div>
 

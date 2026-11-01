@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   Clock,
@@ -17,15 +17,20 @@ import {
   ShieldAlert,
   ArrowUpDown,
   Phone,
-  FileText
+  FileText,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
+import { adminFetch } from '../utils/api';
 
 export default function OrderBookingManagementSection() {
   const toast = useToast();
   const confirm = useConfirm();
 
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedBooking, setSelectedBooking] = useState(null);
@@ -33,182 +38,115 @@ export default function OrderBookingManagementSection() {
   const [newStatus, setNewStatus] = useState('IN_PROGRESS');
   const [overrideReason, setOverrideReason] = useState('');
 
-  // 16 Modules Guide: Order issues — stuck status, customer dispute, manual override, reassign technician
-  const [bookings, setBookings] = useState([
-    {
-      id: 'ORD-9021',
-      customer: 'Priya Sharma',
-      phone: '+91 98765 43210',
-      address: 'Sector 45, Gurugram, Haryana',
-      category: 'Deep Home Cleaning',
-      technician: 'Vikram Singh (PRT-102)',
-      amount: 1499,
-      status: 'IN_PROGRESS',
-      paymentStatus: 'PAID',
-      scheduledDate: 'Nov 01, 2026',
-      scheduledTime: '02:00 PM - 04:00 PM',
-      hasDispute: false,
-      disputeReason: '',
-      notes: 'Customer requested eco-friendly cleaning detergents.',
-      timeline: [
-        { time: '11:00 AM', text: 'Booking placed and online advance confirmed.' },
-        { time: '11:15 AM', text: 'Auto-dispatched to Vikram Singh.' },
-        { time: '01:50 PM', text: 'Technician checked in at customer location.' }
-      ]
-    },
-    {
-      id: 'ORD-9022',
-      customer: 'Amit Verma',
-      phone: '+91 98112 34567',
-      address: 'Indiranagar 100ft Rd, Bengaluru',
-      category: 'Emergency Plumbing',
-      technician: 'Unassigned',
-      amount: 699,
-      status: 'PENDING_DISPATCH',
-      paymentStatus: 'PAID',
-      scheduledDate: 'Nov 01, 2026',
-      scheduledTime: 'Immediate (Emergency 45m)',
-      hasDispute: false,
-      disputeReason: '',
-      notes: 'Main bathroom pipeline leak, water pressure low.',
-      timeline: [
-        { time: '01:45 PM', text: 'Emergency ticket received. Searching nearby active fleet.' }
-      ]
-    },
-    {
-      id: 'ORD-9023',
-      customer: 'Sneha Patel',
-      phone: '+91 99001 22334',
-      address: 'Koregaon Park, Pune',
-      category: 'Electrical Maintenance',
-      technician: 'Ramesh Patel (PRT-104)',
-      amount: 849,
-      status: 'DISPUTED',
-      paymentStatus: 'HELD_IN_ESCROW',
-      scheduledDate: 'Oct 31, 2026',
-      scheduledTime: '04:30 PM',
-      hasDispute: true,
-      disputeReason: 'Customer reported MCB tripping issue returned after 2 hours.',
-      notes: 'Customer opened dispute #DISP-402 requesting warranty revisit or refund.',
-      timeline: [
-        { time: 'Oct 31, 04:30 PM', text: 'Service marked completed by technician.' },
-        { time: 'Oct 31, 07:15 PM', text: 'Dispute raised by customer for unresolved tripping.' }
-      ]
-    },
-    {
-      id: 'ORD-9024',
-      customer: 'Rahul Khanna',
-      phone: '+91 98223 99887',
-      address: 'Bandra West, Mumbai',
-      category: 'AC Jet Wash & Repair',
-      technician: 'Anil Kumar (PRT-108)',
-      amount: 1199,
-      status: 'COMPLETED',
-      paymentStatus: 'PAID',
-      scheduledDate: 'Oct 31, 2026',
-      scheduledTime: '11:00 AM',
-      hasDispute: false,
-      disputeReason: '',
-      notes: 'Customer rated 5.0 stars. Prompt service.',
-      timeline: [
-        { time: 'Oct 31, 10:45 AM', text: 'Technician reached premise.' },
-        { time: 'Oct 31, 11:55 AM', text: 'Completed. Verification OTP: 8841 confirmed.' },
-        { time: 'Oct 31, 12:00 PM', text: 'Technician payout credited to wallet.' }
-      ]
-    },
-    {
-      id: 'ORD-9025',
-      customer: 'Kavita Sundaram',
-      phone: '+91 97400 11223',
-      address: 'T. Nagar, Chennai',
-      category: 'Custom Carpentry',
-      technician: 'Sunil Rao (PRT-110)',
-      amount: 2200,
-      status: 'CANCELLED',
-      paymentStatus: 'REFUNDED',
-      scheduledDate: 'Oct 30, 2026',
-      scheduledTime: '03:00 PM',
-      hasDispute: false,
-      disputeReason: '',
-      notes: 'Customer cancelled prior to dispatch. 100% refund processed.',
-      timeline: [
-        { time: 'Oct 30, 09:00 AM', text: 'Customer cancelled via web portal.' },
-        { time: 'Oct 30, 09:05 AM', text: 'Automated full refund initiated to source UPI.' }
-      ]
+  const fetchBookings = async () => {
+    try {
+      setLoading(true);
+      const res = await adminFetch('/admin/bookings');
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.warn('Failed to load bookings from API:', e);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    fetchBookings();
+  }, []);
 
   const filteredBookings = bookings.filter((b) => {
     const matchesSearch =
-      b.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      b.technician.toLowerCase().includes(searchTerm.toLowerCase());
+      (b.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.customer || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.category || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.technician || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || b.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const handleManualOverride = () => {
+  const handleManualOverride = async () => {
     if (!selectedBooking) return;
     if (!overrideReason.trim()) {
       toast.error('Please enter a justification reason for manual status override.', 'Reason Required');
       return;
     }
 
-    setBookings((prev) =>
-      prev.map((b) =>
-        b.id === selectedBooking.id
-          ? {
-              ...b,
-              status: newStatus,
-              timeline: [
-                ...b.timeline,
-                {
-                  time: 'Just now (Admin Override)',
-                  text: `Status manually changed to ${newStatus}. Reason: ${overrideReason}`
-                }
-              ]
-            }
-          : b
-      )
-    );
+    try {
+      const res = await adminFetch(`/admin/bookings/${selectedBooking.id}/override`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus, reason: overrideReason })
+      });
 
-    toast.success(`Booking ${selectedBooking.id} status updated to ${newStatus}`, 'Override Applied');
-    setShowOverrideModal(false);
-    setSelectedBooking(null);
-    setOverrideReason('');
+      if (res.ok) {
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === selectedBooking.id
+              ? {
+                  ...b,
+                  status: newStatus,
+                  timeline: [
+                    ...(b.timeline || []),
+                    {
+                      time: 'Just now (Admin Override)',
+                      text: `Status manually changed to ${newStatus}. Reason: ${overrideReason}`
+                    }
+                  ]
+                }
+              : b
+          )
+        );
+
+        toast.success(`Booking ${selectedBooking.id} status updated to ${newStatus}`, 'Override Applied');
+        setShowOverrideModal(false);
+        setSelectedBooking(null);
+        setOverrideReason('');
+      } else {
+        toast.error('Failed to apply override to server.');
+      }
+    } catch (e) {
+      toast.error('Network connection error.');
+    }
   };
 
   const handleResolveDispute = async (booking, action) => {
     const confirmed = await confirm({
       title: `${action === 'REFUND' ? 'Refund Customer & Close Dispute' : 'Schedule Warranty Revisit'}?`,
-      message: `Are you sure you want to resolve dispute for ${booking.id}? This will update the escrow status.`,
+      message: `Are you sure you want to resolve dispute for ${booking.id}? This will update the escrow status in database.`,
       confirmText: action === 'REFUND' ? 'Issue Refund' : 'Assign Revisit',
       variant: action === 'REFUND' ? 'danger' : 'primary'
     });
 
     if (confirmed) {
-      setBookings((prev) =>
-        prev.map((b) =>
-          b.id === booking.id
-            ? {
-                ...b,
-                status: action === 'REFUND' ? 'REFUNDED' : 'IN_PROGRESS',
-                hasDispute: false,
-                paymentStatus: action === 'REFUND' ? 'REFUNDED' : 'PAID',
-                timeline: [
-                  ...b.timeline,
-                  {
-                    time: 'Just now',
-                    text: `Admin resolved dispute via: ${action === 'REFUND' ? 'Full customer refund' : 'Warranty technician revisit'}`
-                  }
-                ]
-              }
-            : b
-        )
-      );
-      toast.success(`Dispute on ${booking.id} resolved successfully!`, 'Dispute Resolved');
+      try {
+        await adminFetch(`/admin/bookings/${booking.id}/override`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: action === 'REFUND' ? 'REFUNDED' : 'IN_PROGRESS',
+            reason: action === 'REFUND' ? 'Admin dispute resolution: customer full refund' : 'Admin dispute resolution: warranty revisit'
+          })
+        });
+
+        setBookings((prev) =>
+          prev.map((b) =>
+            b.id === booking.id
+              ? {
+                  ...b,
+                  status: action === 'REFUND' ? 'REFUNDED' : 'IN_PROGRESS',
+                  hasDispute: false,
+                  paymentStatus: action === 'REFUND' ? 'REFUNDED' : 'PAID'
+                }
+              : b
+          )
+        );
+        toast.success(`Dispute on ${booking.id} resolved successfully!`, 'Dispute Resolved');
+        setSelectedBooking(null);
+      } catch (e) {
+        toast.error('Failed to resolve dispute on server');
+      }
     }
   };
 
@@ -217,6 +155,7 @@ export default function OrderBookingManagementSection() {
       case 'IN_PROGRESS':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">In Progress</span>;
       case 'PENDING_DISPATCH':
+      case 'BROADCASTED':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">Pending Dispatch</span>;
       case 'DISPUTED':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Disputed</span>;
@@ -243,16 +182,24 @@ export default function OrderBookingManagementSection() {
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Order & Booking Management</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time booking dispatch lifecycle, dispute arbitration, and emergency status manual overrides without touching database queries.
+            Real-time booking dispatch lifecycle directly queried from database, dispute arbitration, and emergency status manual overrides.
           </p>
         </div>
 
-        {/* Quick Stats Summary */}
+        {/* Action Controls */}
         <div className="flex items-center gap-3">
+          <button
+            onClick={fetchBookings}
+            disabled={loading}
+            className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-xs cursor-pointer"
+            title="Refresh Orders"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+          </button>
           <div className="bg-white px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs shadow-xs">
             <span className="text-slate-400 block text-[10px] font-bold uppercase">Active Orders</span>
             <span className="font-extrabold text-slate-900">
-              {bookings.filter((b) => b.status === 'IN_PROGRESS' || b.status === 'PENDING_DISPATCH').length}
+              {bookings.filter((b) => b.status === 'IN_PROGRESS' || b.status === 'PENDING_DISPATCH' || b.status === 'BROADCASTED').length}
             </span>
           </div>
           <div className="bg-white px-3.5 py-1.5 rounded-xl border border-red-200 text-xs shadow-xs">
@@ -296,91 +243,98 @@ export default function OrderBookingManagementSection() {
 
       {/* Bookings Table */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
-              <tr>
-                <th className="py-3.5 px-4">Booking ID</th>
-                <th className="py-3.5 px-4">Customer</th>
-                <th className="py-3.5 px-4">Service Category</th>
-                <th className="py-3.5 px-4">Assigned Partner</th>
-                <th className="py-3.5 px-4">Amount</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Schedule</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredBookings.length === 0 ? (
+        {loading ? (
+          <div className="p-12 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <span className="text-xs font-bold">Querying live database work requests...</span>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-600">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-slate-400">
-                    No bookings found matching current search and filters.
-                  </td>
+                  <th className="py-3.5 px-4">Booking ID</th>
+                  <th className="py-3.5 px-4">Customer</th>
+                  <th className="py-3.5 px-4">Service Category</th>
+                  <th className="py-3.5 px-4">Assigned Partner</th>
+                  <th className="py-3.5 px-4">Amount</th>
+                  <th className="py-3.5 px-4">Status</th>
+                  <th className="py-3.5 px-4">Schedule</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
-              ) : (
-                filteredBookings.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-50/80 transition group">
-                    <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">
-                      {b.id}
-                      {b.hasDispute && (
-                        <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" title="Open Dispute" />
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900">{b.customer}</div>
-                      <div className="text-[10px] text-slate-400">{b.phone}</div>
-                    </td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800">
-                      {b.category}
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {b.technician === 'Unassigned' ? (
-                        <span className="text-amber-600 font-bold text-[11px] flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5" /> Auto-Seeking...
-                        </span>
-                      ) : (
-                        <div className="font-semibold text-slate-800 flex items-center gap-1.5">
-                          <Wrench className="w-3.5 h-3.5 text-blue-500" />
-                          <span>{b.technician}</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 font-black text-slate-900">
-                      ₹{b.amount}
-                      <span className="block text-[10px] text-emerald-600 font-bold">{b.paymentStatus}</span>
-                    </td>
-                    <td className="py-3.5 px-4">{getStatusBadge(b.status)}</td>
-                    <td className="py-3.5 px-4 text-[11px]">
-                      <div className="font-bold text-slate-700">{b.scheduledDate}</div>
-                      <div className="text-slate-400">{b.scheduledTime}</div>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => setSelectedBooking(b)}
-                          className="px-2.5 py-1 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded font-bold text-[11px] transition cursor-pointer"
-                        >
-                          View Details
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedBooking(b);
-                            setNewStatus(b.status);
-                            setShowOverrideModal(true);
-                          }}
-                          className="px-2.5 py-1 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded font-bold text-[11px] transition cursor-pointer"
-                          title="Manual Override"
-                        >
-                          Override
-                        </button>
-                      </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredBookings.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="py-12 text-center text-slate-400">
+                      No bookings found in database matching current search criteria.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  filteredBookings.map((b) => (
+                    <tr key={b.id} className="hover:bg-slate-50/80 transition group">
+                      <td className="py-3.5 px-4 font-bold text-slate-900 font-mono">
+                        {b.id}
+                        {b.hasDispute && (
+                          <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" title="Open Dispute" />
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-slate-900">{b.customer}</div>
+                        <div className="text-[10px] text-slate-400">{b.phone}</div>
+                      </td>
+                      <td className="py-3.5 px-4 font-medium text-slate-800">
+                        {b.category}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {b.technician === 'Unassigned' ? (
+                          <span className="text-amber-600 font-bold text-[11px] flex items-center gap-1">
+                            <AlertCircle className="w-3.5 h-3.5" /> Auto-Seeking...
+                          </span>
+                        ) : (
+                          <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                            <Wrench className="w-3.5 h-3.5 text-blue-500" />
+                            <span>{b.technician}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 font-black text-slate-900">
+                        ₹{b.amount}
+                        <span className="block text-[10px] text-emerald-600 font-bold">{b.paymentStatus}</span>
+                      </td>
+                      <td className="py-3.5 px-4">{getStatusBadge(b.status)}</td>
+                      <td className="py-3.5 px-4 text-[11px]">
+                        <div className="font-bold text-slate-700">{b.scheduledDate}</div>
+                        <div className="text-slate-400">{b.scheduledTime}</div>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => setSelectedBooking(b)}
+                            className="px-2.5 py-1 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded font-bold text-[11px] transition cursor-pointer"
+                          >
+                            Details
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedBooking(b);
+                              setNewStatus(b.status);
+                              setShowOverrideModal(true);
+                            }}
+                            className="px-2.5 py-1 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded font-bold text-[11px] transition cursor-pointer"
+                            title="Manual Override"
+                          >
+                            Override
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Booking Details Modal */}
@@ -414,13 +368,13 @@ export default function OrderBookingManagementSection() {
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     onClick={() => handleResolveDispute(selectedBooking, 'REFUND')}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] rounded-lg transition"
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] rounded-lg transition cursor-pointer"
                   >
                     Issue Full Refund
                   </button>
                   <button
                     onClick={() => handleResolveDispute(selectedBooking, 'REVISIT')}
-                    className="px-3 py-1 bg-white border border-red-300 text-red-700 hover:bg-red-50 font-bold text-[11px] rounded-lg transition"
+                    className="px-3 py-1 bg-white border border-red-300 text-red-700 hover:bg-red-50 font-bold text-[11px] rounded-lg transition cursor-pointer"
                   >
                     Schedule Warranty Revisit
                   </button>
@@ -446,17 +400,12 @@ export default function OrderBookingManagementSection() {
               </div>
             </div>
 
-            <div>
-              <span className="text-slate-400 font-bold uppercase text-[10px]">Dispatch & Activity Timeline</span>
-              <div className="mt-2 space-y-2 border-l-2 border-blue-200 pl-3">
-                {selectedBooking.timeline.map((item, idx) => (
-                  <div key={idx} className="text-xs">
-                    <span className="font-bold text-slate-700">{item.time}:</span>{' '}
-                    <span className="text-slate-600">{item.text}</span>
-                  </div>
-                ))}
+            {selectedBooking.notes && (
+              <div className="p-3 bg-slate-50 rounded-xl text-xs space-y-1">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Problem Description</span>
+                <p className="text-slate-700 font-medium">{selectedBooking.notes}</p>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
@@ -464,7 +413,7 @@ export default function OrderBookingManagementSection() {
                   setNewStatus(selectedBooking.status);
                   setShowOverrideModal(true);
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
               >
                 Manual Status Override
               </button>
@@ -484,7 +433,7 @@ export default function OrderBookingManagementSection() {
               </h3>
               <button
                 onClick={() => setShowOverrideModal(false)}
-                className="text-slate-400 hover:text-slate-700"
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -513,8 +462,8 @@ export default function OrderBookingManagementSection() {
                   rows="3"
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder="e.g. Customer contacted support confirming job completed manually; technician phone dead."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none"
+                  placeholder="e.g. Customer contacted support confirming job completed manually."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 outline-none font-medium"
                 />
               </div>
             </div>
@@ -522,15 +471,15 @@ export default function OrderBookingManagementSection() {
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 onClick={() => setShowOverrideModal(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleManualOverride}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-xs"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-xs cursor-pointer"
               >
-                Apply Override
+                Apply Override to Server
               </button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   History,
   Search,
@@ -12,89 +12,42 @@ import {
   FileText,
   Calendar,
   Layers,
-  ArrowUpDown
+  ArrowUpDown,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { useToast } from './Toast';
+import { adminFetch } from '../utils/api';
 
 export default function AuditLogsSection() {
   const toast = useToast();
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-  const [auditLogs, setAuditLogs] = useState([
-    {
-      id: 'AUD-8801',
-      actor: 'Anurag Founder',
-      role: 'Super Administrator',
-      action: 'FEATURE_FLAG_TOGGLED',
-      details: 'Enabled dynamic surge pricing during peak evening slots.',
-      target: 'CONFIG:surge_pricing',
-      ip: '103.21.244.18',
-      status: 'SUCCESS',
-      timestamp: '10 mins ago',
-      category: 'GOVERNANCE'
-    },
-    {
-      id: 'AUD-8802',
-      actor: 'Megha Nair',
-      role: 'Finance Officer',
-      action: 'REFUND_AUTHORIZED',
-      details: 'Issued full refund ₹599 to customer Deepa Krishnan (Duplicate UPI charge).',
-      target: 'ORDER:ORD-8941',
-      ip: '14.139.122.9',
-      status: 'SUCCESS',
-      timestamp: '45 mins ago',
-      category: 'FINANCE'
-    },
-    {
-      id: 'AUD-8803',
-      actor: 'Rohit Deshmukh',
-      role: 'Operations Manager',
-      action: 'PARTNER_KYC_APPROVED',
-      details: 'Verified Police Clearance Certificate & Aadhaar for PRT-104 (Ramesh Patel).',
-      target: 'PARTNER:PRT-104',
-      ip: '49.36.18.22',
-      status: 'SUCCESS',
-      timestamp: '2 hours ago',
-      category: 'PARTNERS'
-    },
-    {
-      id: 'AUD-8804',
-      actor: 'Sarah Jenkins',
-      role: 'Super Administrator',
-      action: 'USER_SUSPENDED',
-      details: 'Suspended fraudulent account attempting repeated chargebacks.',
-      target: 'USER:USR-912',
-      ip: '103.21.244.18',
-      status: 'WARNING',
-      timestamp: 'Yesterday 04:30 PM',
-      category: 'SECURITY'
-    },
-    {
-      id: 'AUD-8805',
-      actor: 'Content Specialist',
-      role: 'Content Editor',
-      action: 'CMS_BANNER_PUBLISHED',
-      details: 'Updated Diwali Festival promotional headline and 20% discount marquee.',
-      target: 'CMS:hero_banner',
-      ip: '115.99.201.44',
-      status: 'SUCCESS',
-      timestamp: 'Oct 30, 2026',
-      category: 'CONTENT'
-    },
-    {
-      id: 'AUD-8806',
-      actor: 'SYSTEM_DAEMON',
-      role: 'System Automated Job',
-      action: 'AUTO_DISPATCH_TIMEOUT',
-      details: 'Order #ORD-9022 exceeded 45s broadcast timeout without acceptance. Retried radius 15km.',
-      target: 'ORDER:ORD-9022',
-      ip: '127.0.0.1',
-      status: 'INFO',
-      timestamp: 'Oct 30, 2026',
-      category: 'OPERATIONS'
+  const [auditLogs, setAuditLogs] = useState([]);
+
+  const loadAuditLogs = async () => {
+    setLoading(true);
+    try {
+      const res = await adminFetch('/admin/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setAuditLogs(data);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load audit logs:', err);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadAuditLogs();
+  }, []);
+
 
   const filteredLogs = auditLogs.filter((log) => {
     const matchesSearch =
@@ -163,13 +116,24 @@ export default function AuditLogsSection() {
           </p>
         </div>
 
-        <button
-          onClick={handleExportCSV}
-          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-        >
-          <Download className="w-4 h-4 text-slate-300" />
-          <span>Export Audit Log (CSV)</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadAuditLogs}
+            disabled={loading}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+            title="Reload audit trail"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-slate-300" />
+            <span>Export Audit Log (CSV)</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search */}
