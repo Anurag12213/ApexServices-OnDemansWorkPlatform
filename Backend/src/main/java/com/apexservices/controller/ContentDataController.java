@@ -51,7 +51,7 @@ public class ContentDataController {
     private final com.apexservices.service.PartnerProfileService partnerProfileService;
     private final com.apexservices.repository.UserRepository userRepository;
     private final SiteSettingRepository siteSettingRepository;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final Map<String, Object> siteBranding = new ConcurrentHashMap<>();
     private final Map<String, Object> announcement = new ConcurrentHashMap<>();
