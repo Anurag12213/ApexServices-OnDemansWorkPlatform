@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-ssr
+out
+.next
+*.local
+.DS_Store

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { PartnerProvider, usePartner } from './context/PartnerContext';
 import { PartnerNavbar } from './components/layout/PartnerNavbar';
@@ -9,26 +11,26 @@ import { ToastProvider } from './components/Toast';
 import { ConfirmDialogProvider } from './components/ConfirmDialog';
 
 // Auth Pages
-import { WelcomeScreen } from './pages/auth/WelcomeScreen';
-import { AccountTypeSelect } from './pages/auth/AccountTypeSelect';
-import { SignupScreen } from './pages/auth/SignupScreen';
-import { ContactVerificationScreen } from './pages/auth/ContactVerificationScreen';
-import { LoginScreen } from './pages/auth/LoginScreen';
-import { ForgotPasswordScreen } from './pages/auth/ForgotPasswordScreen';
+import { WelcomeScreen } from './views/auth/WelcomeScreen';
+import { AccountTypeSelect } from './views/auth/AccountTypeSelect';
+import { SignupScreen } from './views/auth/SignupScreen';
+import { ContactVerificationScreen } from './views/auth/ContactVerificationScreen';
+import { LoginScreen } from './views/auth/LoginScreen';
+import { ForgotPasswordScreen } from './views/auth/ForgotPasswordScreen';
 
 // Core Partner Workflow Pages
-import { PartnerDashboardScreen } from './pages/dashboard/PartnerDashboardScreen';
-import { IncomingRequestsListScreen } from './pages/requests/IncomingRequestsListScreen';
-import { NotificationsInboxScreen } from './pages/requests/NotificationsInboxScreen';
-import { JobExecutionFlow } from './pages/jobs/JobExecutionFlow';
-import { AssignedJobsScreen } from './pages/jobs/AssignedJobsScreen';
-import { DocumentsManagerScreen } from './pages/documents/DocumentsManagerScreen';
-import { DepositPaymentFlow } from './pages/deposit/DepositPaymentFlow';
-import { CategoryPricingInfoScreen } from './pages/pricing/CategoryPricingInfoScreen';
-import { OnboardingProgressScreen } from './pages/onboarding/OnboardingProgressScreen';
-import { EarningsManagerScreen } from './pages/earnings/EarningsManagerScreen';
-import { PartnerProfileScreen } from './pages/profile/PartnerProfileScreen';
-import { HelpSupportScreen } from './pages/support/HelpSupportScreen';
+import { PartnerDashboardScreen } from './views/dashboard/PartnerDashboardScreen';
+import { IncomingRequestsListScreen } from './views/requests/IncomingRequestsListScreen';
+import { NotificationsInboxScreen } from './views/requests/NotificationsInboxScreen';
+import { JobExecutionFlow } from './views/jobs/JobExecutionFlow';
+import { AssignedJobsScreen } from './views/jobs/AssignedJobsScreen';
+import { DocumentsManagerScreen } from './views/documents/DocumentsManagerScreen';
+import { DepositPaymentFlow } from './views/deposit/DepositPaymentFlow';
+import { CategoryPricingInfoScreen } from './views/pricing/CategoryPricingInfoScreen';
+import { OnboardingProgressScreen } from './views/onboarding/OnboardingProgressScreen';
+import { EarningsManagerScreen } from './views/earnings/EarningsManagerScreen';
+import { PartnerProfileScreen } from './views/profile/PartnerProfileScreen';
+import { HelpSupportScreen } from './views/support/HelpSupportScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainApp = () => {

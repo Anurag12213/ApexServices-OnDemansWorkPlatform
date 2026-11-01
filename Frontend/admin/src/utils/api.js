@@ -1,7 +1,7 @@
 // Admin Portal Secure API Client with Auto-Authentication Resilience
 export const SERVER_BASE_URL = (
   import.meta.env.VITE_SERVER_URL ||
-  (import.meta.env.PROD ? window.location.origin : 'http://localhost:8080')
+  (import.meta.env.PROD ? 'https://apexservices-backend.onrender.com' : 'http://localhost:8080')
 ).replace(/\/+$/, '');
 
 export const API_BASE_URL = (
@@ -11,7 +11,7 @@ export const API_BASE_URL = (
 
 export const CUSTOMER_PORTAL_URL = (
   import.meta.env.VITE_CUSTOMER_PORTAL_URL ||
-  (import.meta.env.PROD ? window.location.origin : 'http://localhost:5173')
+  (import.meta.env.PROD ? 'https://apexservicesondemand.netlify.app' : 'http://localhost:5173')
 ).replace(/\/+$/, '');
 
 export const getAdminAuth = () => {

@@ -27,16 +27,18 @@ const initialBookingDraft = {
 
 export const DataProvider = ({ children }) => {
   const [data, setData] = useState(() => {
-    try {
-      const cached = localStorage.getItem('apex_cached_presentation_data');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && parsed.heroSlides) {
-          return parsed;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const cached = localStorage.getItem('apex_cached_presentation_data');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.heroSlides) {
+            return parsed;
+          }
         }
+      } catch (e) {
+        console.warn('Failed to read cached presentation data:', e);
       }
-    } catch (e) {
-      console.warn('Failed to read cached presentation data:', e);
     }
     return initialData;
   });
@@ -45,33 +47,51 @@ export const DataProvider = ({ children }) => {
 
   // Customer Authentication State
   const [customerUser, setCustomerUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('apex_customer_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = localStorage.getItem('apex_customer_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
     }
+    return null;
   });
 
   const [customerToken, setCustomerToken] = useState(() => {
-    return localStorage.getItem('apex_customer_token') || null;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('apex_customer_token') || null;
+    }
+    return null;
   });
 
   const [selectedCategory, setSelectedCategory] = useState('');
   const [customerRequests, setCustomerRequests] = useState([]);
   
   const [activeBookingStep, setActiveBookingStep] = useState(() => {
-    const saved = localStorage.getItem('apex_active_booking_step');
-    return saved ? parseInt(saved, 10) : 1;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = localStorage.getItem('apex_active_booking_step');
+      return saved ? parseInt(saved, 10) : 1;
+    }
+    return 1;
   });
   const [activeTrackingRequestId, setActiveTrackingRequestId] = useState(() => {
-    return localStorage.getItem('apex_active_tracking_id') || null;
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('apex_active_tracking_id') || null;
+    }
+    return null;
   });
   const [customerViewMode, setCustomerViewMode] = useState(() => {
-    return localStorage.getItem('apex_customer_view_mode') || 'booking';
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('apex_customer_view_mode') || 'booking';
+    }
+    return 'booking';
   });
   const [customerRequestsTab, setCustomerRequestsTab] = useState(() => {
-    return localStorage.getItem('apex_customer_requests_tab') || 'live';
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('apex_customer_requests_tab') || 'live';
+    }
+    return 'live';
   });
 
   useEffect(() => {
@@ -124,12 +144,15 @@ export const DataProvider = ({ children }) => {
   };
 
   const [bookingDraft, setBookingDraft] = useState(() => {
-    try {
-      const savedDraft = sessionStorage.getItem('apex_booking_draft');
-      return savedDraft ? JSON.parse(savedDraft) : initialBookingDraft;
-    } catch {
-      return initialBookingDraft;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const savedDraft = sessionStorage.getItem('apex_booking_draft');
+        return savedDraft ? JSON.parse(savedDraft) : initialBookingDraft;
+      } catch {
+        return initialBookingDraft;
+      }
     }
+    return initialBookingDraft;
   });
 
   // Sync draft to sessionStorage to survive navigation / page refreshes
@@ -546,12 +569,15 @@ export const DataProvider = ({ children }) => {
   const siteBranding = {
     ...initialData.siteBranding,
     ...(() => {
-      try {
-        const cached = localStorage.getItem('apex_custom_branding');
-        return cached ? JSON.parse(cached) : {};
-      } catch {
-        return {};
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          const cached = localStorage.getItem('apex_custom_branding');
+          return cached ? JSON.parse(cached) : {};
+        } catch {
+          return {};
+        }
       }
+      return {};
     })(),
     ...(data?.publicConfig || {}),
     ...(data?.siteBranding || {}),

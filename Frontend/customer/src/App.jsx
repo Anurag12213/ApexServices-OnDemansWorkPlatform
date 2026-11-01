@@ -1,17 +1,19 @@
+'use client';
+
 import React from 'react';
 import { DataProvider, useData } from './context/DataContext';
 import { TopBar } from './components/TopBar';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 
-import { HomePage } from './pages/HomePage';
-import { ServicesPage } from './pages/ServicesPage';
-import { AboutPage } from './pages/AboutPage';
-import { ReviewsPage } from './pages/ReviewsPage';
-import { ContactPage } from './pages/ContactPage';
-import { LoginPage } from './pages/LoginPage';
-import { RequestWorkPage } from './pages/RequestWorkPage';
-import { MaintenancePage } from './pages/MaintenancePage';
+import { HomePage } from './views/HomePage';
+import { ServicesPage } from './views/ServicesPage';
+import { AboutPage } from './views/AboutPage';
+import { ReviewsPage } from './views/ReviewsPage';
+import { ContactPage } from './views/ContactPage';
+import { LoginPage } from './views/LoginPage';
+import { RequestWorkPage } from './views/RequestWorkPage';
+import { MaintenancePage } from './views/MaintenancePage';
 import { ToastContainer } from './components/Toast';
 import { ConfirmDialogProvider } from './components/ConfirmDialog';
 import { CookieConsent } from './components/CookieConsent';

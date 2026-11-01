@@ -1,2 +1,5 @@
+# API Proxy to Render Spring Boot Backend
+/api/*  https://apexservices-backend.onrender.com/api/:splat  200!
+
 # Netlify SPA redirect: all routes point to index.html with 200 status
 /*    /index.html   200

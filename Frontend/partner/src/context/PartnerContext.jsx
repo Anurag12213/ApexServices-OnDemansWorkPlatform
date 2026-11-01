@@ -180,18 +180,26 @@ export const PartnerProvider = ({ children }) => {
   // Auth: Logout
   const logout = () => {
     const name = partner?.name || partner?.fullName || 'Partner';
-    const currentToken = localStorage.getItem('apex_partner_token');
-      const apiUrl = (import.meta.env.VITE_API_URL || 'https://apexservices-backend.onrender.com/api').replace(/\/+$/, '');
+    const currentToken = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('apex_partner_token') : null;
+    const apiUrl = (
+      (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+      'https://apexservices-backend.onrender.com/api'
+    ).replace(/\/+$/, '');
+    if (currentToken) {
       fetch(`${apiUrl}/auth/logout`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${currentToken}` }
       }).catch(err => console.warn('Partner server logout notification failed', err));
+    }
     const state = api.getState();
     state.partner = null;
     state.activeJob = null;
     state.offers = [];
     api.saveState(state);
-    localStorage.removeItem('apex_partner_token');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem('apex_partner_token');
+    }
     setCurrentIncomingAlert(null);
     setPartner(null);
     setActiveJob(null);

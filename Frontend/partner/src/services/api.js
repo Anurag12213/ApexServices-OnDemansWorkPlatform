@@ -2,7 +2,13 @@
 // Provides full end-to-end offline/online sync, server-side policy enforcement,
 // and atomic persistence for all partner workflows.
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api').replace(/\/+$/, '');
+const API_BASE = (
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+  (typeof window !== 'undefined' && (process.env?.NODE_ENV === 'production' || import.meta?.env?.PROD)
+    ? 'https://apexservices-backend.onrender.com/api'
+    : 'http://localhost:8080/api')
+).replace(/\/+$/, '');
 
 // Initial Authoritative Admin-Configured Document Requirements
 const DEFAULT_DOC_REQUIREMENTS = [
@@ -126,8 +132,25 @@ class ApiClient {
     this.initState();
   }
 
+  getToken() {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      return localStorage.getItem('apex_partner_token');
+    }
+    return null;
+  }
+
+  setToken(token) {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      if (token) {
+        localStorage.setItem('apex_partner_token', token);
+      } else {
+        localStorage.removeItem('apex_partner_token');
+      }
+    }
+  }
+
   async getPartnerAuthToken(forceRefresh = false) {
-    let token = forceRefresh ? null : localStorage.getItem('apex_partner_token');
+    let token = forceRefresh ? null : this.getToken();
     const state = this.getState();
     if (!state.partner) return null;
 
@@ -143,7 +166,7 @@ class ApiClient {
           const authData = await loginRes.json();
           token = authData.token;
           if (token) {
-            localStorage.setItem('apex_partner_token', token);
+            this.setToken(token);
             if (authData.user && state.partner) {
               const u = authData.user;
               state.partner.serviceCategories = (u.serviceCategories && u.serviceCategories.length > 0)
@@ -168,6 +191,7 @@ class ApiClient {
   }
 
   initState() {
+    if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       const stored = localStorage.getItem(this.storageKey);
       if (stored) {
@@ -188,6 +212,7 @@ class ApiClient {
   }
 
   getState() {
+    if (typeof window === 'undefined' || !window.localStorage) return {};
     try {
       const data = localStorage.getItem(this.storageKey);
       return data ? JSON.parse(data) : {};
@@ -197,10 +222,11 @@ class ApiClient {
   }
 
   saveState(state) {
+    if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(state));
     } catch (e) {
-      console.error('State save error:', e);
+      console.error('Failed to save state to localStorage:', e);
     }
   }
 
@@ -293,7 +319,7 @@ class ApiClient {
         const authData = await regRes.json();
         if (authData.token) {
           token = authData.token;
-          localStorage.setItem('apex_partner_token', token);
+          this.setToken(token);
         }
       }
     } catch (e) {
@@ -334,7 +360,7 @@ class ApiClient {
         const authData = await res.json();
         const token = authData.token;
         const user = authData.user || {};
-        localStorage.setItem('apex_partner_token', token);
+        this.setToken(token);
 
         const isOrg = user.partnerType === 'ORG_MEMBER';
         const userCategories = (user.serviceCategories && user.serviceCategories.length > 0)
@@ -597,7 +623,7 @@ class ApiClient {
 
       // Automatic token renewal on expired token (401/403)
       if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('apex_partner_token');
+        this.setToken(null);
         token = await this.getPartnerAuthToken(true);
         if (token) {
           res = await fetch(url, {

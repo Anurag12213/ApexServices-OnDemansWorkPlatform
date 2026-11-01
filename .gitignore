@@ -20,6 +20,8 @@ build/
 **/build/
 out/
 **/out/
+.next/
+**/.next/
 
 # Logs
 logs/
