@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { adminFetch } from '../utils/api';
 import {
   CreditCard,
   CheckCircle2,
@@ -265,6 +266,152 @@ export default function PaymentTransactionsSection() {
   const [userFilter, setUserFilter] = useState('All');
   const [userSearch, setUserSearch] = useState('');
 
+  // Utility to parse numeric amounts from string or number
+  const parseAmount = (val) => {
+    if (typeof val === 'number') return val;
+    if (!val) return 0;
+    const num = parseFloat(String(val).replace(/[^0-9.-]+/g, ''));
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Dynamic Partner Metrics calculation
+  const partnerMetrics = useMemo(() => {
+    let totalSettled = 0;
+    let pendingCount = 0;
+    let pendingAmount = 0;
+    let platformShare = 0;
+
+    partnerPayouts.forEach((p) => {
+      const net = parseAmount(p.netPayout);
+      const gross = parseAmount(p.grossBilled);
+      const cut = parseAmount(p.platformCut) || gross * 0.2;
+
+      if (p.status === 'Settled') {
+        totalSettled += net;
+        platformShare += cut;
+      } else if (p.status === 'Pending Approval' || p.status === 'Approved') {
+        pendingCount += 1;
+        pendingAmount += net;
+      }
+    });
+
+    return {
+      totalSettled: `₹${totalSettled.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      pendingRequests: `${pendingCount} Requests (₹${pendingAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`,
+      platformShare: `₹${platformShare.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    };
+  }, [partnerPayouts]);
+
+  // Dynamic User Metrics calculation
+  const userMetrics = useMemo(() => {
+    let totalCollected = 0;
+    let completedCount = 0;
+    let refundDisputeAmount = 0;
+    let refundCount = 0;
+
+    userTransactions.forEach((t) => {
+      const amt = parseAmount(t.amount);
+      if (t.status === 'Completed') {
+        totalCollected += amt;
+        completedCount += 1;
+      } else if (t.status && (t.status.includes('Refund') || t.status.includes('Dispute'))) {
+        refundDisputeAmount += amt;
+        refundCount += 1;
+      }
+    });
+
+    const totalTransactions = userTransactions.length;
+    const successRate = totalTransactions > 0
+      ? ((completedCount / totalTransactions) * 100).toFixed(1) + '%'
+      : '100%';
+
+    return {
+      totalCollected: `₹${totalCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      successRate,
+      refunds: `₹${refundDisputeAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${refundCount} claims)`,
+    };
+  }, [userTransactions]);
+
+  // Live fetch from backend to make payments & payouts truly dynamic
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLiveFinancials = async () => {
+      try {
+        const res = await adminFetch('/work-requests');
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0 && isMounted) {
+            // 1. Map paid or completed work requests to user transactions
+            const liveUserTxns = list
+              .filter((r) => r.paymentStatus === 'PAID' || r.status === 'COMPLETED' || (r.paidAmount && Number(r.paidAmount) > 0))
+              .map((r) => {
+                const amountNum = Number(r.paidAmount || r.estimatedCost || 499);
+                return {
+                  id: `TXN-${r.id.replace(/[^0-9]/g, '').slice(-5) || Math.floor(10000 + Math.random() * 90000)}`,
+                  customer: r.customerName || 'Customer',
+                  email: r.customerEmail || 'customer@apexservices.com',
+                  serviceTicket: r.id,
+                  service: r.serviceCategory || 'Home Service',
+                  gateway: r.paymentMethod || 'UPI Instant',
+                  amount: `₹${amountNum.toFixed(2)}`,
+                  status: 'Completed',
+                  date: r.paidAt ? new Date(r.paidAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recent',
+                  disputeReason: '',
+                };
+              });
+
+            if (liveUserTxns.length > 0) {
+              setUserTransactions((prev) => {
+                const map = new Map();
+                prev.forEach((t) => map.set(t.id, t));
+                liveUserTxns.forEach((t) => map.set(t.id, t));
+                return Array.from(map.values());
+              });
+            }
+
+            // 2. Map completed or assigned requests to partner payouts
+            const livePartnerPayouts = list
+              .filter((r) => r.assignedPartnerName && (r.status === 'COMPLETED' || r.paymentStatus === 'PAID'))
+              .map((r) => {
+                const gross = Number(r.paidAmount || r.estimatedCost || 499);
+                const cut = Number(r.platformFee || (gross * 0.20));
+                const net = Number(r.partnerNetEarning || (gross - cut));
+                return {
+                  id: `PAY-PRT-${r.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(800 + Math.random() * 199)}`,
+                  partnerName: r.assignedPartnerName,
+                  category: r.serviceCategory || 'Specialist Work',
+                  grossBilled: `₹${gross.toFixed(2)}`,
+                  platformCut: `₹${cut.toFixed(2)} (20%)`,
+                  netPayout: `₹${net.toFixed(2)}`,
+                  paymentMethod: 'Bank Transfer (HDFC Bank)',
+                  status: r.status === 'COMPLETED' ? 'Settled' : 'Pending Approval',
+                  date: r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recent',
+                };
+              });
+
+            if (livePartnerPayouts.length > 0) {
+              setPartnerPayouts((prev) => {
+                const map = new Map();
+                prev.forEach((p) => map.set(p.id, p));
+                livePartnerPayouts.forEach((p) => map.set(p.id, p));
+                return Array.from(map.values());
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Live financials fetch notice:', err);
+      }
+    };
+
+    fetchLiveFinancials();
+    const interval = setInterval(fetchLiveFinancials, 6000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   // Step 1: Admin Approves Customer Refund Request
   const handleApproveUserRefund = (id) => {
     let approvedTxn;
@@ -478,21 +625,21 @@ export default function PaymentTransactionsSection() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
               <span className="text-xs text-slate-500 font-medium">Total Settled to Partners</span>
-              <p className="text-xl font-bold text-emerald-600 mt-1">$14,850.00</p>
+              <p className="text-xl font-bold text-emerald-600 mt-1">{partnerMetrics.totalSettled}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">80% Specialist direct earnings</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
               <span className="text-xs text-slate-500 font-medium">Pending Payout Approvals</span>
               <p className="text-xl font-bold text-amber-600 mt-1">
-                {partnerPayouts.filter((p) => p.status === 'Pending Approval').length} Requests ($2,264.00)
+                {partnerMetrics.pendingRequests}
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">Awaiting admin dispatch clearance</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
               <span className="text-xs text-slate-500 font-medium">Platform Share Collected (20%)</span>
-              <p className="text-xl font-bold text-slate-900 mt-1">$3,712.50</p>
+              <p className="text-xl font-bold text-slate-900 mt-1">{partnerMetrics.platformShare}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Net platform margin retainage</p>
             </div>
           </div>
@@ -633,20 +780,20 @@ export default function PaymentTransactionsSection() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
               <span className="text-xs text-slate-500 font-medium">Total Customer Payments</span>
-              <p className="text-xl font-bold text-slate-900 mt-1">$18,562.50</p>
+              <p className="text-xl font-bold text-slate-900 mt-1">{userMetrics.totalCollected}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Card, UPI & Gateway Settlements</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
               <span className="text-xs text-slate-500 font-medium">Gateway Success Rate</span>
-              <p className="text-xl font-bold text-emerald-600 mt-1">98.4%</p>
+              <p className="text-xl font-bold text-emerald-600 mt-1">{userMetrics.successRate}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">Average settlement latency &lt; 2.5s</p>
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
               <span className="text-xs text-slate-500 font-medium">Refunds & Disputed Adjustments</span>
-              <p className="text-xl font-bold text-rose-600 mt-1">$330.00 (1.8%)</p>
-              <p className="text-[11px] text-slate-400 mt-0.5">2 customer refund reversals</p>
+              <p className="text-xl font-bold text-rose-600 mt-1">{userMetrics.refunds}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Customer refund reversals</p>
             </div>
           </div>
 
