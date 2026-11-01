@@ -35,7 +35,7 @@ export default function RecentActivity() {
     },
     {
       title: 'Database sync notice',
-      desc: 'Spring Boot REST sync executed cleanly',
+      desc: 'Real-time database sync executed cleanly',
       time: '2 hours ago',
       icon: AlertTriangle,
       iconBg: 'bg-amber-50 text-amber-600',

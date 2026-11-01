@@ -4,7 +4,6 @@ import RevenueChart from './RevenueChart';
 import RecentActivity from './RecentActivity';
 import {
   PieChart,
-  Radio,
   ArrowUpRight,
   TrendingUp,
   Users,
@@ -29,12 +28,6 @@ export default function DashboardSection({ onNavigateTab }) {
           <p className="text-xs text-slate-500 mt-1">
             Real-time executive nerve center surfacing active fleet dispatch, revenue velocity, user signups, and live platform health the moment you open the panel.
           </p>
-        </div>
-
-        {/* Live System Beacon */}
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3.5 py-1.5 rounded-xl text-emerald-800 text-xs font-bold shadow-xs">
-          <Radio className="w-4 h-4 text-emerald-600 animate-spin" />
-          <span>Spring Boot REST Backend Connected & Synchronized</span>
         </div>
       </div>
 
