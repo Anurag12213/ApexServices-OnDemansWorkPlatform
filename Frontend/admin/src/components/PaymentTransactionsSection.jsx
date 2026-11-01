@@ -41,64 +41,23 @@ export default function PaymentTransactionsSection() {
   };
 
   // ==========================================
-  // 1. PARTNER PAYMENT MANAGEMENT
+  // 1. PARTNER PAYMENT MANAGEMENT (Dynamic)
   // ==========================================
-  const defaultPartnerPayouts = [
-    {
-      id: 'PAY-PRT-801',
-      partnerName: 'Rajesh Sharma',
-      category: 'Custom Carpentry',
-      grossBilled: '₹1,420.00',
-      platformCut: '₹284.00 (20%)',
-      netPayout: '₹1,136.00',
-      paymentMethod: 'Bank Transfer (HDFC Bank ••4102)',
-      status: 'Settled', // 'Pending Approval' | 'Approved' | 'Settled'
-      date: 'Oct 09, 2026',
-    },
-    {
-      id: 'PAY-PRT-802',
-      partnerName: 'Vikram Rathore',
-      category: 'Emergency Plumbing',
-      grossBilled: '₹1,880.00',
-      platformCut: '₹376.00 (20%)',
-      netPayout: '₹1,504.00',
-      paymentMethod: 'UPI Direct (vikram@okhdfcbank)',
-      status: 'Pending Approval',
-      date: 'Oct 08, 2026',
-    },
-    {
-      id: 'PAY-PRT-803',
-      partnerName: 'Amit Verma',
-      category: 'Electrical Maintenance',
-      grossBilled: '₹950.00',
-      platformCut: '₹190.00 (20%)',
-      netPayout: '₹760.00',
-      paymentMethod: 'Bank Transfer (SBI ••9912)',
-      status: 'Approved',
-      date: 'Oct 07, 2026',
-    },
-    {
-      id: 'PAY-PRT-804',
-      partnerName: 'Sunil Jadhav',
-      category: 'Painting & Decor',
-      grossBilled: '₹640.00',
-      platformCut: '₹128.00 (20%)',
-      netPayout: '₹512.00',
-      paymentMethod: 'UPI Direct (sunil@okicici)',
-      status: 'Settled',
-      date: 'Oct 06, 2026',
-    },
-  ];
-
   const [partnerPayouts, setPartnerPayouts] = useState(() => {
     try {
       const stored = localStorage.getItem('apex_partner_payouts');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Remove legacy hardcoded dummy mock IDs
+          const realOnly = parsed.filter(
+            (p) => !['PAY-PRT-801', 'PAY-PRT-802', 'PAY-PRT-803', 'PAY-PRT-804'].includes(p.id)
+          );
+          return realOnly;
+        }
       }
     } catch (e) {}
-    return defaultPartnerPayouts;
+    return [];
   });
 
   const [partnerFilter, setPartnerFilter] = useState('All');
@@ -199,68 +158,23 @@ export default function PaymentTransactionsSection() {
   };
 
   // ==========================================
-  // 2. USER PAYMENT & REFUND MANAGEMENT
+  // 2. USER PAYMENT & REFUND MANAGEMENT (Dynamic)
   // ==========================================
-  const defaultUserTransactions = [
-    {
-      id: 'TXN-90812',
-      customer: 'Anurag Sharma',
-      email: 'customer@example.com',
-      serviceTicket: 'REQ-1001',
-      service: 'Custom Carpentry',
-      gateway: 'UPI Instant (GPay)',
-      amount: '₹499.00',
-      status: 'Completed', // 'Completed' | 'Dispute / Refund Requested' | 'Refund Approved' | 'Refunded'
-      date: 'Oct 09, 2026 14:20',
-      disputeReason: '',
-    },
-    {
-      id: 'TXN-90813',
-      customer: 'Priya Sharma',
-      email: 'priya.s@yahoo.com',
-      serviceTicket: 'REQ-1002',
-      service: 'Emergency Plumbing',
-      gateway: 'UPI Instant (PhonePe)',
-      amount: '₹399.00',
-      status: 'Dispute / Refund Requested',
-      date: 'Oct 08, 2026 11:15',
-      disputeReason: 'Technician was delayed by 1 hour and required partial re-work.',
-    },
-    {
-      id: 'TXN-90814',
-      customer: 'David Miller',
-      email: 'dmiller@tech.io',
-      serviceTicket: 'REQ-1003',
-      service: 'Electrical Maintenance',
-      gateway: 'Razorpay Credit Card',
-      amount: '₹349.00',
-      status: 'Refund Approved',
-      date: 'Oct 08, 2026 09:30',
-      disputeReason: 'Billed twice due to bank gateway timeout.',
-    },
-    {
-      id: 'TXN-90815',
-      customer: 'Rohan Mehta',
-      email: 'rohan.mehta@outlook.com',
-      serviceTicket: 'REQ-1004',
-      service: 'Painting & Decor',
-      gateway: 'HDFC Net Banking',
-      amount: '₹599.00',
-      status: 'Refunded',
-      date: 'Oct 07, 2026 16:05',
-      disputeReason: 'Cancelled prior to partner arrival.',
-    },
-  ];
-
   const [userTransactions, setUserTransactions] = useState(() => {
     try {
       const stored = localStorage.getItem('apex_user_refunds');
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Remove legacy hardcoded dummy mock IDs
+          const realOnly = parsed.filter(
+            (t) => !['TXN-90812', 'TXN-90813', 'TXN-90814', 'TXN-90815'].includes(t.id)
+          );
+          return realOnly;
+        }
       }
     } catch (e) {}
-    return defaultUserTransactions;
+    return [];
   });
 
   const [userFilter, setUserFilter] = useState('All');
@@ -476,6 +390,35 @@ export default function PaymentTransactionsSection() {
       channel.onmessage = (event) => {
         const data = event.data;
         if (!data) return;
+
+        // When a customer makes a payment
+        if (data.type === 'CUSTOMER_PAYMENT_PROCESSED') {
+          const amountNum = Number(data.gross || 499);
+          const txnId = `TXN-${String(data.jobId || '').replace(/[^0-9]/g, '').slice(-5) || Math.floor(10000 + Math.random() * 90000)}`;
+
+          setUserTransactions((prev) => {
+            if (prev.some((t) => t.id === txnId || t.serviceTicket === data.jobId)) return prev;
+            const newTxn = {
+              id: txnId,
+              customer: data.customerName || 'Customer',
+              email: data.customerEmail || 'customer@apexservices.com',
+              serviceTicket: data.jobId,
+              service: data.serviceCategory || 'Home Service',
+              gateway: data.paymentMethod || 'UPI Instant',
+              amount: `₹${amountNum.toFixed(2)}`,
+              status: 'Completed',
+              date: new Date().toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }),
+              disputeReason: '',
+            };
+            const updated = [newTxn, ...prev];
+            try {
+              localStorage.setItem('apex_user_refunds', JSON.stringify(updated));
+            } catch (e) {}
+            return updated;
+          });
+
+          showToast(`Customer Payment confirmed for ${data.jobId} (₹${amountNum.toFixed(2)}). Platform 20% fee collected.`);
+        }
 
         // When a partner requests a withdrawal
         if (data.type === 'PARTNER_PAYOUT_REQUESTED' && data.payout) {
@@ -696,15 +639,32 @@ export default function PaymentTransactionsSection() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {partnerPayouts
-                  .filter((p) => {
+                {(() => {
+                  const filtered = partnerPayouts.filter((p) => {
                     const matchSearch =
                       p.id.toLowerCase().includes(partnerSearch.toLowerCase()) ||
                       p.partnerName.toLowerCase().includes(partnerSearch.toLowerCase());
                     const matchStatus = partnerFilter === 'All' || p.status === partnerFilter;
                     return matchSearch && matchStatus;
-                  })
-                  .map((p) => (
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                          <div className="flex flex-col items-center justify-center space-y-2">
+                            <Briefcase className="w-8 h-8 text-slate-300" />
+                            <p className="font-semibold text-slate-700">No partner payout requests found</p>
+                            <p className="text-[11px] text-slate-400">
+                              When partners request payout withdrawals or services are settled, records will appear here dynamically.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/70 transition">
                       <td className="p-3.5">
                         <span className="font-mono font-bold text-slate-900">{p.id}</span>
@@ -764,7 +724,8 @@ export default function PaymentTransactionsSection() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -838,16 +799,33 @@ export default function PaymentTransactionsSection() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {userTransactions
-                  .filter((t) => {
+                {(() => {
+                  const filtered = userTransactions.filter((t) => {
                     const matchSearch =
                       t.id.toLowerCase().includes(userSearch.toLowerCase()) ||
                       t.customer.toLowerCase().includes(userSearch.toLowerCase()) ||
                       t.serviceTicket.toLowerCase().includes(userSearch.toLowerCase());
                     const matchStatus = userFilter === 'All' || t.status === userFilter;
                     return matchSearch && matchStatus;
-                  })
-                  .map((txn) => (
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-500">
+                          <div className="flex flex-col items-center justify-center space-y-2">
+                            <CreditCard className="w-8 h-8 text-slate-300" />
+                            <p className="font-semibold text-slate-700">No customer transactions recorded yet</p>
+                            <p className="text-[11px] text-slate-400">
+                              Live customer payments and gateway settlements will populate here automatically.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  }
+
+                  return filtered.map((txn) => (
                     <tr key={txn.id} className="hover:bg-slate-50/70 transition">
                       <td className="p-3.5">
                         <span className="font-mono font-bold text-slate-900">{txn.id}</span>
@@ -921,7 +899,8 @@ export default function PaymentTransactionsSection() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

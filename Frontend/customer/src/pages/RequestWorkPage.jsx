@@ -270,10 +270,32 @@ export const RequestWorkPage = () => {
         setTrackedRequest(updated);
         toast.success(`Payment of ${formatCurrency(updated.paidAmount || updated.estimatedCost || 499)} confirmed! Invoice settled.`, 'Payment Confirmed');
         try {
+          const grossVal = Number(updated.paidAmount || updated.estimatedCost || 499);
+          const platformCut = Number(updated.platformFee || Math.round(grossVal * 0.20));
+          const netEarnings = Number(updated.partnerNetEarning || (grossVal - platformCut));
+
+          const syncChannel = new BroadcastChannel('apex_services_sync');
+          syncChannel.postMessage({
+            type: 'CUSTOMER_PAYMENT_PROCESSED',
+            jobId: reqId,
+            gross: grossVal,
+            platformCut: platformCut,
+            net: netEarnings,
+            partnerName: updated.assignedPartnerName || 'Assigned Partner',
+            serviceCategory: updated.serviceCategory || 'Home Service',
+            customerName: updated.customerName || 'Customer',
+            customerEmail: updated.customerEmail || '',
+            paymentMethod: method,
+            paidAt: updated.paidAt || new Date().toISOString()
+          });
+          syncChannel.close();
+
           window.dispatchEvent(new CustomEvent('apex_payment_settled', {
-            detail: { jobId: reqId, net: updated.partnerNetEarning, gross: updated.paidAmount }
+            detail: { jobId: reqId, net: netEarnings, gross: grossVal }
           }));
-        } catch (e) {}
+        } catch (e) {
+          console.warn('Broadcast sync error:', e);
+        }
       } else {
         toast.error('Payment processing failed. Please retry.', 'Payment Error');
       }

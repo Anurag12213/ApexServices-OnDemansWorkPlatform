@@ -48,3 +48,7 @@ desktop.ini
 # Maven Wrapper JAR (can be downloaded by mvnw)
 .mvn/wrapper/maven-wrapper.jar
 **/maven-wrapper.jar
+
+# Netlify CLI state
+.netlify/
+**/.netlify/

@@ -58,6 +58,71 @@ export const PartnerProvider = ({ children }) => {
     audioService.setVibrationEnabled(vibrationEnabled);
   }, [vibrationEnabled]);
 
+  // Cross-portal BroadcastChannel listener for incoming Customer Payments
+  useEffect(() => {
+    let syncChannel;
+    try {
+      syncChannel = new BroadcastChannel('apex_services_sync');
+      syncChannel.onmessage = (event) => {
+        const data = event.data;
+        if (!data) return;
+
+        if (data.type === 'CUSTOMER_PAYMENT_PROCESSED') {
+          const state = api.getState();
+          if (state.partner) {
+            const net = Number(data.net || 0);
+            const gross = Number(data.gross || 0);
+            const cut = Number(data.platformCut || 0);
+
+            if (!state.partner.earnings) {
+              state.partner.earnings = {
+                today: 0,
+                thisWeek: 0,
+                thisMonth: 0,
+                lifetime: 0,
+                pendingPayout: 0,
+                availableBalance: 0,
+              };
+            }
+
+            state.partner.jobsCompleted = (state.partner.jobsCompleted || 0) + 1;
+            state.partner.earnings.today = (state.partner.earnings.today || 0) + net;
+            state.partner.earnings.thisWeek = (state.partner.earnings.thisWeek || 0) + net;
+            state.partner.earnings.thisMonth = (state.partner.earnings.thisMonth || 0) + net;
+            state.partner.earnings.lifetime = (state.partner.earnings.lifetime || 0) + net;
+            state.partner.earnings.availableBalance = (state.partner.earnings.availableBalance || 0) + net;
+            state.partner.walletBalance = state.partner.earnings.availableBalance;
+
+            if (!state.notifications) state.notifications = [];
+            state.notifications.unshift({
+              id: 'NOTIF-' + Date.now(),
+              category: 'EARNINGS',
+              title: 'Customer Payment Confirmed — Earnings Credited',
+              message: `Customer payment of ₹${gross.toLocaleString('en-IN')} confirmed. 20% platform charge (₹${cut.toLocaleString('en-IN')}) deducted. Net ₹${net.toLocaleString('en-IN')} credited to your wallet balance.`,
+              timestamp: new Date().toISOString(),
+              read: false,
+              actionLink: '/earnings',
+            });
+
+            api.saveState(state);
+            refreshState();
+            audioService.playSuccessSound();
+            toast.success(
+              `Payment Confirmed! ₹${net.toLocaleString('en-IN')} credited to your wallet after 20% platform deduction.`,
+              'Earnings Added'
+            );
+          }
+        }
+      };
+    } catch (e) {
+      console.warn('BroadcastChannel sync error in PartnerContext:', e);
+    }
+
+    return () => {
+      if (syncChannel) syncChannel.close();
+    };
+  }, [refreshState, toast]);
+
   // Periodic poll to fetch live partner feed from backend and check for expiring offers
   useEffect(() => {
     let active = true;
@@ -116,12 +181,11 @@ export const PartnerProvider = ({ children }) => {
   const logout = () => {
     const name = partner?.name || partner?.fullName || 'Partner';
     const currentToken = localStorage.getItem('apex_partner_token');
-    if (currentToken) {
-      fetch('http://localhost:8080/api/auth/logout', {
+      const apiUrl = (import.meta.env.VITE_API_URL || 'https://apexservices-backend.onrender.com/api').replace(/\/+$/, '');
+      fetch(`${apiUrl}/auth/logout`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${currentToken}` }
       }).catch(err => console.warn('Partner server logout notification failed', err));
-    }
     const state = api.getState();
     state.partner = null;
     state.activeJob = null;
