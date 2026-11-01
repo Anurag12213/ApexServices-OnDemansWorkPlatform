@@ -19,6 +19,14 @@ export const PartnerProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [brandName, setBrandName] = useState(() => {
+    try {
+      const cached = localStorage.getItem('apex_custom_branding');
+      return cached ? JSON.parse(cached).brandName || 'ApexServices' : 'ApexServices';
+    } catch {
+      return 'ApexServices';
+    }
+  });
 
   // Sync state from authoritative store
   const refreshState = useCallback(() => {
@@ -43,11 +51,33 @@ export const PartnerProvider = ({ children }) => {
     }
   }, [currentIncomingAlert]);
 
-  // Initial load
+  // Initial load & fetch branding
   useEffect(() => {
     refreshState();
     setIsLoading(false);
+
+    const apiUrl = (
+      (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
+      (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+      'https://apexservices-backend.onrender.com/api'
+    ).replace(/\/+$/, '');
+
+    fetch(`${apiUrl}/data`)
+      .then(res => res.json())
+      .then(d => {
+        if (d?.siteBranding?.brandName) {
+          setBrandName(d.siteBranding.brandName);
+        }
+      })
+      .catch(() => {});
   }, []);
+
+  // Update browser tab title dynamically
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = `${brandName} Partner Portal - Technician Field Operations`;
+    }
+  }, [brandName]);
 
   // Sync sound settings
   useEffect(() => {
@@ -58,7 +88,7 @@ export const PartnerProvider = ({ children }) => {
     audioService.setVibrationEnabled(vibrationEnabled);
   }, [vibrationEnabled]);
 
-  // Cross-portal BroadcastChannel listener for incoming Customer Payments
+  // Cross-portal BroadcastChannel listener for incoming Customer Payments and Brand Updates
   useEffect(() => {
     let syncChannel;
     try {
@@ -66,6 +96,13 @@ export const PartnerProvider = ({ children }) => {
       syncChannel.onmessage = (event) => {
         const data = event.data;
         if (!data) return;
+
+        if (data.type === 'BRANDING_UPDATED') {
+          if (data.brandName) {
+            setBrandName(data.brandName);
+          }
+          return;
+        }
 
         if (data.type === 'CUSTOMER_PAYMENT_PROCESSED') {
           const state = api.getState();
@@ -294,7 +331,8 @@ export const PartnerProvider = ({ children }) => {
         acceptOffer,
         declineOffer,
         updateJobStatus,
-        refreshState
+        refreshState,
+        brandName
       }}
     >
       {children}

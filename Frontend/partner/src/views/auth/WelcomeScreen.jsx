@@ -4,6 +4,7 @@ import { ShieldCheck, Zap, IndianRupee, Users, ArrowRight, Award, CheckCircle } 
 import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 
 export const WelcomeScreen = ({ onGetStarted, onLogin }) => {
+  const { brandName } = usePartner();
   return (
     <div className="min-h-[calc(100vh-4rem)] flex flex-col justify-between py-8 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
       {/* Hero Badge & Title */}
@@ -16,7 +17,7 @@ export const WelcomeScreen = ({ onGetStarted, onLogin }) => {
         <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
           Grow Your Trade with <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3867FF] to-[#7C3AED]">
-            ApexServices Partner Program
+            {brandName || 'ApexServices'} Partner Program
           </span>
         </h1>
 

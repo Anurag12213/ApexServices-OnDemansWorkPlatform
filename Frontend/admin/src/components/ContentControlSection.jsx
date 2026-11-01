@@ -234,7 +234,19 @@ export default function ContentControlSection({ onNavigateTab }) {
         const saved = await res.json().catch(() => payload);
         setBrandingForm((prev) => ({ ...prev, ...saved }));
         await fetchData();
-        triggerSaveNotice('Header, Logo & Branding saved and live on website!');
+
+        try {
+          const ch = new BroadcastChannel('apex_services_sync');
+          ch.postMessage({
+            type: 'BRANDING_UPDATED',
+            brandName: payload.brandName,
+            brandDotColor: payload.brandDotColor,
+            siteBranding: payload,
+          });
+          ch.close();
+        } catch (e) {}
+
+        triggerSaveNotice('Header, Logo & Branding saved and live across all portals!');
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.message || `Failed to save branding (HTTP ${res.status}).`, 'Save Failed');

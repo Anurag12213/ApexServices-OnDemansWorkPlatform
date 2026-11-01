@@ -225,7 +225,17 @@ export const DataProvider = ({ children }) => {
     try {
       syncChannel = new BroadcastChannel('apex_services_sync');
       syncChannel.onmessage = (event) => {
-        if (event.data?.type === 'DATA_UPDATED' || event.data?.type === 'apex_payment_settled') {
+        if (event.data?.type === 'DATA_UPDATED' || event.data?.type === 'apex_payment_settled' || event.data?.type === 'BRANDING_UPDATED') {
+          if (event.data?.type === 'BRANDING_UPDATED' && event.data.siteBranding) {
+            setData(prev => ({
+              ...prev,
+              siteBranding: { ...prev?.siteBranding, ...event.data.siteBranding },
+              publicConfig: { ...prev?.publicConfig, ...event.data.siteBranding },
+            }));
+            if (event.data.brandName) {
+              document.title = `${event.data.brandName} - Certified Home Services & Craftsmanship`;
+            }
+          }
           fetchApiData();
           if (customerUser?.email) {
             fetchCustomerRequests(customerUser.email);

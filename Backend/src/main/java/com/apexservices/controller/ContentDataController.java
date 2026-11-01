@@ -8,11 +8,14 @@ import com.apexservices.dto.WorkRequestDto;
 import com.apexservices.dto.WorkRequestResponseDto;
 import com.apexservices.model.Category;
 import com.apexservices.model.Icon;
+import com.apexservices.model.SiteSetting;
 import com.apexservices.repository.CategoryRepository;
 import com.apexservices.repository.IconRepository;
+import com.apexservices.repository.SiteSettingRepository;
 import com.apexservices.security.InputSanitizer;
 import com.apexservices.service.PartnerPresenceService;
 import com.apexservices.service.WorkRequestService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -47,6 +50,8 @@ public class ContentDataController {
     private final com.apexservices.service.ReviewService reviewService;
     private final com.apexservices.service.PartnerProfileService partnerProfileService;
     private final com.apexservices.repository.UserRepository userRepository;
+    private final SiteSettingRepository siteSettingRepository;
+    private final ObjectMapper objectMapper;
 
     private final Map<String, Object> siteBranding = new ConcurrentHashMap<>();
     private final Map<String, Object> announcement = new ConcurrentHashMap<>();
@@ -63,6 +68,19 @@ public class ContentDataController {
 
     @SuppressWarnings("unchecked")
     private synchronized void persistContentState() {
+        try {
+            if (siteSettingRepository != null && objectMapper != null) {
+                siteSettingRepository.save(new SiteSetting("siteBranding", objectMapper.writeValueAsString(siteBranding)));
+                siteSettingRepository.save(new SiteSetting("announcement", objectMapper.writeValueAsString(announcement)));
+                siteSettingRepository.save(new SiteSetting("aiOwnerSection", objectMapper.writeValueAsString(aiOwnerSection)));
+                siteSettingRepository.save(new SiteSetting("heroSlides", objectMapper.writeValueAsString(heroSlides)));
+                siteSettingRepository.save(new SiteSetting("reviews", objectMapper.writeValueAsString(reviews)));
+                log.info("Site content state successfully saved to MySQL database (brandName={}).", siteBranding.get("brandName"));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to persist site content state to database: {}", e.getMessage());
+        }
+
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("site_content_config.dat"))) {
             Map<String, Object> state = new HashMap<>();
             state.put("siteBranding", new HashMap<>(siteBranding));
@@ -79,35 +97,80 @@ public class ContentDataController {
 
     @SuppressWarnings("unchecked")
     private synchronized void loadPersistedContentState() {
+        boolean loadedFromDb = false;
         try {
-            File file = new File("site_content_config.dat");
-            if (file.exists() && file.length() > 0) {
-                try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-                    Object obj = ois.readObject();
-                    if (obj instanceof Map<?, ?> state) {
-                        if (state.get("siteBranding") instanceof Map<?, ?> m) {
-                            siteBranding.putAll((Map<String, Object>) m);
-                        }
-                        if (state.get("announcement") instanceof Map<?, ?> m) {
-                            announcement.putAll((Map<String, Object>) m);
-                        }
-                        if (state.get("aiOwnerSection") instanceof Map<?, ?> m) {
-                            aiOwnerSection.putAll((Map<String, Object>) m);
-                        }
-                        if (state.get("heroSlides") instanceof List<?> l && !l.isEmpty()) {
-                            heroSlides.clear();
-                            heroSlides.addAll((List<Map<String, Object>>) l);
-                        }
-                        if (state.get("reviews") instanceof List<?> l && !l.isEmpty()) {
-                            reviews.clear();
-                            reviews.addAll((List<Map<String, Object>>) l);
-                        }
-                        log.info("Persisted site content state loaded from disk: brandDotColor={}", siteBranding.get("brandDotColor"));
+            if (siteSettingRepository != null && objectMapper != null) {
+                Optional<SiteSetting> brandingOpt = siteSettingRepository.findById("siteBranding");
+                if (brandingOpt.isPresent() && brandingOpt.get().getValue() != null) {
+                    Map<String, Object> m = objectMapper.readValue(brandingOpt.get().getValue(), Map.class);
+                    siteBranding.putAll(m);
+                    loadedFromDb = true;
+                }
+                Optional<SiteSetting> annOpt = siteSettingRepository.findById("announcement");
+                if (annOpt.isPresent() && annOpt.get().getValue() != null) {
+                    Map<String, Object> m = objectMapper.readValue(annOpt.get().getValue(), Map.class);
+                    announcement.putAll(m);
+                }
+                Optional<SiteSetting> aiOpt = siteSettingRepository.findById("aiOwnerSection");
+                if (aiOpt.isPresent() && aiOpt.get().getValue() != null) {
+                    Map<String, Object> m = objectMapper.readValue(aiOpt.get().getValue(), Map.class);
+                    aiOwnerSection.putAll(m);
+                }
+                Optional<SiteSetting> slidesOpt = siteSettingRepository.findById("heroSlides");
+                if (slidesOpt.isPresent() && slidesOpt.get().getValue() != null) {
+                    List<Map<String, Object>> l = objectMapper.readValue(slidesOpt.get().getValue(), List.class);
+                    if (!l.isEmpty()) {
+                        heroSlides.clear();
+                        heroSlides.addAll(l);
                     }
+                }
+                Optional<SiteSetting> revOpt = siteSettingRepository.findById("reviews");
+                if (revOpt.isPresent() && revOpt.get().getValue() != null) {
+                    List<Map<String, Object>> l = objectMapper.readValue(revOpt.get().getValue(), List.class);
+                    if (!l.isEmpty()) {
+                        reviews.clear();
+                        reviews.addAll(l);
+                    }
+                }
+                if (loadedFromDb) {
+                    log.info("Loaded site branding from MySQL database: brandName={}", siteBranding.get("brandName"));
                 }
             }
         } catch (Exception e) {
-            log.warn("Failed to load persisted site content state from disk: {}", e.getMessage());
+            log.warn("Database content settings load failed, falling back to disk: {}", e.getMessage());
+        }
+
+        if (!loadedFromDb) {
+            try {
+                File file = new File("site_content_config.dat");
+                if (file.exists() && file.length() > 0) {
+                    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
+                        Object obj = ois.readObject();
+                        if (obj instanceof Map<?, ?> state) {
+                            if (state.get("siteBranding") instanceof Map<?, ?> m) {
+                                siteBranding.putAll((Map<String, Object>) m);
+                            }
+                            if (state.get("announcement") instanceof Map<?, ?> m) {
+                                announcement.putAll((Map<String, Object>) m);
+                            }
+                            if (state.get("aiOwnerSection") instanceof Map<?, ?> m) {
+                                aiOwnerSection.putAll((Map<String, Object>) m);
+                            }
+                            if (state.get("heroSlides") instanceof List<?> l && !l.isEmpty()) {
+                                heroSlides.clear();
+                                heroSlides.addAll((List<Map<String, Object>>) l);
+                            }
+                            if (state.get("reviews") instanceof List<?> l && !l.isEmpty()) {
+                                reviews.clear();
+                                reviews.addAll((List<Map<String, Object>>) l);
+                            }
+                            log.info("Persisted site content state loaded from disk: brandDotColor={}", siteBranding.get("brandDotColor"));
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load persisted site content state from disk: {}", e.getMessage());
+            }
         }
     }
 

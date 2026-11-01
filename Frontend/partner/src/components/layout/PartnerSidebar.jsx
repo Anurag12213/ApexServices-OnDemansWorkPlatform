@@ -19,7 +19,7 @@ import { StatusBadge } from '../common/StatusBadge';
 import { useConfirm } from '../ConfirmDialog';
 
 export const PartnerSidebar = ({ isOpen, onClose }) => {
-  const { activeTab, setActiveTab, partner, logout, offers, activeJob } = usePartner();
+  const { activeTab, setActiveTab, partner, logout, offers, activeJob, brandName } = usePartner();
   const confirm = useConfirm();
 
   const pendingOffersCount = (offers || []).filter(o => o.status === 'PENDING').length;
@@ -67,11 +67,11 @@ export const PartnerSidebar = ({ isOpen, onClose }) => {
         <div className="h-16 px-6 border-b border-slate-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-sm">
-              A
+              {(brandName || 'ApexServices').charAt(0)}
             </div>
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-slate-900 tracking-tight text-base">
-                Apex<span className="text-blue-600">Services</span>
+                {brandName || 'ApexServices'}
               </span>
               <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">
                 Partner

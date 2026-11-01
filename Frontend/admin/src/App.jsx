@@ -3,14 +3,25 @@ import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import DashboardSection from './components/DashboardSection';
 import ServiceCategoriesSection from './components/ServiceCategoriesSection';
-import ServiceOperationsSection from './components/ServiceOperationsSection';
 import UserManagementSection from './components/UserManagementSection';
 import ContentControlSection from './components/ContentControlSection';
 import PaymentTransactionsSection from './components/PaymentTransactionsSection';
 import NotificationsSection from './components/NotificationsSection';
 import ReportsSection from './components/ReportsSection';
-import SettingsSection from './components/SettingsSection';
 import ProfileSection from './components/ProfileSection';
+
+// The 16 Complete Founder's Admin Panel Checklist Modules (unmerged)
+import OrderBookingManagementSection from './components/OrderBookingManagementSection';
+import VendorPartnerManagementSection from './components/VendorPartnerManagementSection';
+import RolesPermissionsSection from './components/RolesPermissionsSection';
+import SupportTicketManagementSection from './components/SupportTicketManagementSection';
+import AuditLogsSection from './components/AuditLogsSection';
+import FeatureFlagsConfigSection from './components/FeatureFlagsConfigSection';
+import CouponsDiscountsSection from './components/CouponsDiscountsSection';
+import ContentModerationSection from './components/ContentModerationSection';
+import SessionDeviceManagementSection from './components/SessionDeviceManagementSection';
+import ForceUpdateVersionControlSection from './components/ForceUpdateVersionControlSection';
+
 import { ToastProvider } from './components/Toast';
 import { ConfirmDialogProvider } from './components/ConfirmDialog';
 import AdminLoginPage from './pages/AdminLoginPage';
@@ -45,30 +56,84 @@ function AdminDashboardApp() {
     return <AdminLoginPage onLogin={(data) => setAdminSession(data)} />;
   }
 
+  // Explicit, unmerged rendering for each of the 16 Founder's Admin Panel modules
   const renderSection = () => {
     switch (activeTab) {
+      // Module 9: Live Analytics Dashboard
       case 'dashboard':
-        return <DashboardSection />;
-      case 'categories':
-        return <ServiceCategoriesSection />;
-      case 'operations':
-        return <ServiceOperationsSection onNavigateTab={setActiveTab} />;
+        return <DashboardSection onNavigateTab={setActiveTab} />;
+
+      // Module 7: Order / Booking Management
+      case 'bookings':
+        return <OrderBookingManagementSection />;
+
+      // Module 13: Vendor / Partner Management
+      case 'partners':
+        return <VendorPartnerManagementSection />;
+
+      // Module 1: User Management
       case 'users':
         return <UserManagementSection />;
-      case 'content':
-        return <ContentControlSection onNavigateTab={setActiveTab} />;
+
+      // Module 3: Payments & Transactions
       case 'payments':
         return <PaymentTransactionsSection />;
-      case 'notifications':
-        return <NotificationsSection />;
+
+      // Module 12: Coupons & Discount Management
+      case 'coupons':
+        return <CouponsDiscountsSection />;
+
+      // Module 5: Reports & Exports
       case 'reports':
         return <ReportsSection />;
+
+      // Module 8: Support & Ticket Management
+      case 'support':
+        return <SupportTicketManagementSection />;
+
+      // Module 4: Notifications
+      case 'notifications':
+        return <NotificationsSection />;
+
+      // Module 2: Content Management (CMS)
+      case 'content':
+        return <ContentControlSection onNavigateTab={setActiveTab} />;
+
+      // Module 14: Content Moderation Tools
+      case 'moderation':
+        return <ContentModerationSection />;
+
+      // Core Service Offerings & Pricing Catalog
+      case 'categories':
+        return <ServiceCategoriesSection />;
+
+      // Module 6: Roles & Permissions (RBAC)
+      case 'roles':
+        return <RolesPermissionsSection />;
+
+      // Module 10: Audit Logs & Activity History
+      case 'audit':
+        return <AuditLogsSection />;
+
+      // Module 11: Feature Flags & App Configuration
+      case 'feature-flags':
       case 'settings':
-        return <SettingsSection />;
+        return <FeatureFlagsConfigSection />;
+
+      // Module 15: Session & Device Management
+      case 'sessions':
+        return <SessionDeviceManagementSection />;
+
+      // Module 16: Force-Update & App Version Control
+      case 'versions':
+        return <ForceUpdateVersionControlSection />;
+
+      // Auxiliary Admin Profile
       case 'profile':
         return <ProfileSection />;
+
       default:
-        return <DashboardSection />;
+        return <DashboardSection onNavigateTab={setActiveTab} />;
     }
   };
 
@@ -83,8 +148,9 @@ function AdminDashboardApp() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
+        {/* Top Navbar with 16-module mega-switcher, instant search, and quick horizontal pills */}
         <Navbar
+          activeTab={activeTab}
           setActiveTab={setActiveTab}
           sidebarCollapsed={sidebarCollapsed}
           setSidebarCollapsed={setSidebarCollapsed}
