@@ -67,6 +67,9 @@ export const PartnerProvider = ({ children }) => {
       .then(d => {
         if (d?.siteBranding?.brandName) {
           setBrandName(d.siteBranding.brandName);
+          try {
+            localStorage.setItem('apex_custom_branding', JSON.stringify(d.siteBranding));
+          } catch {}
         }
       })
       .catch(() => {});
@@ -100,6 +103,9 @@ export const PartnerProvider = ({ children }) => {
         if (data.type === 'BRANDING_UPDATED') {
           if (data.brandName) {
             setBrandName(data.brandName);
+            try {
+              localStorage.setItem('apex_custom_branding', JSON.stringify(data.siteBranding || { brandName: data.brandName }));
+            } catch {}
           }
           return;
         }

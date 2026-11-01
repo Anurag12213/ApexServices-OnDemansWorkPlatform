@@ -11,7 +11,8 @@ export const PartnerNavbar = ({ onOpenMenu }) => {
     toggleOnline,
     setActiveTab,
     login,
-    logout
+    logout,
+    brandName
   } = usePartner();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -48,12 +49,12 @@ export const PartnerNavbar = ({ onOpenMenu }) => {
             className="flex items-center gap-2 cursor-pointer select-none"
           >
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-base shadow-sm">
-              A
+              {(brandName || 'ApexServices').charAt(0)}
             </div>
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900">
-                  Apex<span className="text-blue-600">Services</span>
+                  {brandName || 'ApexServices'}
                 </span>
                 <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200">
                   Partner
