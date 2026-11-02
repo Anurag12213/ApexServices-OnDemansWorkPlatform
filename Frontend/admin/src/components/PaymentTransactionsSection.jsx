@@ -93,6 +93,11 @@ export default function PaymentTransactionsSection() {
       return next;
     });
 
+    adminFetch(`/admin/payments/payouts/${id}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'APPROVE' })
+    }).catch(e => console.warn('Backend payout approve sync note:', e));
+
     broadcastSync('PARTNER_PAYOUT_APPROVED', {
       payoutId: id,
       partnerName: updatedPayout?.partnerName,
@@ -118,6 +123,11 @@ export default function PaymentTransactionsSection() {
       } catch (e) {}
       return next;
     });
+
+    adminFetch(`/admin/payments/payouts/${id}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'SETTLE', transactionReference: `TXN-PRT-${Date.now()}` })
+    }).catch(e => console.warn('Backend payout settle sync note:', e));
 
     broadcastSync('PARTNER_PAYOUT_SETTLED', {
       payoutId: id,
@@ -343,6 +353,11 @@ export default function PaymentTransactionsSection() {
       return next;
     });
 
+    adminFetch(`/admin/payments/refunds/${id}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'APPROVE' })
+    }).catch(e => console.warn('Backend refund approve sync note:', e));
+
     broadcastSync('USER_REFUND_APPROVED', {
       txnId: id,
       ticket: approvedTxn?.serviceTicket,
@@ -370,6 +385,11 @@ export default function PaymentTransactionsSection() {
       } catch (e) {}
       return next;
     });
+
+    adminFetch(`/admin/payments/refunds/${id}/action`, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'SETTLE', transactionReference: `REF-SETTLE-${Date.now()}` })
+    }).catch(e => console.warn('Backend refund settle sync note:', e));
 
     broadcastSync('USER_REFUND_SETTLED', {
       txnId: id,

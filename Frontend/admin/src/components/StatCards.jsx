@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminFetch } from '../utils/api';
 
 export default function StatCards() {
   const [requests, setRequests] = useState([]);
@@ -6,7 +7,7 @@ export default function StatCards() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:8080/api/work-requests');
+        const res = await adminFetch('/work-requests');
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
@@ -19,7 +20,7 @@ export default function StatCards() {
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 3000);
+    const interval = setInterval(fetchStats, 10000);
     return () => clearInterval(interval);
   }, []);
 

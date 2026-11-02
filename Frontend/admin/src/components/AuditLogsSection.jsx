@@ -34,7 +34,19 @@ export default function AuditLogsSection() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setAuditLogs(data);
+          const mapped = data.map((l) => ({
+            id: l.id,
+            timestamp: l.createdAt ? new Date(l.createdAt).toLocaleString() : (l.timestamp || 'Recent'),
+            actor: l.actorId || l.actor || 'SYSTEM',
+            role: (l.actorRole || l.role || 'ADMIN').replace('ROLE_', ''),
+            action: l.action || 'OPERATION',
+            category: l.entityType || l.category || 'SYSTEM',
+            target: l.entityId || l.target || 'General',
+            ip: l.ipAddress || l.ip || '127.0.0.1',
+            status: l.status || 'SUCCESS',
+            details: l.details || ''
+          }));
+          setAuditLogs(mapped);
         }
       }
     } catch (err) {

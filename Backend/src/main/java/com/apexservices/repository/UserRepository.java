@@ -27,6 +27,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     java.util.List<User> findByRole(com.apexservices.model.Role role);
 
+    long countByRole(com.apexservices.model.Role role);
+
+    long countByRoleAndActiveTrue(com.apexservices.model.Role role);
+
     @Query("SELECT DISTINCT u FROM User u JOIN u.serviceCategories c WHERE u.role = com.apexservices.model.Role.ROLE_PARTNER AND u.active = true AND c.id = :categoryId")
     java.util.List<User> findEligiblePartnersByCategoryId(@Param("categoryId") Long categoryId);
 

@@ -35,7 +35,21 @@ export default function SessionDeviceManagementSection() {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          setSessions(data);
+          const mapped = data.map((s) => ({
+            id: s.id,
+            user: s.user?.fullName || s.userEmail?.split('@')[0] || s.user || 'Apex User',
+            email: s.userEmail || s.email || 'user@apexservices.com',
+            role: (s.role || 'CUSTOMER').replace('ROLE_', ''),
+            device: s.deviceInfo || s.device || 'Desktop Chrome',
+            deviceType: ((s.deviceInfo || s.device || '')).toLowerCase().includes('phone') || ((s.deviceInfo || s.device || '')).toLowerCase().includes('android') ? 'MOBILE' : 'DESKTOP',
+            browser: s.browser || 'Chrome / WebKit',
+            ip: s.ipAddress || s.ip || '127.0.0.1',
+            location: s.location || 'Mumbai, IN',
+            lastActive: s.lastActiveAt ? new Date(s.lastActiveAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (s.lastActive || 'Just now'),
+            createdAt: s.createdAt ? new Date(s.createdAt).toLocaleDateString() : 'Active',
+            isCurrent: s.isCurrent || false
+          }));
+          setSessions(mapped);
         }
       }
     } catch (err) {

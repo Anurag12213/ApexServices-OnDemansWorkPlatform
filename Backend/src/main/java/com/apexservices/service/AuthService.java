@@ -31,6 +31,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final com.apexservices.security.LoginRateLimiterService rateLimiterService;
+    private final EmailOtpService emailOtpService;
+    private final com.apexservices.email.EmailService emailService;
 
     // Static dummy BCrypt hash used to equalize execution time against timing attacks for non-existent users
     private static final String DUMMY_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoOhtn.02nF3r.f4FfGZ4K9mD5zXlH3lU.";
@@ -139,6 +141,15 @@ public class AuthService {
             throw new IllegalArgumentException("Registration data contains forbidden SQL commands or symbols.");
         }
 
+        // Mandatory Email Verification: Any registration supplying an email MUST provide a valid verification grant
+        if (email != null && !email.isBlank()) {
+            if (request.getVerificationGrant() == null || request.getVerificationGrant().isBlank()) {
+                log.warn("[SECURITY AUDIT] Email registration rejected: missing verification grant for [{}]", maskIdentifier(email));
+                throw new IllegalArgumentException("Verification grant token is required for email registration.");
+            }
+            emailOtpService.validateAndConsumeGrant(email, com.apexservices.model.OtpPurpose.REGISTRATION, request.getVerificationGrant().trim());
+        }
+
         // Allowed public roles: ROLE_CUSTOMER (default) or ROLE_PARTNER
         Role assignedRole = (request.getRole() == Role.ROLE_PARTNER) ? Role.ROLE_PARTNER : Role.ROLE_CUSTOMER;
 
@@ -154,6 +165,16 @@ public class AuthService {
 
         user = userRepository.save(user);
         log.info("[SECURITY AUDIT] New user registered successfully [id={}, role={}]", user.getId(), user.getRole());
+
+        // Dispatch Welcome email asynchronously if email is present
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
+            try {
+                emailService.sendWelcomeEmail(user.getEmail(), user.getFullName(), null);
+            } catch (Exception ex) {
+                log.warn("[EMAIL] Failed to dispatch welcome email: {}", ex.getMessage());
+            }
+        }
+
         return buildAuthResponse(user);
     }
 
@@ -271,6 +292,38 @@ public class AuthService {
                 .organizationName(orgName)
                 .serviceCategories(categories)
                 .build();
+    }
+
+    /**
+     * Resets a user's password using an authenticated single-use Verification Grant.
+     * Enforces that ROLE_ADMIN passwords cannot be reset via public recovery endpoints.
+     */
+    @Transactional
+    public void resetPasswordWithGrant(ResetPasswordWithOtpRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        // 1. Atomically validate and consume the single-use grant
+        emailOtpService.validateAndConsumeGrant(email, com.apexservices.model.OtpPurpose.PASSWORD_RESET, request.getVerificationGrant());
+
+        // 2. Fetch user account
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("User account not found"));
+
+        if (!user.isActive()) {
+            throw new BadCredentialsException("Your account is currently deactivated. Please contact support.");
+        }
+
+        // STRICT SECURITY INVARIANT: Public password reset for ROLE_ADMIN is prohibited
+        if (user.getRole() == Role.ROLE_ADMIN) {
+            log.warn("[SECURITY ALERT] Unauthorized password reset attempt for administrative account [{}]", maskIdentifier(email));
+            throw new BadCredentialsException("Administrative passwords cannot be reset via public recovery endpoints.");
+        }
+
+        // 3. Update password using BCrypt
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        log.info("[SECURITY AUDIT] Password reset successfully for user [id={}] via verified grant", user.getId());
     }
 
     private String maskIdentifier(String id) {

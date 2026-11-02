@@ -88,14 +88,23 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/slides/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/work-requests/**").permitAll()
+                .requestMatchers("/api/config/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/coupons/validate").permitAll()
 
-                // Public Work Request Submission, Cancellation, Stage Sync, Completion, Settlement & Review
+                // Work Request Submission (Public for guest / customer creation)
                 .requestMatchers(HttpMethod.POST, "/api/work-requests").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/cancel").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/advance-stage").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/verify-completion").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/pay").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/review").permitAll()
+
+                // Technician Execution & Completion Operations
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/advance-stage").hasAnyRole("PARTNER", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/verify-completion").hasAnyRole("PARTNER", "ADMIN")
+
+                // Cancellation, Payment Settlement & Customer Review Operations
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/cancel").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/pay").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/review").hasAnyRole("CUSTOMER", "ADMIN")
+
+                // Support Tickets Module across Portals
+                .requestMatchers("/api/tickets/**").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
 
                 // Actuator Security (Only health and info are public; metrics/env require ADMIN)
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
@@ -156,10 +165,11 @@ public class SecurityConfig {
             configuration.addAllowedOrigin(origin);
         }
 
-        // Strict domain patterns for production subdomains
+        // Strict domain patterns for production subdomains and Netlify deployments
         configuration.setAllowedOriginPatterns(List.of(
             "https://*.apexservices.com",
-            "https://apexservices.com"
+            "https://apexservices.com",
+            "https://*.netlify.app"
         ));
 
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

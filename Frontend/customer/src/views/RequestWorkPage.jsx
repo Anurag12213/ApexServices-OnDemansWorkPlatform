@@ -43,6 +43,7 @@ import {
   Pencil,
   CreditCard,
   Activity,
+  Tag,
 } from 'lucide-react';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { useConfirm } from '../components/ConfirmDialog';
@@ -201,6 +202,26 @@ export const RequestWorkPage = () => {
         ch.close();
       } catch (err) {}
 
+      // Persist real dispute ticket to backend database
+      try {
+        const ticketHeaders = { 'Content-Type': 'application/json' };
+        if (customerToken) ticketHeaders['Authorization'] = `Bearer ${customerToken}`;
+        fetch(`${API_BASE_URL}/tickets`, {
+          method: 'POST',
+          headers: ticketHeaders,
+          body: JSON.stringify({
+            workRequestId: selectedDisputeReq.id,
+            name: customerUser?.fullName || selectedDisputeReq.customerName,
+            email: customerUser?.email || selectedDisputeReq.customerEmail,
+            phone: customerUser?.mobileNumber || selectedDisputeReq.contactPhone,
+            subject: `Dispute on Order #${selectedDisputeReq.id}: ${disputeReason}`,
+            category: 'DISPUTE',
+            priority: 'HIGH',
+            message: `${disputeReason}: ${disputeNotes || 'Customer requested dispute resolution & refund'}`
+          })
+        }).catch(err => console.warn('Real ticket submission notice:', err));
+      } catch (err) {}
+
       // Update selected item in view
       if (selectedHistoryRequest && selectedHistoryRequest.id === selectedDisputeReq.id) {
         setSelectedHistoryRequest((prev) => ({
@@ -256,14 +277,63 @@ export const RequestWorkPage = () => {
     }
   };
 
+  // Coupon and promo discount state
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCodeInput.trim()) {
+      toast.error('Please enter a promo code');
+      return;
+    }
+    setIsValidatingCoupon(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/coupons/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: couponCodeInput.trim(),
+          orderAmount: trackedRequest?.estimatedCost || 499,
+          phone: customerUser?.mobileNumber || trackedRequest?.contactPhone,
+          category: trackedRequest?.serviceCategory
+        })
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setAppliedCoupon(data);
+        toast.success(data.message || 'Coupon applied successfully!');
+      } else {
+        setAppliedCoupon(null);
+        toast.error(data.message || 'Invalid coupon code');
+      }
+    } catch (err) {
+      toast.error('Failed to validate coupon');
+    } finally {
+      setIsValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCodeInput('');
+    toast.info('Coupon removed');
+  };
+
   // Customer settlement payment handler
   const handleCustomerPay = async (reqId, method = 'UPI') => {
     setIsProcessingPayment(true);
     try {
+      const payHeaders = { 'Content-Type': 'application/json' };
+      if (customerToken) payHeaders['Authorization'] = `Bearer ${customerToken}`;
       const res = await fetch(`${API_BASE_URL}/work-requests/${reqId}/pay`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method })
+        headers: payHeaders,
+        body: JSON.stringify({
+          method,
+          couponCode: appliedCoupon?.code,
+          discountAmount: appliedCoupon?.discountAmount
+        })
       });
       if (res.ok) {
         const updated = await res.json();
@@ -2946,9 +3016,60 @@ export const RequestWorkPage = () => {
                                     </div>
                                     <div className="text-left sm:text-right shrink-0">
                                       <span className="text-xs font-semibold text-slate-500 block">Total Due:</span>
-                                      <span className="text-2xl font-black text-[#3867FF]">
-                                        {formatCurrency(trackedRequest.estimatedCost || 499)}
-                                      </span>
+                                      {appliedCoupon ? (
+                                        <div className="flex flex-col items-start sm:items-end">
+                                          <span className="text-xs text-slate-400 line-through">
+                                            {formatCurrency(trackedRequest.estimatedCost || 499)}
+                                          </span>
+                                          <span className="text-2xl font-black text-emerald-600">
+                                            {formatCurrency(appliedCoupon.netAmount)}
+                                          </span>
+                                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded mt-0.5">
+                                            Saved {formatCurrency(appliedCoupon.discountAmount)}
+                                          </span>
+                                        </div>
+                                      ) : (
+                                        <span className="text-2xl font-black text-[#3867FF]">
+                                          {formatCurrency(trackedRequest.estimatedCost || 499)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Promo Code / Coupon Section */}
+                                  <div className="p-3 bg-white rounded-xl border border-amber-200/80 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                        <Tag className="w-3.5 h-3.5 text-[#3867FF]" />
+                                        <span>Apply Promo / Coupon Code</span>
+                                      </label>
+                                      {appliedCoupon && (
+                                        <button
+                                          type="button"
+                                          onClick={handleRemoveCoupon}
+                                          className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                                        >
+                                          Remove Coupon
+                                        </button>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        value={couponCodeInput}
+                                        onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+                                        placeholder="Enter code (e.g. APEXFIRST)"
+                                        disabled={!!appliedCoupon || isValidatingCoupon}
+                                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold uppercase tracking-wider text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={!!appliedCoupon || isValidatingCoupon || !couponCodeInput.trim()}
+                                        onClick={handleApplyCoupon}
+                                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shrink-0"
+                                      >
+                                        {isValidatingCoupon ? 'Validating...' : 'Apply Code'}
+                                      </button>
                                     </div>
                                   </div>
 

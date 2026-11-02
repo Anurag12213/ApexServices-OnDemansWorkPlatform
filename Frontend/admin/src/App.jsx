@@ -6,7 +6,6 @@ import ServiceCategoriesSection from './components/ServiceCategoriesSection';
 import UserManagementSection from './components/UserManagementSection';
 import ContentControlSection from './components/ContentControlSection';
 import PaymentTransactionsSection from './components/PaymentTransactionsSection';
-import NotificationsSection from './components/NotificationsSection';
 import ReportsSection from './components/ReportsSection';
 import ProfileSection from './components/ProfileSection';
 
@@ -100,6 +99,16 @@ function AdminDashboardApp() {
     }
   });
 
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setAdminSession(null);
+    };
+    window.addEventListener('apex_admin_auth_expired', handleAuthExpired);
+    return () => {
+      window.removeEventListener('apex_admin_auth_expired', handleAuthExpired);
+    };
+  }, []);
+
   const handleLogout = () => {
     if (adminSession?.token) {
       fetch(`${API_BASE_URL}/auth/logout`, {
@@ -150,10 +159,6 @@ function AdminDashboardApp() {
       // Module 8: Support & Ticket Management
       case 'support':
         return <SupportTicketManagementSection />;
-
-      // Module 4: Notifications
-      case 'notifications':
-        return <NotificationsSection />;
 
       // Module 2: Content Management (CMS)
       case 'content':

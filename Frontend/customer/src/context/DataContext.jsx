@@ -309,7 +309,7 @@ export const DataProvider = ({ children }) => {
   };
 
   // Customer Registration
-  const registerCustomer = async (fullName, email, phone, password) => {
+  const registerCustomer = async (fullName, email, phone, password, verificationGrant) => {
     try {
       const res = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
@@ -319,7 +319,8 @@ export const DataProvider = ({ children }) => {
           email: email || undefined,
           mobileNumber: phone || undefined,
           password,
-          role: 'ROLE_CUSTOMER'
+          role: 'ROLE_CUSTOMER',
+          verificationGrant: verificationGrant || undefined,
         }),
       });
       const resData = await res.json();

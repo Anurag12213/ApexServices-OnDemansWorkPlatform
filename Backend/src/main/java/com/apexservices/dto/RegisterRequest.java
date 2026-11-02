@@ -43,6 +43,8 @@ public class RegisterRequest {
 
     private Role role;
 
+    private String verificationGrant;
+
     public void setFullName(String fullName) {
         this.fullName = fullName != null ? fullName.trim() : null;
     }

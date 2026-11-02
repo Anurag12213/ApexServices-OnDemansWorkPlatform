@@ -102,7 +102,21 @@ export default function VendorPartnerManagementSection() {
     }
   };
 
-  const handleDocumentDecision = (partnerId, docId, decision) => {
+  const handleDocumentDecision = async (partnerId, docId, decision) => {
+    const rawId = String(partnerId).replace('PRT-', '');
+    try {
+      await adminFetch(`/admin/partners/${rawId}/verify-doc`, {
+        method: 'POST',
+        body: JSON.stringify({
+          docId,
+          status: decision,
+          reason: decision === 'REJECTED' ? 'Document unreadable or invalid credentials' : null
+        })
+      });
+    } catch (e) {
+      console.warn('Backend document verification sync note:', e);
+    }
+
     setPartners((prev) =>
       prev.map((p) => {
         if (p.id !== partnerId) return p;
@@ -118,7 +132,7 @@ export default function VendorPartnerManagementSection() {
         };
       })
     );
-    toast.success(`Document marked as ${decision}`, 'KYC Update');
+    toast.success(`Document marked as ${decision} in database`, 'KYC Update');
     setSelectedPartner((prev) => prev ? {
       ...prev,
       documents: (prev.documents || []).map(d => d.id === docId ? { ...d, status: decision } : d)

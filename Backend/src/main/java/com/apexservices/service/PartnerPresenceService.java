@@ -96,6 +96,16 @@ public class PartnerPresenceService {
                 || "General".equalsIgnoreCase(state.getServiceCategory());
     }
 
+    public void evictPartner(Long partnerId) {
+        PartnerPresenceState state = presenceMap.get(partnerId);
+        if (state != null) {
+            state.setOnline(false);
+            state.setAvailable(false);
+        }
+        presenceMap.remove(partnerId);
+        log.info("Partner {} forcefully evicted from presence cache", partnerId);
+    }
+
     public Map<Long, PartnerPresenceState> getAllPresence() {
         return presenceMap;
     }

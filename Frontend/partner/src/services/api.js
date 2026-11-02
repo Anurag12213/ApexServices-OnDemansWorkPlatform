@@ -312,7 +312,8 @@ class ApiClient {
           email: email,
           mobileNumber: phone,
           password: partnerData.password || 'partner123',
-          role: 'ROLE_PARTNER'
+          role: 'ROLE_PARTNER',
+          verificationGrant: partnerData.verificationGrant || undefined
         })
       });
       if (regRes.ok) {
@@ -324,6 +325,95 @@ class ApiClient {
       }
     } catch (e) {
       console.warn('Backend partner register sync notice:', e);
+    }
+
+  }
+
+  // Centralized Email OTP Verification Methods (Backend-only)
+  async sendEmailOtp(email, purpose = 'REGISTRATION') {
+    try {
+      const res = await fetch(`${API_BASE}/auth/send-email-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), purpose })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || data.error || 'Failed to dispatch verification code.' };
+      }
+      return {
+        success: true,
+        message: data.message,
+        cooldownSeconds: data.cooldownSeconds || 60,
+        expiresInSeconds: data.expiresInSeconds || 300
+      };
+    } catch (err) {
+      return { success: false, error: 'Network error communicating with verification server.' };
+    }
+  }
+
+  async verifyEmailOtp(email, otp, purpose = 'REGISTRATION') {
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-email-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.trim(), purpose })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || data.error || 'Verification failed. Please check the code.' };
+      }
+      return {
+        success: true,
+        message: data.message,
+        verificationGrant: data.verificationGrant,
+        grantExpiresInSeconds: data.grantExpiresInSeconds || 600
+      };
+    } catch (err) {
+      return { success: false, error: 'Network error verifying code.' };
+    }
+  }
+
+  async resendEmailOtp(email, purpose = 'REGISTRATION') {
+    try {
+      const res = await fetch(`${API_BASE}/auth/resend-email-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), purpose })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || data.error || 'Failed to resend code.' };
+      }
+      return {
+        success: true,
+        message: data.message,
+        cooldownSeconds: data.cooldownSeconds || 60,
+        expiresInSeconds: data.expiresInSeconds || 300
+      };
+    } catch (err) {
+      return { success: false, error: 'Network error resending verification code.' };
+    }
+  }
+
+  async resetPasswordWithGrant(email, newPassword, verificationGrant) {
+    try {
+      const res = await fetch(`${API_BASE}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          newPassword,
+          verificationGrant
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.message || data.error || 'Password reset failed.' };
+      }
+      return { success: true, message: data.message };
+    } catch (err) {
+      return { success: false, error: 'Network error resetting password.' };
     }
 
     state.partner = newPartner;
@@ -562,6 +652,27 @@ class ApiClient {
       timestamp: new Date().toISOString(),
       read: false
     });
+
+    // Authoritative backend persistence for administrative review
+    try {
+      const token = await this.getPartnerAuthToken();
+      if (token) {
+        await fetch(`${API_BASE}/partners/documents/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            documentType: reqId,
+            documentName: fileDetails.name,
+            documentUrl: fileDetails.url || `https://apexservices-storage.local/docs/${encodeURIComponent(fileDetails.name)}`
+          })
+        });
+      }
+    } catch (docErr) {
+      console.warn('Backend document upload sync notice:', docErr);
+    }
 
     this.saveState(state);
     return { success: true, documents: partner.documents };

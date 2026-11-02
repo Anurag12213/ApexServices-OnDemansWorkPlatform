@@ -31,35 +31,16 @@ export const getAdminToken = () => {
   return session?.token || null;
 };
 
-// Automatic administrator token acquisition if session is missing or expired
+// Administrator session management: retrieve current authenticated session
 export const ensureAdminToken = async () => {
-  try {
-    const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'admin@apexservices.com', password: 'admin123' }),
-    });
-    if (loginRes.ok) {
-      const data = await loginRes.json();
-      if (data.token) {
-        const session = {
-          success: true,
-          token: data.token,
-          admin: {
-            name: data.user?.fullName || 'Super Administrator',
-            email: data.user?.email || 'admin@apex.com',
-            role: data.user?.role || 'ROLE_ADMIN',
-          },
-          user: data.user,
-        };
-        localStorage.setItem('apex_admin_auth', JSON.stringify(session));
-        return data.token;
-      }
-    }
-  } catch (err) {
-    console.warn('Auto-admin auth fallback failed:', err);
+  const token = getAdminToken();
+  if (!token) {
+    // If no valid session exists, trigger session cleanup so user logs in cleanly
+    localStorage.removeItem('apex_admin_auth');
+    window.dispatchEvent(new Event('apex_admin_auth_expired'));
+    return null;
   }
-  return null;
+  return token;
 };
 
 export const getAdminAuthHeaders = async () => {
@@ -94,22 +75,11 @@ export const adminFetch = async (endpoint, options = {}) => {
     headers,
   });
 
-  // If 401 Unauthorized, automatically refresh admin token and retry request once
+  // If 401 Unauthorized, notify the application to route to login
   if (response.status === 401) {
-    console.warn('[SECURITY] Admin session expired or invalid token. Refreshing token...');
+    console.warn('[SECURITY] Admin session expired or unauthorized. Redirecting to login...');
     localStorage.removeItem('apex_admin_auth');
-    const freshToken = await ensureAdminToken();
-    if (freshToken) {
-      const retryHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${freshToken}`,
-        ...(options.headers || {}),
-      };
-      response = await fetch(url, {
-        ...options,
-        headers: retryHeaders,
-      });
-    }
+    window.dispatchEvent(new Event('apex_admin_auth_expired'));
   }
 
   return response;

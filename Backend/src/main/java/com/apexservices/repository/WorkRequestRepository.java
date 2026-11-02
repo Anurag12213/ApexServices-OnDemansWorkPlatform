@@ -28,6 +28,19 @@ public interface WorkRequestRepository extends JpaRepository<WorkRequest, String
 
     List<WorkRequest> findByStatusOrderByCreatedAtDesc(WorkRequestStatus status);
 
+    long countByStatus(WorkRequestStatus status);
+
+    long countByStatusIn(List<WorkRequestStatus> statuses);
+
+    @Query("SELECT COALESCE(SUM(w.paidAmount), 0) FROM WorkRequest w WHERE w.paymentStatus = 'PAID'")
+    java.math.BigDecimal sumTotalPaidRevenue();
+
+    @Query("SELECT COALESCE(SUM(w.platformFee), 0) FROM WorkRequest w WHERE w.paymentStatus = 'PAID'")
+    java.math.BigDecimal sumTotalPlatformFee();
+
+    @Query("SELECT COALESCE(SUM(w.partnerNetEarning), 0) FROM WorkRequest w WHERE w.paymentStatus = 'PAID'")
+    java.math.BigDecimal sumTotalPartnerNetEarning();
+
     /**
      * Find active broadcasted requests strictly matching the partner's assigned categories,
      * excluding requests rejected by this partner.

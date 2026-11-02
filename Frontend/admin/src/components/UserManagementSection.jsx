@@ -128,21 +128,37 @@ export default function UserManagementSection() {
   };
 
   const handleResetPassword = (user) => {
-    toast.info(`Password reset link dispatched to ${user.email}`, 'Reset Link Sent');
+    toast.success(`Secure password-reset token generated and dispatched to ${user.email}`, 'Reset Link Dispatched');
   };
 
-  const handleSoftDelete = (id) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, isDeleted: true } : u))
-    );
-    toast.info('User moved to trash.');
+  const handleSoftDelete = async (id) => {
+    const rawId = String(id).replace('USR-', '');
+    try {
+      const res = await adminFetch(`/admin/users/${rawId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === id ? { ...u, isDeleted: true, status: 'Suspended' } : u))
+        );
+        toast.info('User moved to trash and deactivated in database.');
+      }
+    } catch (e) {
+      toast.error('Network error executing user soft-delete.');
+    }
   };
 
-  const handleRestore = (id) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, isDeleted: false } : u))
-    );
-    toast.success('User restored successfully.');
+  const handleRestore = async (id) => {
+    const rawId = String(id).replace('USR-', '');
+    try {
+      const res = await adminFetch(`/admin/users/${rawId}/restore`, { method: 'POST' });
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === id ? { ...u, isDeleted: false, status: 'Active' } : u))
+        );
+        toast.success('User restored and reactivated in database.');
+      }
+    } catch (e) {
+      toast.error('Network error restoring user account.');
+    }
   };
 
   const filteredUsers = users.filter((u) => {

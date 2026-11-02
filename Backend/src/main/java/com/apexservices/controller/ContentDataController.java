@@ -280,20 +280,6 @@ public class ContentDataController {
         return ResponseEntity.ok(siteBranding);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/admin/audit-logs")
-    public ResponseEntity<List<Map<String, Object>>> getAuditLogs() {
-        List<Map<String, Object>> logs = new ArrayList<>();
-        Map<String, Object> l1 = new LinkedHashMap<>();
-        l1.put("id", "audit-" + System.currentTimeMillis());
-        l1.put("action", "SETTINGS_UPDATED");
-        l1.put("details", "Website branding, dot color, and header configuration synced.");
-        l1.put("actor", "admin@apex.com");
-        l1.put("timestamp", Instant.now().toString());
-        logs.add(l1);
-        return ResponseEntity.ok(logs);
-    }
-
     // --- ICONS REPOSITORY CRUD (SYSTEM & CUSTOM) ---
     @GetMapping("/icons")
     public ResponseEntity<List<Icon>> getIcons() {

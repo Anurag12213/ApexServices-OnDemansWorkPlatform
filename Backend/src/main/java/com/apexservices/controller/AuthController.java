@@ -49,6 +49,15 @@ public class AuthController {
     }
 
     /**
+     * Finalize Password Reset with Verified Grant
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(@Valid @RequestBody ResetPasswordWithOtpRequest request) {
+        authService.resetPasswordWithGrant(request);
+        return ResponseEntity.ok(Map.of("message", "Password updated successfully. Please log in with your new credentials."));
+    }
+
+    /**
      * Google OAuth2 Login / Auto-Registration via Google ID Token
      */
     @PostMapping("/google")

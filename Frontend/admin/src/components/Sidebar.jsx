@@ -26,17 +26,16 @@ export default function Sidebar({ activeTab, setActiveTab, sidebarCollapsed, set
   const displayBrand = brandName || 'ApexServices';
   const initialChar = displayBrand.charAt(0).toUpperCase();
 
-  // All 16 modules in strict sequence with zero numbers
+  // All 16 core modules in strict sequence
   const navigationItems = [
+    { id: 'dashboard', label: 'Live Analytics Dashboard', icon: PieChart },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'content', label: 'Content Management (CMS)', icon: Palette },
     { id: 'payments', label: 'Payments & Transactions', icon: CreditCard, badge: 'Escrow' },
-    { id: 'notifications', label: 'Notifications', icon: Mail },
     { id: 'reports', label: 'Reports & Exports', icon: BarChart3 },
     { id: 'roles', label: 'Roles & Permissions (RBAC)', icon: ShieldCheck },
     { id: 'bookings', label: 'Order / Booking Management', icon: Calendar, badge: 'Live' },
     { id: 'support', label: 'Support & Ticket Management', icon: LifeBuoy, badge: 'Desk' },
-    { id: 'dashboard', label: 'Live Analytics Dashboard', icon: PieChart },
     { id: 'audit', label: 'Audit Logs & Activity History', icon: History },
     { id: 'feature-flags', label: 'Feature Flags & App Configuration', icon: Sliders },
     { id: 'coupons', label: 'Coupons & Discount Management', icon: Tag, badge: 'Promo' },
