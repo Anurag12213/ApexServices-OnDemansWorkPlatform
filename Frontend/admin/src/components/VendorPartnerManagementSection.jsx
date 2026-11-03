@@ -165,7 +165,7 @@ export default function VendorPartnerManagementSection() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Vendor & Partner Management</h1>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Partner Management</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
             Centrally onboard certified service technicians, verify KYC & police clearance documents, track field performance, and manage payout disbursements.

@@ -23,10 +23,10 @@ export default function DashboardSection({ onNavigateTab }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Live Analytics Dashboard</h1>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Dashboard</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Real-time executive nerve center surfacing active fleet dispatch, revenue velocity, user signups, and live platform health the moment you open the panel.
+            Real-time executive nerve center surfacing active fleet dispatch, revenue velocity, user signups, and live platform health.
           </p>
         </div>
       </div>
