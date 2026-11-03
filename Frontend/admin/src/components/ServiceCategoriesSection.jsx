@@ -60,7 +60,35 @@ export default function ServiceCategoriesSection() {
     }
   };
 
-  const saveCategoryImage = (catIdOrName, imageUrl) => {
+  const compressImage = (file, maxWidth = 900, quality = 0.82) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => resolve(e.target.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const saveCategoryImage = async (catIdOrName, imageUrl) => {
     if (!catIdOrName) return;
     try {
       const map = getCategoryImagesMap();
@@ -70,47 +98,56 @@ export default function ServiceCategoriesSection() {
         map[String(catIdOrName)] = imageUrl;
       }
       localStorage.setItem('apex_category_images', JSON.stringify(map));
+
+      // 1. Sync to backend MySQL database via /admin/settings so customer website receives it
+      try {
+        await adminFetch('/admin/settings', {
+          method: 'PUT',
+          body: JSON.stringify({ categoryImages: map }),
+        });
+      } catch (err) {
+        console.warn('Backend sync failed:', err);
+      }
+
+      // 2. Broadcast to other open tabs
+      try {
+        const syncChannel = new BroadcastChannel('apex_services_sync');
+        syncChannel.postMessage({ type: 'DATA_UPDATED', categoryImages: map });
+        syncChannel.close();
+      } catch (err) {}
     } catch (e) {
       console.warn('Failed to save category image to storage:', e);
     }
   };
 
   // Direct manual image upload handler for New Category
-  const handleNewCategoryFileUpload = (e) => {
+  const handleNewCategoryFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image file size must be under 5MB.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (base64) {
-        setNewCategory((prev) => ({ ...prev, bannerImageUrl: base64 }));
-        showToast(`Imported image: ${file.name}`);
+    try {
+      const compressed = await compressImage(file);
+      if (compressed) {
+        setNewCategory((prev) => ({ ...prev, bannerImageUrl: compressed }));
+        showToast(`Imported & optimized: ${file.name}`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      showToast('Failed to process image file.');
+    }
   };
 
   // Direct manual image upload handler for Edit Category
-  const handleEditCategoryFileUpload = (e) => {
+  const handleEditCategoryFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image file size must be under 5MB.');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (base64) {
-        setEditingCategory((prev) => ({ ...prev, bannerImageUrl: base64 }));
-        showToast(`Imported image: ${file.name}`);
+    try {
+      const compressed = await compressImage(file);
+      if (compressed) {
+        setEditingCategory((prev) => ({ ...prev, bannerImageUrl: compressed }));
+        showToast(`Imported & optimized: ${file.name}`);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      showToast('Failed to process image file.');
+    }
   };
 
   const showToast = (msg) => {
@@ -122,7 +159,26 @@ export default function ServiceCategoriesSection() {
   const fetchCategories = async () => {
     setIsLoading(true);
     try {
-      const imgMap = getCategoryImagesMap();
+      let imgMap = getCategoryImagesMap();
+
+      // Load server settings to merge existing category images from database
+      try {
+        const settingsRes = await adminFetch('/admin/settings');
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json();
+          if (settings.categoryImages && typeof settings.categoryImages === 'object') {
+            imgMap = { ...settings.categoryImages, ...imgMap };
+            localStorage.setItem('apex_category_images', JSON.stringify(imgMap));
+          } else if (Object.keys(imgMap).length > 0) {
+            // Automatically push local images to server if server doesn't have them yet
+            adminFetch('/admin/settings', {
+              method: 'PUT',
+              body: JSON.stringify({ categoryImages: imgMap }),
+            }).catch(() => {});
+          }
+        }
+      } catch (e) {}
+
       const res = await adminFetch('/admin/service-categories');
       if (res.ok) {
         const list = await res.json();

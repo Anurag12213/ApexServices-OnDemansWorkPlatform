@@ -46,8 +46,10 @@ export const CategoriesSection = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {categories.filter(c => !c.isSoftDeleted && c.active !== false).map((cat) => {
               const isDown = cat.isTemporaryDown;
-              const hasImage = Boolean(cat.bannerImageUrl || cat.imageUrl);
-              const imageUrl = cat.bannerImageUrl || cat.imageUrl;
+              const serverImages = siteBranding?.categoryImages || data?.siteBranding?.categoryImages || data?.publicConfig?.categoryImages || {};
+              const serverImg = serverImages[String(cat.id)] || serverImages[cat.name] || serverImages[cat.slug];
+              const imageUrl = cat.bannerImageUrl || cat.imageUrl || serverImg || '';
+              const hasImage = Boolean(imageUrl);
 
               return (
                 <div

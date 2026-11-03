@@ -35,12 +35,19 @@ const getCategoryImagesMap = () => {
   }
 };
 
-const mergeCategoryImages = (categories) => {
+const mergeCategoryImages = (categories, serverMap = {}) => {
   if (!Array.isArray(categories)) return categories;
-  const imgMap = getCategoryImagesMap();
+  const localMap = getCategoryImagesMap();
+  const combined = { ...serverMap, ...localMap };
   return categories.map((c) => ({
     ...c,
-    bannerImageUrl: c.bannerImageUrl || imgMap[String(c.id)] || imgMap[c.name] || imgMap[c.slug] || '',
+    bannerImageUrl:
+      c.bannerImageUrl ||
+      c.imageUrl ||
+      combined[String(c.id)] ||
+      combined[c.name] ||
+      combined[c.slug] ||
+      '',
   }));
 };
 
@@ -210,8 +217,12 @@ export const DataProvider = ({ children }) => {
       if (res.ok) {
         const result = await res.json();
         if (result && result.heroSlides) {
+          const serverCategoryImages =
+            result.siteBranding?.categoryImages ||
+            result.publicConfig?.categoryImages ||
+            {};
           if (result.categories) {
-            result.categories = mergeCategoryImages(result.categories);
+            result.categories = mergeCategoryImages(result.categories, serverCategoryImages);
           }
           setData(result);
           try {
