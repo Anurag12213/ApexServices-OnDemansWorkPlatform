@@ -23,6 +23,7 @@ import {
   RefreshCw,
   ShieldCheck,
   ArrowRight,
+  Upload,
 } from 'lucide-react';
 import CategoryIconSelector, { RenderIcon } from './CategoryIconSelector';
 import { useToast } from './Toast';
@@ -200,6 +201,63 @@ export default function ContentControlSection({ onNavigateTab }) {
       const base64 = event.target?.result;
       if (base64) {
         setBrandingForm((prev) => ({ ...prev, logoImageUrl: base64 }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Direct manual image file import for new hero slide
+  const handleNewSlideFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Slide image size must be under 5MB.', 'File Size Exceeded');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      if (base64) {
+        setNewSlide((prev) => ({ ...prev, imageUrl: base64 }));
+        toast.success(`Imported image: ${file.name}`, 'Direct Import Ready');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Direct manual image file import for editing existing slide
+  const handleEditSlideFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Slide image size must be under 5MB.', 'File Size Exceeded');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      if (base64) {
+        setEditingSlide((prev) => ({ ...prev, imageUrl: base64 }));
+        toast.success(`Imported image: ${file.name}`, 'Direct Import Ready');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Direct manual image file import for AI Founder photo
+  const handleOwnerFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Founder photo size must be under 5MB.', 'File Size Exceeded');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      if (base64) {
+        setOwnerForm((prev) => ({ ...prev, imageUrl: base64 }));
+        toast.success(`Imported founder image: ${file.name}`, 'Direct Import Ready');
       }
     };
     reader.readAsDataURL(file);
@@ -996,24 +1054,70 @@ export default function ContentControlSection({ onNavigateTab }) {
                     className="w-full bg-white border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500"
                   />
                 </div>
-                <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Header Image URL</label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      required
-                      type="text"
-                      value={editingSlide.imageUrl}
-                      onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
-                      className="w-full bg-white border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500"
-                    />
+                <div className="sm:col-span-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                      <Image className="w-3.5 h-3.5 text-blue-600" />
+                      Header Slide Image (Direct File Import or URL)
+                    </label>
                     {editingSlide.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingSlide({ ...editingSlide, imageUrl: '' })}
+                        className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" /> Clear Image
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Option 1: Direct File Import from Computer */}
+                    <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
+                      <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
+                        <Upload className="w-4 h-4 text-blue-600" /> Direct Import from Computer
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditSlideFileUpload}
+                        className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP, SVG (up to 5MB)</span>
+                    </div>
+
+                    {/* Option 2: Image URL input */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200">
+                      <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Paste Web Image URL</span>
+                      <input
+                        type="text"
+                        value={editingSlide.imageUrl}
+                        onChange={(e) => setEditingSlide({ ...editingSlide, imageUrl: e.target.value })}
+                        placeholder="https://images.unsplash.com/..."
+                        className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
+                      />
+                      <span className="text-[10px] text-slate-400 block mt-1.5">Direct image link or CDN address</span>
+                    </div>
+                  </div>
+
+                  {/* Image Preview Banner */}
+                  {editingSlide.imageUrl && (
+                    <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
                       <img
                         src={editingSlide.imageUrl}
                         alt="Preview"
-                        className="w-10 h-8 object-cover rounded border border-slate-300 shrink-0"
+                        className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 shadow-xs"
                       />
-                    )}
-                  </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-800 block truncate">
+                          {editingSlide.imageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : editingSlide.imageUrl}
+                        </span>
+                        <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Live Carousel
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2 flex items-center justify-end space-x-3 pt-2">
@@ -1082,24 +1186,70 @@ export default function ContentControlSection({ onNavigateTab }) {
                   className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500"
                 />
               </div>
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Header Image URL</label>
-                <div className="flex items-center space-x-2">
-                  <input
-                    required
-                    type="text"
-                    value={newSlide.imageUrl}
-                    onChange={(e) => setNewSlide({ ...newSlide, imageUrl: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500"
-                  />
+              <div className="sm:col-span-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                    <Image className="w-3.5 h-3.5 text-blue-600" />
+                    Header Slide Image (Direct File Import or URL)
+                  </label>
                   {newSlide.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setNewSlide({ ...newSlide, imageUrl: '' })}
+                      className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" /> Clear Image
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Option 1: Direct File Import from Computer */}
+                  <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
+                    <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-blue-600" /> Direct Import from Computer
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleNewSlideFileUpload}
+                      className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP, SVG (up to 5MB)</span>
+                  </div>
+
+                  {/* Option 2: Image URL input */}
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Paste Web Image URL</span>
+                    <input
+                      type="text"
+                      value={newSlide.imageUrl}
+                      onChange={(e) => setNewSlide({ ...newSlide, imageUrl: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1.5">Direct image link or CDN address</span>
+                  </div>
+                </div>
+
+                {/* Image Preview Banner */}
+                {newSlide.imageUrl && (
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
                     <img
                       src={newSlide.imageUrl}
                       alt="Thumbnail"
-                      className="w-10 h-8 object-cover rounded border border-slate-300 shrink-0"
+                      className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 shadow-xs"
                     />
-                  )}
-                </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-slate-800 block truncate">
+                        {newSlide.imageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : newSlide.imageUrl}
+                      </span>
+                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Home Carousel
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <button
@@ -1219,24 +1369,70 @@ export default function ContentControlSection({ onNavigateTab }) {
                 className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500 font-semibold"
               />
             </div>
-            <div className="sm:col-span-2">
-              <label className="block font-bold text-slate-700 uppercase mb-1">Founder Image URL / Path</label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="text"
-                  value={ownerForm.imageUrl || ''}
-                  onChange={(e) => setOwnerForm({ ...ownerForm, imageUrl: e.target.value })}
-                  placeholder="/anurag_founder.jpg or custom image URL"
-                  className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-2 outline-none focus:border-blue-500"
-                />
+            <div className="sm:col-span-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-600" />
+                  Founder Photo (Direct File Import or URL)
+                </label>
                 {ownerForm.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setOwnerForm({ ...ownerForm, imageUrl: '' })}
+                    className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" /> Clear Image
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* Option 1: Direct File Import */}
+                <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
+                  <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-blue-600" /> Direct Import Founder Photo
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleOwnerFileUpload}
+                    className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP (up to 5MB)</span>
+                </div>
+
+                {/* Option 2: Image URL / Path */}
+                <div className="p-3 bg-white rounded-lg border border-slate-200">
+                  <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Enter Image URL / Path</span>
+                  <input
+                    type="text"
+                    value={ownerForm.imageUrl || ''}
+                    onChange={(e) => setOwnerForm({ ...ownerForm, imageUrl: e.target.value })}
+                    placeholder="/anurag_founder.jpg or custom image URL"
+                    className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
+                  />
+                  <span className="text-[10px] text-slate-400 block mt-1.5">Local asset path or hosted image URL</span>
+                </div>
+              </div>
+
+              {/* Founder Image Preview Banner */}
+              {ownerForm.imageUrl && (
+                <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
                   <img
                     src={ownerForm.imageUrl}
                     alt="Founder Preview"
-                    className="w-10 h-10 object-cover rounded-full border border-slate-300 shrink-0"
+                    className="w-12 h-12 object-cover rounded-full border-2 border-blue-500 shrink-0 shadow-xs"
                   />
-                )}
-              </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-bold text-slate-800 block truncate">
+                      {ownerForm.imageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : ownerForm.imageUrl}
+                    </span>
+                    <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> Founder Photo Active
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="sm:col-span-2">
               <label className="block font-bold text-blue-700 uppercase mb-1">
