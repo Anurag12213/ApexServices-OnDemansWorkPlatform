@@ -759,16 +759,16 @@ export default function ServiceCategoriesSection() {
       )}
 
       {/* ======================================================== */}
-      {/* ADD CATEGORY MODAL (COMPLETELY VISIBLE & SCROLLABLE)      */}
+      {/* ADD CATEGORY MODAL (CLEAN & CONCISE)                      */}
       {/* ======================================================== */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[88vh] my-auto overflow-hidden text-left animate-fade-in">
-            {/* Modal Header (Pinned / Sticky) */}
-            <div className="px-5 py-4 border-b border-slate-200 shrink-0 bg-white sticky top-0 z-10 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200/90 shadow-2xl overflow-hidden text-left my-auto">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Add New Service Category</h3>
-                <p className="text-[11px] text-slate-500">Configure title, URL identifier slug, badge tag, and category image.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Configure title, slug, tag, and display image.</p>
               </div>
               <button
                 type="button"
@@ -776,22 +776,23 @@ export default function ServiceCategoriesSection() {
                   setShowAddModal(false);
                   setCategoryError('');
                 }}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Error Banner */}
+            {/* Error Alert */}
             {categoryError && (
-              <div className="mx-5 mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <div className="mx-6 mt-4 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                 <span>{categoryError}</span>
               </div>
             )}
 
-            {/* Modal Form Body (Scrollable!) */}
-            <form id="add-category-form" onSubmit={handleCreateCategory} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs overscroll-contain">
+            {/* Form Body */}
+            <form id="add-category-form" onSubmit={handleCreateCategory} className="p-6 space-y-4 text-xs">
+              {/* Title */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Category Title <span className="text-rose-500">*</span>
@@ -810,131 +811,128 @@ export default function ServiceCategoriesSection() {
                       slug: newCategory.slug && newCategory.slug !== autoSlug ? newCategory.slug : autoSlug,
                     });
                   }}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500 text-xs text-slate-800 transition"
                 />
               </div>
 
+              {/* Slug & Tag in 2-column grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">URL Identifier / Slug</label>
+                  <label className="block font-bold text-slate-700 mb-1">URL Identifier (Slug)</label>
                   <input
                     type="text"
                     placeholder="e.g. custom-carpentry"
                     value={newCategory.slug || ''}
                     onChange={(e) => setNewCategory({ ...newCategory, slug: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono focus:bg-white focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono text-xs focus:bg-white focus:border-blue-500 transition"
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Badge Tag</label>
                   <input
                     type="text"
-                    placeholder="e.g. Popular, 24/7 Service, Certified"
+                    placeholder="e.g. Popular, 24/7 Service"
                     value={newCategory.tag || ''}
                     onChange={(e) => setNewCategory({ ...newCategory, tag: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-xs focus:bg-white focus:border-blue-500 transition"
                   />
                 </div>
               </div>
 
-              {/* Category Feature Image (Direct File Import or URL) */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
-                    <Image className="w-3.5 h-3.5 text-blue-600" />
-                    Category Box Image (Direct File Import or URL)
-                  </label>
-                  {newCategory.bannerImageUrl && (
+              {/* Clean, Concise Image Upload Section */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Image className="w-3.5 h-3.5 text-blue-600" />
+                  Category Card Image
+                </label>
+                
+                {newCategory.bannerImageUrl ? (
+                  /* Active Image Preview Card */
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={newCategory.bannerImageUrl}
+                        alt="Category Preview"
+                        className="w-14 h-12 object-cover rounded-lg border border-slate-200 shrink-0 shadow-2xs"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-800 block truncate">
+                          {newCategory.bannerImageUrl.startsWith('data:') ? 'Custom Uploaded File' : 'External Image Link'}
+                        </span>
+                        <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Ready for live card
+                        </span>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setNewCategory({ ...newCategory, bannerImageUrl: '' })}
-                      className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0"
                     >
-                      <X className="w-3 h-3" /> Clear Image
+                      Change / Remove
                     </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Option 1: Direct File Import from Computer */}
-                  <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
-                    <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
-                      <Upload className="w-4 h-4 text-blue-600" /> Direct Import from Computer
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleNewCategoryFileUpload}
-                      className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
-                    />
-                    <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP (up to 5MB)</span>
                   </div>
-
-                  {/* Option 2: Image URL input */}
-                  <div className="p-3 bg-white rounded-lg border border-slate-200">
-                    <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Paste Web Image URL</span>
-                    <input
-                      type="text"
-                      value={newCategory.bannerImageUrl || ''}
-                      onChange={(e) => setNewCategory({ ...newCategory, bannerImageUrl: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
-                    />
-                    <span className="text-[10px] text-slate-400 block mt-1.5">Direct image link or CDN address</span>
-                  </div>
-                </div>
-
-                {/* Image Preview Banner */}
-                {newCategory.bannerImageUrl && (
-                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
-                    <img
-                      src={newCategory.bannerImageUrl}
-                      alt="Category Preview"
-                      className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 shadow-xs"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs font-bold text-slate-800 block truncate">
-                        {newCategory.bannerImageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : newCategory.bannerImageUrl}
-                      </span>
-                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Live Category Card
-                      </span>
+                ) : (
+                  /* Clean, Unified Image Input Options */
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white border border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg text-blue-600 font-bold cursor-pointer transition text-xs shadow-2xs">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Choose File from Computer</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleNewCategoryFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 px-1">OR</span>
+                      <input
+                        type="text"
+                        placeholder="Paste image URL (https://...)"
+                        value={newCategory.bannerImageUrl || ''}
+                        onChange={(e) => setNewCategory({ ...newCategory, bannerImageUrl: e.target.value })}
+                        className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none text-xs focus:border-blue-500 transition"
+                      />
                     </div>
                   </div>
                 )}
               </div>
 
+              {/* Description */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Service Scope Description <span className="text-rose-500">*</span>
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   required
-                  placeholder="Describe scope of work, typical technician tasks, and service expectations..."
+                  placeholder="Describe scope of work and services provided..."
                   value={newCategory.description}
                   onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500 text-xs text-slate-800 transition resize-none"
                 />
               </div>
             </form>
 
-            {/* Modal Footer (Pinned / Sticky) */}
-            <div className="px-5 py-3.5 border-t border-slate-200 shrink-0 bg-slate-50 sticky bottom-0 z-10 flex items-center justify-end gap-2.5">
+            {/* Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => {
                   setShowAddModal(false);
                   setCategoryError('');
                 }}
-                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition cursor-pointer"
+                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition cursor-pointer text-xs"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 form="add-category-form"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5 text-xs"
               >
                 <Plus className="w-4 h-4" />
                 <span>Create Category</span>
@@ -945,16 +943,21 @@ export default function ServiceCategoriesSection() {
       )}
 
       {/* ======================================================== */}
-      {/* EDIT CATEGORY MODAL (COMPLETELY VISIBLE & SCROLLABLE)     */}
+      {/* EDIT CATEGORY MODAL (CLEAN & CONCISE)                     */}
       {/* ======================================================== */}
       {editingCategory && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl flex flex-col max-h-[92vh] sm:max-h-[88vh] my-auto overflow-hidden text-left animate-fade-in">
-            {/* Modal Header (Pinned / Sticky) */}
-            <div className="px-5 py-4 border-b border-slate-200 shrink-0 bg-white sticky top-0 z-10 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200/90 shadow-2xl overflow-hidden text-left my-auto">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
               <div>
-                <h3 className="font-bold text-slate-900 text-base">Edit: {editingCategory.name}</h3>
-                <p className="text-[11px] text-slate-500">Update category details, slug, badge tag, and category image.</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-slate-900 text-base">Edit Category</h3>
+                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-bold">
+                    {editingCategory.name}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">Manage category details and display image.</p>
               </div>
               <button
                 type="button"
@@ -962,22 +965,23 @@ export default function ServiceCategoriesSection() {
                   setEditingCategory(null);
                   setCategoryError('');
                 }}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Error Banner */}
+            {/* Error Alert */}
             {categoryError && (
-              <div className="mx-5 mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <div className="mx-6 mt-4 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
                 <span>{categoryError}</span>
               </div>
             )}
 
-            {/* Modal Form Body (Scrollable!) */}
-            <form id="edit-category-form" onSubmit={handleUpdateCategory} className="p-5 overflow-y-auto flex-1 space-y-4 text-xs overscroll-contain">
+            {/* Form Body */}
+            <form id="edit-category-form" onSubmit={handleUpdateCategory} className="p-6 space-y-4 text-xs">
+              {/* Title */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Category Title <span className="text-rose-500">*</span>
@@ -987,131 +991,131 @@ export default function ServiceCategoriesSection() {
                   required
                   value={editingCategory.name || ''}
                   onChange={(e) => setEditingCategory({ ...editingCategory, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                  placeholder="e.g. Custom Carpentry"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500 text-xs text-slate-800 transition"
                 />
               </div>
 
+              {/* Slug & Tag in 2-column grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">URL Identifier / Slug</label>
+                  <label className="block font-bold text-slate-700 mb-1">URL Identifier (Slug)</label>
                   <input
                     type="text"
                     value={editingCategory.slug || ''}
                     onChange={(e) => setEditingCategory({ ...editingCategory, slug: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono focus:bg-white focus:border-blue-500"
+                    placeholder="e.g. custom-carpentry"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono text-xs focus:bg-white focus:border-blue-500 transition"
                   />
                 </div>
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Badge Tag</label>
                   <input
                     type="text"
-                    placeholder="e.g. Popular, 24/7 Service, Certified"
                     value={editingCategory.tag || ''}
                     onChange={(e) => setEditingCategory({ ...editingCategory, tag: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                    placeholder="e.g. Popular, 24/7 Service"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-xs focus:bg-white focus:border-blue-500 transition"
                   />
                 </div>
               </div>
 
-              {/* Category Feature Image (Direct File Import or URL) */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
-                    <Image className="w-3.5 h-3.5 text-blue-600" />
-                    Category Box Image (Direct File Import or URL)
-                  </label>
-                  {editingCategory.bannerImageUrl && (
+              {/* Clean, Concise Image Upload Section */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Image className="w-3.5 h-3.5 text-blue-600" />
+                  Category Card Image
+                </label>
+                
+                {editingCategory.bannerImageUrl ? (
+                  /* Active Image Preview Card */
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <img
+                        src={editingCategory.bannerImageUrl}
+                        alt="Category Preview"
+                        className="w-14 h-12 object-cover rounded-lg border border-slate-200 shrink-0 shadow-2xs"
+                      />
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-slate-800 block truncate">
+                          {editingCategory.bannerImageUrl.startsWith('data:') ? 'Custom Uploaded File' : 'External Image Link'}
+                        </span>
+                        <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3" /> Ready for live card
+                        </span>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setEditingCategory({ ...editingCategory, bannerImageUrl: '' })}
-                      className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0"
                     >
-                      <X className="w-3 h-3" /> Clear Image
+                      Change / Remove
                     </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Option 1: Direct File Import from Computer */}
-                  <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
-                    <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
-                      <Upload className="w-4 h-4 text-blue-600" /> Direct Import from Computer
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleEditCategoryFileUpload}
-                      className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
-                    />
-                    <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP (up to 5MB)</span>
                   </div>
-
-                  {/* Option 2: Image URL input */}
-                  <div className="p-3 bg-white rounded-lg border border-slate-200">
-                    <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Paste Web Image URL</span>
-                    <input
-                      type="text"
-                      value={editingCategory.bannerImageUrl || ''}
-                      onChange={(e) => setEditingCategory({ ...editingCategory, bannerImageUrl: e.target.value })}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
-                    />
-                    <span className="text-[10px] text-slate-400 block mt-1.5">Direct image link or CDN address</span>
-                  </div>
-                </div>
-
-                {/* Image Preview Banner */}
-                {editingCategory.bannerImageUrl && (
-                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
-                    <img
-                      src={editingCategory.bannerImageUrl}
-                      alt="Category Preview"
-                      className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 shadow-xs"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs font-bold text-slate-800 block truncate">
-                        {editingCategory.bannerImageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : editingCategory.bannerImageUrl}
-                      </span>
-                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Live Category Card
-                      </span>
+                ) : (
+                  /* Clean, Unified Image Input Options */
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-white border border-dashed border-blue-300 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg text-blue-600 font-bold cursor-pointer transition text-xs shadow-2xs">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Choose File from Computer</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleEditCategoryFileUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 px-1">OR</span>
+                      <input
+                        type="text"
+                        placeholder="Paste image URL (https://...)"
+                        value={editingCategory.bannerImageUrl || ''}
+                        onChange={(e) => setEditingCategory({ ...editingCategory, bannerImageUrl: e.target.value })}
+                        className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none text-xs focus:border-blue-500 transition"
+                      />
                     </div>
                   </div>
                 )}
               </div>
 
+              {/* Description */}
               <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Service Scope Description <span className="text-rose-500">*</span>
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   required
                   value={editingCategory.description || ''}
                   onChange={(e) => setEditingCategory({ ...editingCategory, description: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                  placeholder="Describe scope of work and services provided..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500 text-xs text-slate-800 transition resize-none"
                 />
               </div>
             </form>
 
-            {/* Modal Footer (Pinned / Sticky) */}
-            <div className="px-5 py-3.5 border-t border-slate-200 shrink-0 bg-slate-50 sticky bottom-0 z-10 flex items-center justify-end gap-2.5">
+            {/* Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => {
                   setEditingCategory(null);
                   setCategoryError('');
                 }}
-                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition cursor-pointer"
+                className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition cursor-pointer text-xs"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 form="edit-category-form"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5 text-xs"
               >
-                <Edit className="w-4 h-4" />
+                <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Save Changes</span>
               </button>
             </div>
