@@ -22,7 +22,7 @@ import {
   Upload,
   FileImage,
 } from 'lucide-react';
-import { RenderIcon } from './CategoryIconSelector';
+import { RenderIcon, SYSTEM_ICONS } from './CategoryIconSelector';
 import { adminFetch, API_BASE_URL } from '../utils/api';
 import { useConfirm } from './ConfirmDialog';
 
@@ -45,6 +45,8 @@ export default function ServiceCategoriesSection() {
     slug: '',
     description: '',
     tag: 'Popular',
+    iconName: 'Hammer',
+    iconId: 1,
     bannerImageUrl: '',
   });
 
@@ -192,8 +194,8 @@ export default function ServiceCategoriesSection() {
         slug: newCategory.slug || newCategory.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         description: newCategory.description || '',
         tag: newCategory.tag || 'Popular',
-        iconId: 1,
-        iconName: 'Hammer',
+        iconId: newCategory.iconId || 1,
+        iconName: newCategory.iconName || 'Hammer',
         customIconValue: null,
       };
 
@@ -224,6 +226,8 @@ export default function ServiceCategoriesSection() {
           slug: '',
           description: '',
           tag: 'Popular',
+          iconName: 'Hammer',
+          iconId: 1,
           bannerImageUrl: '',
         });
 
@@ -815,8 +819,8 @@ export default function ServiceCategoriesSection() {
                 />
               </div>
 
-              {/* Slug & Tag in 2-column grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Slug, Tag & Badge Icon in 3-column clean grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">URL Identifier (Slug)</label>
                   <input
@@ -836,6 +840,38 @@ export default function ServiceCategoriesSection() {
                     onChange={(e) => setNewCategory({ ...newCategory, tag: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-xs focus:bg-white focus:border-blue-500 transition"
                   />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Badge Icon</span>
+                    <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
+                      <RenderIcon iconName={newCategory.iconName || 'Hammer'} className="w-3 h-3" />
+                    </span>
+                  </label>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-2.5 pointer-events-none text-blue-600">
+                      <RenderIcon iconName={newCategory.iconName || 'Hammer'} className="w-3.5 h-3.5" />
+                    </div>
+                    <select
+                      value={newCategory.iconName || 'Hammer'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const found = SYSTEM_ICONS.find((i) => i.iconValue === val);
+                        setNewCategory({
+                          ...newCategory,
+                          iconName: val,
+                          iconId: found ? found.id : 1,
+                        });
+                      }}
+                      className="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-xs focus:bg-white focus:border-blue-500 transition font-medium cursor-pointer"
+                    >
+                      {SYSTEM_ICONS.map((i) => (
+                        <option key={i.id} value={i.iconValue}>
+                          {i.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -996,8 +1032,8 @@ export default function ServiceCategoriesSection() {
                 />
               </div>
 
-              {/* Slug & Tag in 2-column grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Slug, Tag & Badge Icon in 3-column clean grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">URL Identifier (Slug)</label>
                   <input
@@ -1017,6 +1053,40 @@ export default function ServiceCategoriesSection() {
                     placeholder="e.g. Popular, 24/7 Service"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-xs focus:bg-white focus:border-blue-500 transition"
                   />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 flex items-center justify-between">
+                    <span>Badge Icon</span>
+                    <span className="text-[10px] text-blue-600 font-bold flex items-center gap-1">
+                      <RenderIcon iconName={editingCategory.iconName || editingCategory.icon?.iconValue || 'Hammer'} className="w-3 h-3" />
+                    </span>
+                  </label>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-2.5 pointer-events-none text-blue-600">
+                      <RenderIcon iconName={editingCategory.iconName || editingCategory.icon?.iconValue || 'Hammer'} className="w-3.5 h-3.5" />
+                    </div>
+                    <select
+                      value={editingCategory.iconName || editingCategory.icon?.iconValue || 'Hammer'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const found = SYSTEM_ICONS.find((i) => i.iconValue === val);
+                        setEditingCategory({
+                          ...editingCategory,
+                          iconName: val,
+                          iconId: found ? found.id : 1,
+                          icon: { ...(editingCategory.icon || {}), iconValue: val, name: val, id: found ? found.id : 1 },
+                          customIconValue: null,
+                        });
+                      }}
+                      className="w-full pl-8 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none text-xs focus:bg-white focus:border-blue-500 transition font-medium cursor-pointer"
+                    >
+                      {SYSTEM_ICONS.map((i) => (
+                        <option key={i.id} value={i.iconValue}>
+                          {i.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
