@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 import DashboardSection from './components/DashboardSection';
@@ -26,9 +26,57 @@ import { ConfirmDialogProvider } from './components/ConfirmDialog';
 import AdminLoginPage from './pages/AdminLoginPage';
 import { API_BASE_URL } from './utils/api';
 
+// Approved 16 Core Navigation Tabs in Exact Sequence
+const VALID_TABS = [
+  'dashboard',
+  'users',
+  'partners',
+  'bookings',
+  'categories',
+  'payments',
+  'support',
+  'content',
+  'coupons',
+  'moderation',
+  'reports',
+  'audit',
+  'roles',
+  'sessions',
+  'feature-flags',
+  'versions',
+  'profile', // Auxiliary
+  'settings'  // Compatibility alias for feature-flags
+];
+
+function getInitialTab() {
+  if (typeof window === 'undefined') return 'dashboard';
+
+  // 1. Check URL Hash (e.g., #users or #/users)
+  const hash = window.location.hash.replace(/^#\/?/, '').trim();
+  if (hash && VALID_TABS.includes(hash)) {
+    return hash === 'settings' ? 'feature-flags' : hash;
+  }
+
+  // 2. Check URL Query Param (e.g., ?tab=users)
+  const params = new URLSearchParams(window.location.search);
+  const tabParam = params.get('tab');
+  if (tabParam && VALID_TABS.includes(tabParam)) {
+    return tabParam === 'settings' ? 'feature-flags' : tabParam;
+  }
+
+  // 3. Check Pathname (e.g., /users)
+  const path = window.location.pathname.replace(/^\//, '').trim();
+  if (path && VALID_TABS.includes(path)) {
+    return path === 'settings' ? 'feature-flags' : path;
+  }
+
+  return 'dashboard';
+}
+
 function AdminDashboardApp() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTabState] = useState(getInitialTab);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [brandName, setBrandName] = useState(() => {
     try {
       const cached = localStorage.getItem('apex_custom_branding');
@@ -38,7 +86,36 @@ function AdminDashboardApp() {
     }
   });
 
-  // Sync brandName from backend API and listen to updates
+  // Authoritative tab navigation with browser history and URL sync
+  const setActiveTab = useCallback((newTab) => {
+    const targetTab = newTab === 'settings' ? 'feature-flags' : newTab;
+    if (!VALID_TABS.includes(targetTab)) return;
+
+    setActiveTabState(targetTab);
+
+    // Update URL hash for direct links, bookmarks, and refresh persistence
+    if (window.location.hash.replace(/^#\/?/, '') !== targetTab) {
+      window.history.pushState(null, '', `#${targetTab}`);
+    }
+  }, []);
+
+  // Listen to browser Back/Forward (popstate) and hashchange
+  useEffect(() => {
+    const handleUrlChange = () => {
+      const current = getInitialTab();
+      setActiveTabState(current);
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
+
+  // Sync brandName from backend API
   useEffect(() => {
     const fetchBranding = async () => {
       try {
@@ -60,26 +137,10 @@ function AdminDashboardApp() {
 
     fetchBranding();
 
-    // Cross-tab real-time sync via BroadcastChannel
-    let ch;
-    try {
-      ch = new BroadcastChannel('apex_services_sync');
-      ch.onmessage = (event) => {
-        if (event.data?.type === 'BRANDING_UPDATED' || event.data?.type === 'DATA_UPDATED') {
-          if (event.data?.brandName) {
-            setBrandName(event.data.brandName);
-          } else {
-            fetchBranding();
-          }
-        }
-      };
-    } catch (e) {}
-
     const handleFocus = () => fetchBranding();
     window.addEventListener('focus', handleFocus);
 
     return () => {
-      try { ch?.close(); } catch {}
       window.removeEventListener('focus', handleFocus);
     };
   }, []);
@@ -118,78 +179,90 @@ function AdminDashboardApp() {
     }
     localStorage.removeItem('apex_admin_auth');
     setAdminSession(null);
+    // Reset to default dashboard on logout
+    if (window.location.hash) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
   };
 
   // If not authenticated, require Admin Login
   if (!adminSession) {
-    return <AdminLoginPage onLogin={(data) => setAdminSession(data)} brandName={brandName} />;
+    return (
+      <AdminLoginPage
+        onLogin={(data) => {
+          setAdminSession(data);
+          setActiveTab('dashboard');
+        }}
+        brandName={brandName}
+      />
+    );
   }
 
-  // Explicit, unmerged rendering for each of the 16 Founder's Admin Panel modules
+  // Explicit, unmerged rendering for each of the 16 approved Admin Panel modules
   const renderSection = () => {
     switch (activeTab) {
-      // Module 9: Live Analytics Dashboard
+      // 1. Dashboard
       case 'dashboard':
         return <DashboardSection onNavigateTab={setActiveTab} />;
 
-      // Module 7: Order / Booking Management
-      case 'bookings':
-        return <OrderBookingManagementSection />;
-
-      // Module 13: Vendor / Partner Management
-      case 'partners':
-        return <VendorPartnerManagementSection />;
-
-      // Module 1: User Management
+      // 2. User Management
       case 'users':
         return <UserManagementSection />;
 
-      // Module 3: Payments & Transactions
-      case 'payments':
-        return <PaymentTransactionsSection />;
+      // 3. Partner Management
+      case 'partners':
+        return <VendorPartnerManagementSection />;
 
-      // Module 12: Coupons & Discount Management
-      case 'coupons':
-        return <CouponsDiscountsSection />;
+      // 4. Booking Management
+      case 'bookings':
+        return <OrderBookingManagementSection />;
 
-      // Module 5: Reports & Exports
-      case 'reports':
-        return <ReportsSection />;
-
-      // Module 8: Support & Ticket Management
-      case 'support':
-        return <SupportTicketManagementSection />;
-
-      // Module 2: Content Management (CMS)
-      case 'content':
-        return <ContentControlSection onNavigateTab={setActiveTab} />;
-
-      // Module 14: Content Moderation Tools
-      case 'moderation':
-        return <ContentModerationSection />;
-
-      // Core Service Offerings & Pricing Catalog
+      // 5. Service Catalog & Pricing
       case 'categories':
         return <ServiceCategoriesSection />;
 
-      // Module 6: Roles & Permissions (RBAC)
-      case 'roles':
-        return <RolesPermissionsSection />;
+      // 6. Payments & Escrow
+      case 'payments':
+        return <PaymentTransactionsSection />;
 
-      // Module 10: Audit Logs & Activity History
+      // 7. Support & Ticket Management
+      case 'support':
+        return <SupportTicketManagementSection />;
+
+      // 8. Content Management (CMS)
+      case 'content':
+        return <ContentControlSection onNavigateTab={setActiveTab} />;
+
+      // 9. Coupons & Discounts
+      case 'coupons':
+        return <CouponsDiscountsSection />;
+
+      // 10. Content Moderation
+      case 'moderation':
+        return <ContentModerationSection />;
+
+      // 11. Reports & Exports
+      case 'reports':
+        return <ReportsSection />;
+
+      // 12. Audit Logs & Activity History
       case 'audit':
         return <AuditLogsSection />;
 
-      // Module 11: Feature Flags & App Configuration
+      // 13. Roles & Permissions (RBAC)
+      case 'roles':
+        return <RolesPermissionsSection />;
+
+      // 14. Session & Device Management
+      case 'sessions':
+        return <SessionDeviceManagementSection />;
+
+      // 15. Feature Flags & App Configuration
       case 'feature-flags':
       case 'settings':
         return <FeatureFlagsConfigSection />;
 
-      // Module 15: Session & Device Management
-      case 'sessions':
-        return <SessionDeviceManagementSection />;
-
-      // Module 16: Force-Update & App Version Control
+      // 16. Force Update & App Version Management
       case 'versions':
         return <ForceUpdateVersionControlSection />;
 
@@ -202,32 +275,56 @@ function AdminDashboardApp() {
     }
   };
 
+  const handleToggleSidebar = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setMobileNavOpen((prev) => !prev);
+    } else {
+      setSidebarCollapsed((prev) => !prev);
+    }
+  };
+
   return (
     <div className="min-h-screen flex bg-slate-50 font-sans antialiased text-slate-800">
-      {/* Sidebar Navigation */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        sidebarCollapsed={sidebarCollapsed}
-        setSidebarCollapsed={setSidebarCollapsed}
-        onLogout={handleLogout}
-        brandName={brandName}
-      />
+      {/* Mobile Drawer Backdrop */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-30 md:hidden transition-opacity"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar with 16-module mega-switcher, instant search, and quick horizontal pills */}
-        <Navbar
+      {/* Sidebar Navigation: Responsive Drawer on mobile, Collapsible on desktop */}
+      <div
+        className={`fixed inset-y-0 left-0 z-40 md:static md:z-auto transition-transform duration-200 ease-in-out md:translate-x-0 ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           sidebarCollapsed={sidebarCollapsed}
           setSidebarCollapsed={setSidebarCollapsed}
+          onLogout={handleLogout}
+          brandName={brandName}
+          onCloseMobile={() => setMobileNavOpen(false)}
+        />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Navbar */}
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          sidebarCollapsed={sidebarCollapsed}
+          setSidebarCollapsed={handleToggleSidebar}
           adminUser={adminSession.admin}
           onLogout={handleLogout}
         />
 
         {/* Page Content Body */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {renderSection()}
         </main>
       </div>

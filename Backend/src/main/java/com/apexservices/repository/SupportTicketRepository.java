@@ -9,6 +9,7 @@ import java.util.List;
 @Repository
 public interface SupportTicketRepository extends JpaRepository<SupportTicket, String> {
     List<SupportTicket> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<SupportTicket> findByCustomerEmailOrderByCreatedAtDesc(String customerEmail);
     List<SupportTicket> findByStatusOrderByCreatedAtDesc(String status);
     List<SupportTicket> findAllByOrderByCreatedAtDesc();
 }

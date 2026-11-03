@@ -38,23 +38,22 @@ export default function Navbar({
   }, []);
 
   const allModules = [
+    { id: 'dashboard', name: 'Dashboard' },
     { id: 'users', name: 'User Management' },
-    { id: 'content', name: 'Content Management (CMS)' },
-    { id: 'payments', name: 'Payments & Transactions' },
-    { id: 'notifications', name: 'Notifications' },
-    { id: 'reports', name: 'Reports & Exports' },
-    { id: 'roles', name: 'Roles & Permissions (RBAC)' },
-    { id: 'bookings', name: 'Order / Booking Management' },
-    { id: 'support', name: 'Support & Ticket Management' },
-    { id: 'dashboard', name: 'Live Analytics Dashboard' },
-    { id: 'audit', name: 'Audit Logs & Activity History' },
-    { id: 'feature-flags', name: 'Feature Flags & App Configuration' },
-    { id: 'coupons', name: 'Coupons & Discount Management' },
-    { id: 'partners', name: 'Vendor / Partner Management' },
-    { id: 'moderation', name: 'Content Moderation Tools' },
-    { id: 'sessions', name: 'Session & Device Management' },
-    { id: 'versions', name: 'Force-Update & App Version Control' },
+    { id: 'partners', name: 'Partner Management' },
+    { id: 'bookings', name: 'Booking Management' },
     { id: 'categories', name: 'Service Catalog & Pricing' },
+    { id: 'payments', name: 'Payments & Escrow' },
+    { id: 'support', name: 'Support & Ticket Management' },
+    { id: 'content', name: 'Content Management (CMS)' },
+    { id: 'coupons', name: 'Coupons & Discounts' },
+    { id: 'moderation', name: 'Content Moderation' },
+    { id: 'reports', name: 'Reports & Exports' },
+    { id: 'audit', name: 'Audit Logs & Activity History' },
+    { id: 'roles', name: 'Roles & Permissions (RBAC)' },
+    { id: 'sessions', name: 'Session & Device Management' },
+    { id: 'feature-flags', name: 'Feature Flags & App Configuration' },
+    { id: 'versions', name: 'Force Update & App Version Management' },
   ];
 
   const searchFilteredModules = allModules.filter((m) =>

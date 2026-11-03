@@ -1284,8 +1284,12 @@ class ApiClient {
   // 11. Support Tickets API Client
   async getMyTickets() {
     const token = await this.getPartnerAuthToken();
+    const state = this.getState();
+    const partner = state.partner || {};
+    const emailParam = partner.email ? `?email=${encodeURIComponent(partner.email)}` : '';
+
     try {
-      const res = await fetch(`${API_BASE}/tickets/my-tickets`, {
+      const res = await fetch(`${API_BASE}/tickets/my-tickets${emailParam}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -1295,7 +1299,6 @@ class ApiClient {
       if (res.ok) {
         const list = await res.json();
         if (Array.isArray(list)) {
-          const state = this.getState();
           state.partnerTickets = list;
           this.saveState(state);
           return list;
@@ -1304,7 +1307,6 @@ class ApiClient {
     } catch (err) {
       console.warn('Failed to fetch partner tickets from backend:', err);
     }
-    const state = this.getState();
     return state.partnerTickets || [];
   }
 
@@ -1320,7 +1322,7 @@ class ApiClient {
       message: ticketData.message || ticketData.description || '',
       workRequestId: ticketData.workRequestId || null,
       name: partner.fullName || partner.name || 'Trade Partner',
-      email: partner.email || null,
+      email: partner.email || 'partner@apexservices.com',
       phone: partner.phone || partner.mobileNumber || null,
       userType: 'PARTNER'
     };
@@ -1340,6 +1342,8 @@ class ApiClient {
         state.partnerTickets = [created, ...existing.filter(t => t.id !== created.id)];
         this.saveState(state);
         return created;
+      } else {
+        console.error('Backend ticket creation error status:', res.status);
       }
     } catch (err) {
       console.warn('Backend ticket creation error, saving locally:', err);

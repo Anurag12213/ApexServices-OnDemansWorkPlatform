@@ -48,6 +48,25 @@ export default function SupportTicketManagementSection() {
 
   useEffect(() => {
     fetchTickets();
+
+    // Real-time cross-tab synchronization
+    let channel;
+    try {
+      channel = new BroadcastChannel('apex_services_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'TICKET_UPDATED' || event.data?.type === 'DATA_UPDATED') {
+          fetchTickets();
+        }
+      };
+    } catch (e) {}
+
+    // Background polling every 15s to auto-detect new partner tickets
+    const interval = setInterval(fetchTickets, 15000);
+
+    return () => {
+      clearInterval(interval);
+      if (channel) channel.close();
+    };
   }, []);
 
   const getCustomerName = (t) => t?.customerName || t?.customer || 'User';

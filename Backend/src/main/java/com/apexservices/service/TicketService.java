@@ -33,6 +33,11 @@ public class TicketService {
         return ticketRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
+    public List<SupportTicket> getTicketsByEmail(String email) {
+        if (email == null || email.isBlank()) return List.of();
+        return ticketRepository.findByCustomerEmailOrderByCreatedAtDesc(email.trim().toLowerCase());
+    }
+
     public Optional<SupportTicket> getTicketById(String id) {
         return ticketRepository.findById(id);
     }

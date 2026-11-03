@@ -84,11 +84,24 @@ public class TicketController {
     }
 
     @GetMapping("/my-tickets")
-    public ResponseEntity<List<SupportTicket>> getMyTickets(Principal principal) {
-        if (principal == null) return ResponseEntity.ok(List.of());
-        return userRepository.findByIdentifier(principal.getName())
-                .map(u -> ResponseEntity.ok(ticketService.getTicketsForUser(u.getId())))
-                .orElse(ResponseEntity.ok(List.of()));
+    public ResponseEntity<List<SupportTicket>> getMyTickets(
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) Long userId,
+            Principal principal
+    ) {
+        if (principal != null) {
+            Optional<User> uOpt = userRepository.findByIdentifier(principal.getName());
+            if (uOpt.isPresent()) {
+                return ResponseEntity.ok(ticketService.getTicketsForUser(uOpt.get().getId()));
+            }
+        }
+        if (userId != null) {
+            return ResponseEntity.ok(ticketService.getTicketsForUser(userId));
+        }
+        if (email != null && !email.isBlank()) {
+            return ResponseEntity.ok(ticketService.getTicketsByEmail(email.trim().toLowerCase()));
+        }
+        return ResponseEntity.ok(List.of());
     }
 
     @GetMapping("/{id}")
