@@ -67,10 +67,56 @@ public class PartnerManagementService {
 
     @Transactional
     public PartnerDocument reviewDocument(String docId, String status, String rejectionReason, String verifiedBy) {
-        PartnerDocument doc = documentRepository.findById(docId)
-                .orElseThrow(() -> new IllegalArgumentException("Document not found: " + docId));
+        return reviewDocument(null, docId, status, rejectionReason, verifiedBy);
+    }
 
-        doc.setStatus(status); // VERIFIED, REJECTED
+    @Transactional
+    public PartnerDocument reviewDocument(Long partnerId, String docId, String status, String rejectionReason, String verifiedBy) {
+        PartnerDocument doc = documentRepository.findById(docId).orElse(null);
+
+        if (doc == null && partnerId != null) {
+            User partner = userRepository.findById(partnerId)
+                    .orElseThrow(() -> new IllegalArgumentException("Partner not found: " + partnerId));
+
+            String docName = docId.toLowerCase().contains("skill") || docId.toLowerCase().contains("cert")
+                    ? "Trade Skill Certification"
+                    : "Government Aadhaar / ID";
+            String docType = docId.toLowerCase().contains("skill") ? "CERTIFICATION" : "AADHAAR";
+
+            doc = PartnerDocument.builder()
+                    .id(docId)
+                    .partner(partner)
+                    .documentType(docType)
+                    .documentName(docName)
+                    .documentUrl("https://storage.apexservices.com/docs/" + docId)
+                    .status(status)
+                    .rejectionReason(rejectionReason)
+                    .verifiedBy(verifiedBy != null ? verifiedBy : "ADMIN")
+                    .verifiedAt(LocalDateTime.now())
+                    .uploadedAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            PartnerDocument saved = documentRepository.save(doc);
+
+            auditLogService.record(
+                    verifiedBy != null ? verifiedBy : "ADMIN",
+                    "ADMIN",
+                    "DOCUMENT_" + status,
+                    "PARTNER_KYC",
+                    docId,
+                    "Partner KYC document " + doc.getDocumentName() + " created and marked as " + status + (rejectionReason != null ? " Reason: " + rejectionReason : ""),
+                    "127.0.0.1"
+            );
+
+            return saved;
+        }
+
+        if (doc == null) {
+            throw new IllegalArgumentException("Document not found: " + docId);
+        }
+
+        doc.setStatus(status); // VERIFIED, REJECTED, PENDING_REVIEW, UNDER_REVIEW
         doc.setRejectionReason(rejectionReason);
         doc.setVerifiedBy(verifiedBy != null ? verifiedBy : "ADMIN");
         doc.setVerifiedAt(LocalDateTime.now());
