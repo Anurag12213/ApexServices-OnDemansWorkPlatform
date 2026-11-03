@@ -18,6 +18,9 @@ import {
   Archive,
   ArrowRight,
   Sparkles,
+  Image,
+  Upload,
+  FileImage,
 } from 'lucide-react';
 import CategoryIconSelector, { RenderIcon } from './CategoryIconSelector';
 import { adminFetch, API_BASE_URL } from '../utils/api';
@@ -44,7 +47,47 @@ export default function ServiceCategoriesSection() {
     iconName: 'Hammer',
     customIconValue: '',
     description: '',
+    tag: 'Popular',
+    bannerImageUrl: '',
   });
+
+  // Direct manual image upload handler for New Category
+  const handleNewCategoryFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image file size must be under 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      if (base64) {
+        setNewCategory((prev) => ({ ...prev, bannerImageUrl: base64 }));
+        showToast(`Imported banner image: ${file.name}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Direct manual image upload handler for Edit Category
+  const handleEditCategoryFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Image file size must be under 5MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      if (base64) {
+        setEditingCategory((prev) => ({ ...prev, bannerImageUrl: base64 }));
+        showToast(`Imported banner image: ${file.name}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const showToast = (msg) => {
     setNotification(msg);
@@ -129,7 +172,15 @@ export default function ServiceCategoriesSection() {
           iconName: 'Hammer',
           customIconValue: '',
           description: '',
+          tag: 'Popular',
+          bannerImageUrl: '',
         });
+        // Notify other tabs via sync channel
+        try {
+          const syncChannel = new BroadcastChannel('apex_services_sync');
+          syncChannel.postMessage({ type: 'DATA_UPDATED' });
+          syncChannel.close();
+        } catch (err) {}
         showToast(`Category "${saved.name}" successfully created!`);
         fetchCategories(); // Refresh to guarantee sync
       } else {
@@ -157,6 +208,11 @@ export default function ServiceCategoriesSection() {
         const updated = await res.json();
         setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
         setEditingCategory(null);
+        try {
+          const syncChannel = new BroadcastChannel('apex_services_sync');
+          syncChannel.postMessage({ type: 'DATA_UPDATED' });
+          syncChannel.close();
+        } catch (err) {}
         showToast(`Category "${updated.name}" updated successfully!`);
         fetchCategories();
       } else {
@@ -483,18 +539,35 @@ export default function ServiceCategoriesSection() {
                       {/* Category & Icon */}
                       <td className="p-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center p-2 border border-blue-200 shrink-0 shadow-2xs">
-                            <RenderIcon
-                              icon={cat.icon}
-                              iconName={cat.iconName}
-                              className="w-4 h-4 text-blue-700"
-                              imgClassName="w-full h-full object-contain"
-                            />
-                          </div>
+                          {cat.bannerImageUrl ? (
+                            <div className="w-12 h-9 rounded-lg overflow-hidden border border-slate-200 shrink-0 relative group shadow-2xs">
+                              <img
+                                src={cat.bannerImageUrl}
+                                alt={cat.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center p-2 border border-blue-200 shrink-0 shadow-2xs">
+                              <RenderIcon
+                                icon={cat.icon}
+                                iconName={cat.iconName}
+                                className="w-4 h-4 text-blue-700"
+                                imgClassName="w-full h-full object-contain"
+                              />
+                            </div>
+                          )}
                           <div className="min-w-0 max-w-xs">
-                            <h4 className="font-bold text-slate-900 text-xs leading-snug truncate">
-                              {cat.name}
-                            </h4>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-bold text-slate-900 text-xs leading-snug truncate">
+                                {cat.name}
+                              </h4>
+                              {cat.tag && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 bg-blue-50 text-blue-700 border border-blue-200 rounded">
+                                  {cat.tag}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] text-slate-500 truncate mt-0.5">
                               {cat.description || 'No description provided.'}
                             </p>
@@ -676,6 +749,83 @@ export default function ServiceCategoriesSection() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono focus:bg-white focus:border-blue-500"
                   />
                 </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Badge Tag</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Popular, 24/7 Service, Certified"
+                    value={newCategory.tag || ''}
+                    onChange={(e) => setNewCategory({ ...newCategory, tag: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Category Feature Image (Direct File Import or URL) */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                    <Image className="w-3.5 h-3.5 text-blue-600" />
+                    Category Box Image (Direct File Import or URL)
+                  </label>
+                  {newCategory.bannerImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setNewCategory({ ...newCategory, bannerImageUrl: '' })}
+                      className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" /> Clear Image
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Direct File Import from Computer */}
+                  <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
+                    <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-blue-600" /> Direct Import from Computer
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleNewCategoryFileUpload}
+                      className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP (up to 5MB)</span>
+                  </div>
+
+                  {/* Option 2: Image URL input */}
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Paste Web Image URL</span>
+                    <input
+                      type="text"
+                      value={newCategory.bannerImageUrl || ''}
+                      onChange={(e) => setNewCategory({ ...newCategory, bannerImageUrl: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1.5">Direct image link or CDN address</span>
+                  </div>
+                </div>
+
+                {/* Image Preview Banner */}
+                {newCategory.bannerImageUrl && (
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
+                    <img
+                      src={newCategory.bannerImageUrl}
+                      alt="Category Preview"
+                      className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 shadow-xs"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-slate-800 block truncate">
+                        {newCategory.bannerImageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : newCategory.bannerImageUrl}
+                      </span>
+                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Live Category Card
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -792,6 +942,83 @@ export default function ServiceCategoriesSection() {
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-mono focus:bg-white focus:border-blue-500"
                   />
                 </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Badge Tag</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Popular, 24/7 Service, Certified"
+                    value={editingCategory.tag || ''}
+                    onChange={(e) => setEditingCategory({ ...editingCategory, tag: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Category Feature Image (Direct File Import or URL) */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-slate-700 uppercase tracking-wide text-[11px] flex items-center gap-1.5">
+                    <Image className="w-3.5 h-3.5 text-blue-600" />
+                    Category Box Image (Direct File Import or URL)
+                  </label>
+                  {editingCategory.bannerImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setEditingCategory({ ...editingCategory, bannerImageUrl: '' })}
+                      className="text-[11px] text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" /> Clear Image
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Direct File Import from Computer */}
+                  <div className="p-3 bg-white rounded-lg border-2 border-dashed border-blue-200 hover:border-blue-400 transition">
+                    <span className="text-xs font-bold text-blue-700 block mb-1.5 flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-blue-600" /> Direct Import from Computer
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleEditCategoryFileUpload}
+                      className="w-full text-xs text-slate-500 file:mr-2.5 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer border border-slate-200 rounded p-1 bg-slate-50"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1.5">PNG, JPG, JPEG, WebP (up to 5MB)</span>
+                  </div>
+
+                  {/* Option 2: Image URL input */}
+                  <div className="p-3 bg-white rounded-lg border border-slate-200">
+                    <span className="text-xs font-bold text-slate-700 block mb-1.5">Or Paste Web Image URL</span>
+                    <input
+                      type="text"
+                      value={editingCategory.bannerImageUrl || ''}
+                      onChange={(e) => setEditingCategory({ ...editingCategory, bannerImageUrl: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-slate-50 border border-slate-300 rounded px-3 py-1.5 outline-none focus:border-blue-500 text-xs"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1.5">Direct image link or CDN address</span>
+                  </div>
+                </div>
+
+                {/* Image Preview Banner */}
+                {editingCategory.bannerImageUrl && (
+                  <div className="flex items-center gap-3 p-2.5 bg-white rounded-lg border border-slate-200">
+                    <img
+                      src={editingCategory.bannerImageUrl}
+                      alt="Category Preview"
+                      className="w-20 h-14 object-cover rounded-md border border-slate-200 shrink-0 shadow-xs"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-bold text-slate-800 block truncate">
+                        {editingCategory.bannerImageUrl.startsWith('data:') ? 'Local Image File Imported (Direct Data)' : editingCategory.bannerImageUrl}
+                      </span>
+                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Ready for Live Category Card
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>

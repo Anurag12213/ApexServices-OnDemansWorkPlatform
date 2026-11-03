@@ -43,58 +43,110 @@ export const CategoriesSection = () => {
             No service categories found.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {categories.filter(c => !c.isSoftDeleted && c.active !== false).map((cat) => {
               const isDown = cat.isTemporaryDown;
+              const hasImage = Boolean(cat.bannerImageUrl || cat.imageUrl);
+              const imageUrl = cat.bannerImageUrl || cat.imageUrl;
+
               return (
                 <div
                   key={cat.id}
-                  className={`bg-white border p-6 rounded-2xl transition-all shadow-xs flex flex-col justify-between text-left group ${
-                    isDown ? 'border-amber-200 bg-amber-50/20 opacity-80' : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
+                  onClick={() => !isDown && handleInitiateRequestWork(cat.name)}
+                  className={`bg-white rounded-[26px] border transition-all duration-300 shadow-sm flex flex-col justify-between overflow-hidden text-left group cursor-pointer ${
+                    isDown
+                      ? 'border-amber-200 bg-amber-50/20 opacity-80 cursor-not-allowed'
+                      : 'border-slate-200/90 hover:border-blue-400 hover:shadow-xl hover:-translate-y-1'
                   }`}
                 >
                   <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center p-2 transition-colors ${
-                        isDown ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'bg-blue-50 border border-blue-200 text-blue-700 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600'
-                      }`}>
-                        <CategoryIcon
-                          icon={cat.icon}
-                          iconName={cat.iconName}
-                          iconValue={cat.icon?.iconValue || cat.iconValue}
-                          className="w-5 h-5"
-                          imgClassName="w-full h-full object-contain"
+                    {/* Top Section: Category Image Header */}
+                    <div className="relative h-44 w-full overflow-hidden bg-gradient-to-br from-slate-100 via-blue-50/50 to-slate-200">
+                      {hasImage ? (
+                        <img
+                          src={imageUrl}
+                          alt={cat.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-6 text-slate-300 group-hover:text-blue-400 transition-colors bg-gradient-to-b from-slate-50 to-slate-100">
+                          <CategoryIcon
+                            icon={cat.icon}
+                            iconName={cat.iconName}
+                            iconValue={cat.icon?.iconValue || cat.iconValue}
+                            className="w-16 h-16 opacity-30 group-hover:scale-110 transition-transform duration-300"
+                            imgClassName="w-16 h-16 object-contain opacity-40"
+                          />
+                        </div>
+                      )}
+
+                      {/* Gentle Wave SVG Curve seamlessly cutting into image */}
+                      <div className="absolute -bottom-1 left-0 right-0 pointer-events-none text-white leading-none">
+                        <svg
+                          viewBox="0 0 400 38"
+                          fill="currentColor"
+                          preserveAspectRatio="none"
+                          className="w-full h-7 block"
+                        >
+                          <path d="M0,0 C120,38 280,38 400,0 L400,38 L0,38 Z"></path>
+                        </svg>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        {isDown && (
-                          <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-amber-300">
-                            Temporarily Paused
+
+                      {/* Tag pill at top right if present */}
+                      {cat.tag && (
+                        <div className="absolute top-3 right-3 z-10">
+                          <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-xs text-[10px] font-black uppercase tracking-wider text-slate-800 shadow-xs border border-white/80">
+                            {cat.tag}
                           </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
-                    <h3 className="text-lg font-bold text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">
-                      {cat.name}
-                    </h3>
-                    <p className="text-slate-600 text-sm leading-relaxed mb-6 font-normal">
-                      {cat.description}
-                    </p>
+                    {/* Middle Section: Floating Icon + Content */}
+                    <div className="px-5 pt-0 pb-2 relative">
+                      {/* Floating Category Icon Badge */}
+                      <div className="relative -mt-6 mb-3">
+                        <div
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center p-2.5 shadow-sm border transition-colors ${
+                            isDown
+                              ? 'bg-amber-100 text-amber-700 border-amber-300'
+                              : 'bg-blue-50 border-blue-200 text-blue-600 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600'
+                          }`}
+                        >
+                          <CategoryIcon
+                            icon={cat.icon}
+                            iconName={cat.iconName}
+                            iconValue={cat.icon?.iconValue || cat.iconValue}
+                            className="w-5 h-5 transition-transform group-hover:scale-110"
+                            imgClassName="w-full h-full object-contain"
+                          />
+                        </div>
+                      </div>
+
+                      <h3 className="text-base font-black text-slate-900 mb-1 group-hover:text-blue-600 transition-colors tracking-tight line-clamp-1">
+                        {cat.name}
+                      </h3>
+                      <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 font-normal">
+                        {cat.description || 'Professional home repairs and maintenance solutions.'}
+                      </p>
+                    </div>
                   </div>
 
-                  <button
-                    disabled={isDown}
-                    onClick={() => !isDown && handleInitiateRequestWork(cat.name)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border font-bold text-xs uppercase tracking-wider transition-all ${
-                      isDown
-                        ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                        : 'bg-slate-50 hover:bg-blue-600 hover:text-white text-slate-800 border border-slate-200 hover:border-blue-600 group-hover:border-blue-200 shadow-xs cursor-pointer'
-                    }`}
-                  >
-                    <span>{isDown ? 'Service Paused for Maintenance' : 'Request Service'}</span>
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
-                  </button>
+                  {/* Bottom Action Footer with Circular Arrow */}
+                  <div className="px-5 pb-5 pt-2 flex items-center justify-between border-t border-slate-100/80 mt-2">
+                    <span className="text-xs font-bold text-slate-600 group-hover:text-blue-600 transition-colors">
+                      {isDown ? 'Service Paused' : 'Request Service'}
+                    </span>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isDown
+                          ? 'bg-slate-100 text-slate-400'
+                          : 'bg-slate-100 text-slate-700 group-hover:bg-blue-600 group-hover:text-white group-hover:translate-x-1 shadow-xs'
+                      }`}
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
                 </div>
               );
             })}
