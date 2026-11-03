@@ -16,7 +16,8 @@ const getApiBase = () => {
   ).replace(/\/+$/, '');
 };
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
+export const SERVER_BASE = API_BASE.replace(/\/api\/?$/, '');
 
 // Initial Authoritative Admin-Configured Document Requirements
 const DEFAULT_DOC_REQUIREMENTS = [
@@ -510,75 +511,6 @@ class ApiClient {
       console.warn('Backend login error:', e);
       return { success: false, error: 'Network error connecting to login server' };
     }
-  }
-
-  // Seed demo partner with realistic configuration
-  seedDemoPartner(email, type = 'INDIVIDUAL') {
-    const state = this.getState();
-    const isOrg = type === 'ORGANIZATION';
-    const amount = isOrg ? 10000 : 5000;
-
-    const partner = {
-      id: 'PRT-2041',
-      fullName: isOrg ? 'Apex Craft Solutions LLP' : 'Rajesh Sharma',
-      email: email || 'partner@apexservices.com',
-      phone: '+91 98234 11200',
-      accountType: type,
-      orgName: isOrg ? 'Apex Craft Solutions LLP' : null,
-      gstin: isOrg ? '27AABCA1234F1Z5' : null,
-      category: isOrg ? 'Custom Carpentry, Emergency Plumbing' : 'Custom Carpentry',
-      serviceCategories: isOrg ? ['Custom Carpentry', 'Emergency Plumbing'] : ['Custom Carpentry'],
-      territory: 'Mumbai West (Andheri - Bandra)',
-      serviceRadiusKm: 15,
-      rating: 5.0,
-      reviewCount: 0,
-      jobsCompleted: 0,
-      isAvailable: true,
-      onboardingState: 'APPROVED',
-      depositStatus: 'VERIFIED',
-      depositAmount: amount,
-      createdAt: new Date().toISOString(),
-      documents: {
-        'DOC-REQ-1': { status: 'APPROVED', fileName: 'aadhaar_partner.pdf', verifiedAt: '2026-01-16' },
-        'DOC-REQ-2': { status: 'APPROVED', fileName: 'trade_cert.pdf', verifiedAt: '2026-01-16' },
-        'DOC-REQ-3': { status: 'APPROVED', fileName: 'police_clearance_2026.pdf', verifiedAt: '2026-01-16' }
-      },
-      earnings: {
-        today: 0,
-        thisWeek: 0,
-        thisMonth: 0,
-        lifetime: 0,
-        pendingPayout: 0,
-        availableBalance: 0
-      },
-      payoutMethods: [
-        { id: 'PM-1', type: 'UPI', address: 'rajesh@okhdfcbank', isDefault: true, verified: true },
-        { id: 'PM-2', type: 'BANK', bankName: 'HDFC Bank', accountMasked: '•••• 4102', ifsc: 'HDFC0001234', isDefault: false, verified: true }
-      ],
-      preferences: {
-        soundAlerts: true,
-        vibration: true,
-        pushNotifications: true
-      }
-    };
-
-    state.partner = partner;
-    state.payoutMethods = partner.payoutMethods;
-    state.depositTransactions = [
-      {
-        id: 'TXN-DEP-1092',
-        amount: amount,
-        currency: 'INR',
-        method: 'UPI Direct',
-        gatewayRef: 'pay_rzp_dep_88912',
-        status: 'VERIFIED',
-        date: '2026-01-15 11:20:00',
-        receiptUrl: '#'
-      }
-    ];
-
-    this.saveState(state);
-    return { success: true, partner, token: 'prt-tok-demo-active' };
   }
 
   // 4. Deposit Payment Execution

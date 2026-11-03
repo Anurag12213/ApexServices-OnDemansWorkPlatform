@@ -9,9 +9,9 @@ export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
   const { login, setActiveTab, brandName } = usePartner();
 
   const [loginTab, setLoginTab] = useState('email');
-  const [email, setEmail] = useState('partner@apexservices.com');
-  const [phone, setPhone] = useState('9823411200');
-  const [password, setPassword] = useState('partner123');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [keepSignedIn, setKeepSignedIn] = useState(true);
   const [error, setError] = useState('');
@@ -310,26 +310,28 @@ export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
               </button>
             </form>
 
-            {/* Quick Certified Partner Switcher */}
-            <div className="mt-4 pt-3 border-t border-slate-100">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2 text-center">
-                Switch Test Partner Account (1-Click)
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                {quickPartners.map((qp) => (
-                  <button
-                    key={qp.email}
-                    type="button"
-                    onClick={() => handleQuickLogin(qp.email)}
-                    disabled={isLoading}
-                    className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-left transition-all text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span>{qp.icon}</span>
-                    <span className="truncate">{qp.name}</span>
-                  </button>
-                ))}
+            {/* Quick Certified Partner Switcher (Dev Mode Only) */}
+            {!import.meta.env?.PROD && (
+              <div className="mt-4 pt-3 border-t border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-2 text-center">
+                  Switch Test Partner Account (Dev Only)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {quickPartners.map((qp) => (
+                    <button
+                      key={qp.email}
+                      type="button"
+                      onClick={() => handleQuickLogin(qp.email)}
+                      disabled={isLoading}
+                      className="p-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-left transition-all text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <span>{qp.icon}</span>
+                      <span className="truncate">{qp.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Registration link */}

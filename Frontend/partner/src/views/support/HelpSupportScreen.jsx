@@ -47,7 +47,13 @@ export const HelpSupportScreen = () => {
     try {
       if (!isBackground) setLoading(true);
       const list = await api.getMyTickets();
-      setTickets(Array.isArray(list) ? list : []);
+      const incoming = Array.isArray(list) ? list : [];
+      setTickets(incoming);
+      setSelectedTicket((current) => {
+        if (!current) return null;
+        const fresh = incoming.find((t) => t.id === current.id);
+        return fresh || current;
+      });
     } catch (err) {
       console.warn('Error loading partner tickets:', err);
     } finally {

@@ -34,23 +34,15 @@ export const JobExecutionFlow = () => {
 
   // Diagnosis state (Screen 27 & 39)
   const [diagnosisNotes, setDiagnosisNotes] = useState(
-    activeJob?.diagnosis?.notes || 'Inspection reveals internal door hinge latch plate misalignment causing lock jam.'
+    activeJob?.diagnosis?.notes || ''
   );
-  const [safetyConcerns, setSafetyConcerns] = useState('None observed. Work area clear of hazardous wiring.');
+  const [safetyConcerns, setSafetyConcerns] = useState(
+    activeJob?.diagnosis?.safetyConcerns || ''
+  );
 
   // Required Products state (Screens 28, 29, 30)
   const [requiredParts, setRequiredParts] = useState(
-    activeJob?.requiredProducts || [
-      {
-        id: 'PART-1',
-        name: 'Heavy Duty Mortise Latch Plate & Screws',
-        specs: 'Godrej / Yale Compatible 65mm Brass Plated',
-        quantity: 1,
-        reason: 'Original plate screw holes stripped',
-        procurementSource: 'OUTSIDE_MARKET', // 'OUTSIDE_MARKET' or 'DIRECT_PARTNER'
-        status: 'PRODUCT_IDENTIFIED' // PRODUCT_IDENTIFIED, AWAITING_CUSTOMER, CUSTOMER_REPORTED_PURCHASED, PRODUCT_AVAILABLE
-      }
-    ]
+    activeJob?.requiredProducts || []
   );
   const [newPartName, setNewPartName] = useState('');
   const [newPartSpecs, setNewPartSpecs] = useState('');

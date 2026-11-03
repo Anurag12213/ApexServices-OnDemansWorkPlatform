@@ -27,8 +27,8 @@ export const SignupScreen = ({ accountType = 'INDIVIDUAL', onBack, onComplete })
     regNumber: '',
     businessEmail: '',
     businessMobile: '',
-    password: 'password123',
-    confirmPassword: 'password123',
+    password: '',
+    confirmPassword: '',
   });
 
   const [showPassword, setShowPassword] = useState(false);

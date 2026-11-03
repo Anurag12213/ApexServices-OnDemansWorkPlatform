@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { usePartner } from '../../context/PartnerContext';
-import { api } from '../../services/api';
+import { api, SERVER_BASE } from '../../services/api';
 import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import {
@@ -117,7 +117,7 @@ export const PartnerProfileScreen = () => {
           <div className="relative group">
             {partner?.avatarUrl ? (
               <img
-                src={partner.avatarUrl.startsWith('http') ? partner.avatarUrl : `http://localhost:8080${partner.avatarUrl}`}
+                src={partner.avatarUrl.startsWith('http') ? partner.avatarUrl : `${SERVER_BASE}${partner.avatarUrl.startsWith('/') ? '' : '/'}${partner.avatarUrl}`}
                 alt={partner?.fullName}
                 className="w-16 h-16 rounded-2xl object-cover border-2 border-blue-500 shadow-xs"
               />

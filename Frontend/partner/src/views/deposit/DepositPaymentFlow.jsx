@@ -29,8 +29,7 @@ export const DepositPaymentFlow = () => {
 
   const [policy, setPolicy] = useState({ amount: 5000, formatted: '₹5,000' });
   const [selectedMethod, setSelectedMethod] = useState('UPI'); // UPI, CARD, NETBANKING
-  const [upiVpa, setUpiVpa] = useState('partner@okhdfcbank');
-  const [cardNumber, setCardNumber] = useState('4532 •••• •••• 8821');
+  const [upiVpa, setUpiVpa] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentResult, setPaymentResult] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
