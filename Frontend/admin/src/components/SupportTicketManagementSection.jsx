@@ -50,12 +50,32 @@ export default function SupportTicketManagementSection() {
     fetchTickets();
   }, []);
 
+  const getCustomerName = (t) => t?.customerName || t?.customer || 'User';
+  const getWorkRequestId = (t) => t?.workRequestId || t?.relatedOrder || '';
+  const getEmail = (t) => t?.customerEmail || t?.email || '';
+  const getPhone = (t) => t?.customerPhone || t?.phone || '';
+  const getUserType = (t) => (t?.userType || 'CUSTOMER').toUpperCase();
+  const formatDateTime = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString('en-IN', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const filteredTickets = tickets.filter((t) => {
     const matchesSearch =
       (t.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (t.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.customer || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (t.relatedOrder || '').toLowerCase().includes(searchTerm.toLowerCase());
+      getCustomerName(t).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getWorkRequestId(t).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getUserType(t).toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'ALL' || t.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -72,20 +92,25 @@ export default function SupportTicketManagementSection() {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        const serverMsg = data.message || {};
         const newMessage = {
-          sender: 'ApexServices Official Support',
-          text: replyMessage,
-          timestamp: 'Just now',
+          senderName: serverMsg.senderName || 'ApexServices Official Support',
+          messageText: serverMsg.messageText || replyMessage,
+          createdAt: serverMsg.createdAt || new Date().toISOString(),
           isStaff: true
         };
+
+        const updatedMessages = [...(selectedTicket.messages || []), newMessage];
+        const nextStatus = selectedTicket.status === 'OPEN' ? 'IN_PROGRESS' : selectedTicket.status;
 
         setTickets((prev) =>
           prev.map((t) =>
             t.id === selectedTicket.id
               ? {
                   ...t,
-                  status: t.status === 'OPEN' ? 'IN_PROGRESS' : t.status,
-                  messages: [...(t.messages || []), newMessage]
+                  status: nextStatus,
+                  messages: updatedMessages
                 }
               : t
           )
@@ -93,11 +118,11 @@ export default function SupportTicketManagementSection() {
 
         setSelectedTicket((prev) => ({
           ...prev,
-          status: prev.status === 'OPEN' ? 'IN_PROGRESS' : prev.status,
-          messages: [...(prev.messages || []), newMessage]
+          status: nextStatus,
+          messages: updatedMessages
         }));
 
-        toast.success(`Reply dispatched to ${selectedTicket.customer}`, 'Message Sent');
+        toast.success(`Reply dispatched to ${getCustomerName(selectedTicket)}`, 'Message Sent');
         setReplyMessage('');
       } else {
         toast.error('Failed to send reply to backend');
@@ -210,6 +235,11 @@ export default function SupportTicketManagementSection() {
           ) : (
             filteredTickets.map((t) => {
               const isSelected = selectedTicket?.id === t.id;
+              const lastMsg = (t.messages && t.messages.length > 0) ? t.messages[t.messages.length - 1] : null;
+              const lastText = lastMsg ? (lastMsg.messageText || lastMsg.text) : 'No messages yet';
+              const userType = getUserType(t);
+              const customerName = getCustomerName(t);
+
               return (
                 <div
                   key={t.id}
@@ -221,9 +251,18 @@ export default function SupportTicketManagementSection() {
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                      {t.id}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                        {t.id}
+                      </span>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                        userType === 'PARTNER'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200'
+                      }`}>
+                        {userType}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
@@ -252,12 +291,12 @@ export default function SupportTicketManagementSection() {
 
                   <h4 className="font-extrabold text-xs text-slate-900 line-clamp-1">{t.subject}</h4>
                   <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                    {(t.messages && t.messages.length > 0) ? t.messages[t.messages.length - 1]?.text : 'No messages'}
+                    {lastText}
                   </p>
 
                   <div className="flex items-center justify-between text-[10px] text-slate-400 mt-2.5 pt-2 border-t border-slate-100">
-                    <span className="font-bold text-slate-700">{t.customer}</span>
-                    <span>{t.createdAt}</span>
+                    <span className="font-bold text-slate-700">{customerName}</span>
+                    <span>{formatDateTime(t.createdAt)}</span>
                   </div>
                 </div>
               );
@@ -277,15 +316,22 @@ export default function SupportTicketManagementSection() {
                       <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
                         {selectedTicket.id}
                       </span>
-                      {selectedTicket.relatedOrder && selectedTicket.relatedOrder !== 'N/A' && (
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${
+                        getUserType(selectedTicket) === 'PARTNER'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200'
+                      }`}>
+                        {getUserType(selectedTicket)}
+                      </span>
+                      {getWorkRequestId(selectedTicket) && getWorkRequestId(selectedTicket) !== 'N/A' && (
                         <span className="text-[11px] font-bold text-slate-500">
-                          Ref: {selectedTicket.relatedOrder}
+                          Ref: {getWorkRequestId(selectedTicket)}
                         </span>
                       )}
                     </div>
                     <h3 className="text-base font-black text-slate-900 mt-1">{selectedTicket.subject}</h3>
                     <p className="text-[11px] text-slate-500">
-                      User: {selectedTicket.customer} ({selectedTicket.email} • {selectedTicket.phone})
+                      User: <strong className="text-slate-700">{getCustomerName(selectedTicket)}</strong> • {getEmail(selectedTicket) || 'No Email'} • {getPhone(selectedTicket) || 'No Phone'}
                     </p>
                   </div>
 
@@ -302,24 +348,31 @@ export default function SupportTicketManagementSection() {
 
                 {/* Conversation Thread */}
                 <div className="my-4 space-y-3 max-h-72 overflow-y-auto pr-2">
-                  {(selectedTicket.messages || []).map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3.5 rounded-xl text-xs space-y-1 ${
-                        msg.isStaff
-                          ? 'bg-blue-50/70 border border-blue-200 text-blue-900 ml-8'
-                          : 'bg-slate-50 border border-slate-200 text-slate-800 mr-8'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className={`font-bold ${msg.isStaff ? 'text-blue-700' : 'text-slate-600'}`}>
-                          {msg.sender}
-                        </span>
-                        <span className="text-slate-400">{msg.timestamp}</span>
+                  {(selectedTicket.messages || []).map((msg, idx) => {
+                    const isStaff = msg.isStaff || msg.staff;
+                    const sender = msg.senderName || msg.sender || (isStaff ? 'Official Support Desk' : getCustomerName(selectedTicket));
+                    const text = msg.messageText || msg.text || '';
+                    const time = formatDateTime(msg.createdAt) || msg.timestamp || 'Just now';
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3.5 rounded-xl text-xs space-y-1 ${
+                          isStaff
+                            ? 'bg-blue-50/70 border border-blue-200 text-blue-900 ml-8'
+                            : 'bg-slate-50 border border-slate-200 text-slate-800 mr-8'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className={`font-bold ${isStaff ? 'text-blue-700' : 'text-slate-600'}`}>
+                            {sender}
+                          </span>
+                          <span className="text-slate-400">{time}</span>
+                        </div>
+                        <p className="leading-relaxed whitespace-pre-wrap">{text}</p>
                       </div>
-                      <p className="leading-relaxed">{msg.text}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
@@ -329,7 +382,7 @@ export default function SupportTicketManagementSection() {
                   rows="3"
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                  placeholder={`Write official support reply to ${selectedTicket.customer}...`}
+                  placeholder={`Write official support reply to ${getCustomerName(selectedTicket)}...`}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:bg-white focus:border-blue-500 transition"
                 />
                 <div className="flex justify-end">

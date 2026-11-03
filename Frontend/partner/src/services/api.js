@@ -1280,6 +1280,146 @@ class ApiClient {
     this.saveState(state);
     return { success: true, requiredProducts: productsList };
   }
+
+  // 11. Support Tickets API Client
+  async getMyTickets() {
+    const token = await this.getPartnerAuthToken();
+    try {
+      const res = await fetch(`${API_BASE}/tickets/my-tickets`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list)) {
+          const state = this.getState();
+          state.partnerTickets = list;
+          this.saveState(state);
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch partner tickets from backend:', err);
+    }
+    const state = this.getState();
+    return state.partnerTickets || [];
+  }
+
+  async createTicket(ticketData) {
+    const token = await this.getPartnerAuthToken();
+    const state = this.getState();
+    const partner = state.partner || {};
+
+    const payload = {
+      subject: ticketData.subject,
+      category: ticketData.category || 'JOB_ISSUE',
+      priority: ticketData.priority || 'MEDIUM',
+      message: ticketData.message || ticketData.description || '',
+      workRequestId: ticketData.workRequestId || null,
+      name: partner.fullName || partner.name || 'Trade Partner',
+      email: partner.email || null,
+      phone: partner.phone || partner.mobileNumber || null,
+      userType: 'PARTNER'
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/tickets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const created = await res.json();
+        const existing = state.partnerTickets || [];
+        state.partnerTickets = [created, ...existing.filter(t => t.id !== created.id)];
+        this.saveState(state);
+        return created;
+      }
+    } catch (err) {
+      console.warn('Backend ticket creation error, saving locally:', err);
+    }
+
+    const localTicket = {
+      id: 'TCK-' + Math.floor(1000 + Math.random() * 9000),
+      subject: payload.subject,
+      category: payload.category,
+      priority: payload.priority,
+      status: 'OPEN',
+      workRequestId: payload.workRequestId,
+      customerName: payload.name,
+      customerEmail: payload.email,
+      customerPhone: payload.phone,
+      userType: 'PARTNER',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          id: Date.now(),
+          senderName: payload.name,
+          isStaff: false,
+          messageText: payload.message,
+          createdAt: new Date().toISOString()
+        }
+      ]
+    };
+    const existing = state.partnerTickets || [];
+    state.partnerTickets = [localTicket, ...existing];
+    this.saveState(state);
+    return localTicket;
+  }
+
+  async replyTicket(ticketId, messageText) {
+    const token = await this.getPartnerAuthToken();
+    try {
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}/reply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text: messageText })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const updatedTicket = data.ticket;
+        const state = this.getState();
+        if (state.partnerTickets && updatedTicket) {
+          state.partnerTickets = state.partnerTickets.map(t => t.id === ticketId ? updatedTicket : t);
+          this.saveState(state);
+        }
+        return data;
+      }
+    } catch (err) {
+      console.warn('Backend ticket reply error:', err);
+    }
+    return null;
+  }
+
+  async getTicketDetails(ticketId) {
+    const token = await this.getPartnerAuthToken();
+    try {
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('Backend ticket fetch error:', err);
+    }
+    const state = this.getState();
+    return (state.partnerTickets || []).find(t => t.id === ticketId) || null;
+  }
 }
 
 export const api = new ApiClient();

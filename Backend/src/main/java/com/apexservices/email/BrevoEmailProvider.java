@@ -33,12 +33,13 @@ public class BrevoEmailProvider implements EmailProvider {
     private final String fromName;
     private final RestClient restClient;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public BrevoEmailProvider(
             @Value("${brevo.api.key:}") String apiKey,
             @Value("${brevo.api.base-url:https://api.brevo.com/v3}") String baseUrl,
             @Value("${mail.from.email:notifications@apexservices.com}") String fromEmail,
             @Value("${mail.from.name:Apex Services}") String fromName,
-            RestClient.Builder restClientBuilder) {
+            @org.springframework.beans.factory.annotation.Autowired(required = false) RestClient.Builder restClientBuilder) {
 
         this.apiKey = apiKey != null ? apiKey.trim() : "";
         this.baseUrl = baseUrl != null ? baseUrl.trim().replaceAll("/+$", "") : "https://api.brevo.com/v3";
@@ -49,7 +50,8 @@ public class BrevoEmailProvider implements EmailProvider {
         requestFactory.setConnectTimeout(Duration.ofSeconds(5));
         requestFactory.setReadTimeout(Duration.ofSeconds(8));
 
-        this.restClient = restClientBuilder
+        RestClient.Builder builder = restClientBuilder != null ? restClientBuilder : RestClient.builder();
+        this.restClient = builder
                 .baseUrl(this.baseUrl)
                 .requestFactory(requestFactory)
                 .defaultHeader("api-key", this.apiKey)

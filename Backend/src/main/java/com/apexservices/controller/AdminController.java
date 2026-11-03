@@ -382,10 +382,17 @@ public class AdminController {
             Principal principal
     ) {
         String replyText = payload.get("text");
+        if (replyText == null || replyText.isBlank()) {
+            replyText = payload.get("message");
+        }
+        if (replyText == null || replyText.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Reply message text is required"));
+        }
         String senderName = principal != null ? principal.getName() : "ApexServices Support Desk";
 
         TicketMessage msg = ticketService.replyTicket(id, null, senderName, true, replyText);
-        return ResponseEntity.ok(Map.of("success", true, "message", msg));
+        SupportTicket updatedTicket = ticketService.getTicketById(id).orElse(null);
+        return ResponseEntity.ok(Map.of("success", true, "message", msg, "ticket", updatedTicket != null ? updatedTicket : Map.of()));
     }
 
     @PatchMapping("/tickets/{id}/resolve")

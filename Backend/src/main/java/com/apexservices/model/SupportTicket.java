@@ -64,7 +64,7 @@ public class SupportTicket {
     @Column(name = "assigned_to", length = 100)
     private String assignedTo;
 
-    @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")
     @Builder.Default
     private List<TicketMessage> messages = new ArrayList<>();

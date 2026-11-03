@@ -104,7 +104,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/review").hasAnyRole("CUSTOMER", "ADMIN")
 
                 // Support Tickets Module across Portals
-                .requestMatchers("/api/tickets/**").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
+                .requestMatchers("/api/tickets", "/api/tickets/**").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
 
                 // Actuator Security (Only health and info are public; metrics/env require ADMIN)
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
