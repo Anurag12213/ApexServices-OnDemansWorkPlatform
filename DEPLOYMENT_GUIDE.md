@@ -12,8 +12,8 @@ The ApexServices platform utilizes a unified backend architecture with multi-cli
 
 ### Backend (`Backend/.env` / Render Dashboard)
 ```env
-SPRING_DATASOURCE_URL=jdbc:mysql://mysql-36d7d04b-anuragvj2312-edc3.a.aivencloud.com:17959/defaultdb?sslMode=REQUIRED&trustServerCertificate=true&serverTimezone=UTC
-SPRING_DATASOURCE_USERNAME=avnadmin
+SPRING_DATASOURCE_URL=jdbc:mysql://<your-aiven-mysql-host>:<port>/defaultdb?sslMode=REQUIRED&trustServerCertificate=true&serverTimezone=UTC
+SPRING_DATASOURCE_USERNAME=<your-database-username>
 SPRING_DATASOURCE_PASSWORD=*****
 JWT_SECRET=*****
 SPRING_FLYWAY_ENABLED=true
