@@ -48,26 +48,34 @@ const VALID_TABS = [
   'settings'  // Compatibility alias for feature-flags
 ];
 
+function resolveTabAlias(tab) {
+  if (!tab) return 'dashboard';
+  const clean = tab.trim().toLowerCase();
+  if (clean === 'settings') return 'feature-flags';
+  if (clean === 'notifications') return 'audit';
+  return clean;
+}
+
 function getInitialTab() {
   if (typeof window === 'undefined') return 'dashboard';
 
   // 1. Check URL Hash (e.g., #users or #/users)
-  const hash = window.location.hash.replace(/^#\/?/, '').trim();
+  const hash = resolveTabAlias(window.location.hash.replace(/^#\/?/, ''));
   if (hash && VALID_TABS.includes(hash)) {
-    return hash === 'settings' ? 'feature-flags' : hash;
+    return hash;
   }
 
   // 2. Check URL Query Param (e.g., ?tab=users)
   const params = new URLSearchParams(window.location.search);
-  const tabParam = params.get('tab');
+  const tabParam = resolveTabAlias(params.get('tab'));
   if (tabParam && VALID_TABS.includes(tabParam)) {
-    return tabParam === 'settings' ? 'feature-flags' : tabParam;
+    return tabParam;
   }
 
   // 3. Check Pathname (e.g., /users)
-  const path = window.location.pathname.replace(/^\//, '').trim();
+  const path = resolveTabAlias(window.location.pathname.replace(/^\//, ''));
   if (path && VALID_TABS.includes(path)) {
-    return path === 'settings' ? 'feature-flags' : path;
+    return path;
   }
 
   return 'dashboard';
@@ -88,7 +96,7 @@ function AdminDashboardApp() {
 
   // Authoritative tab navigation with browser history and URL sync
   const setActiveTab = useCallback((newTab) => {
-    const targetTab = newTab === 'settings' ? 'feature-flags' : newTab;
+    const targetTab = resolveTabAlias(newTab);
     if (!VALID_TABS.includes(targetTab)) return;
 
     setActiveTabState(targetTab);
