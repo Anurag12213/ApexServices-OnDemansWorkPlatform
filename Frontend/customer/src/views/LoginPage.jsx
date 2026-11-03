@@ -63,9 +63,9 @@ export const LoginPage = () => {
 
   // Login form state
   const [loginForm, setLoginForm] = useState({
-    email: 'user@example.com',
-    mobileNumber: '9876543210',
-    password: 'password123',
+    email: '',
+    mobileNumber: '',
+    password: '',
     keepSignedIn: true,
   });
 
@@ -746,8 +746,8 @@ export const LoginPage = () => {
 
                 {/* Google Button */}
                 <GoogleButton
-                  onClick={async () => {
-                    await loginCustomer('customer@example.com', 'password123');
+                  onClick={() => {
+                    toast.info('Google Sign-In is active. Please authenticate via your registered email/phone or connect Google SSO in system settings.', 'Google Sign-In');
                   }}
                   label="Continue with Google"
                 />

@@ -159,43 +159,13 @@ class ApiClient {
   }
 
   async getPartnerAuthToken(forceRefresh = false) {
-    let token = forceRefresh ? null : this.getToken();
-    const state = this.getState();
-    if (!state.partner) return null;
-
-    if (!token) {
-      try {
-        const currentEmail = state.partner.email || 'partner@apexservices.com';
-        const loginRes = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: currentEmail, password: 'partner123' })
-        });
-        if (loginRes.ok) {
-          const authData = await loginRes.json();
-          token = authData.token;
-          if (token) {
-            this.setToken(token);
-            if (authData.user && state.partner) {
-              const u = authData.user;
-              state.partner.serviceCategories = (u.serviceCategories && u.serviceCategories.length > 0)
-                ? u.serviceCategories
-                : state.partner.serviceCategories;
-              state.partner.fullName = u.fullName || state.partner.fullName;
-              state.partner.partnerType = u.partnerType || state.partner.partnerType;
-              state.partner.orgName = u.organizationName || state.partner.orgName;
-              state.partner.email = u.email || state.partner.email;
-              state.partner.category = (state.partner.serviceCategories && state.partner.serviceCategories.length > 0)
-                ? state.partner.serviceCategories.join(', ')
-                : state.partner.category;
-              this.saveState(state);
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Auto-login for partner token failed:', e);
-      }
+    if (forceRefresh) {
+      this.setToken(null);
+      return null;
     }
+    const token = this.getToken();
+    const state = this.getState();
+    if (!state.partner || !token) return null;
     return token;
   }
 
@@ -320,7 +290,7 @@ class ApiClient {
           fullName: partnerData.fullName,
           email: email,
           mobileNumber: phone,
-          password: partnerData.password || 'partner123',
+          password: partnerData.password,
           role: 'ROLE_PARTNER',
           verificationGrant: partnerData.verificationGrant || undefined
         })
