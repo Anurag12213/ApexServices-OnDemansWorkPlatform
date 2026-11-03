@@ -2,13 +2,21 @@
 // Provides full end-to-end offline/online sync, server-side policy enforcement,
 // and atomic persistence for all partner workflows.
 
-const API_BASE = (
-  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
-  (typeof window !== 'undefined' && (process.env?.NODE_ENV === 'production' || import.meta?.env?.PROD)
-    ? 'https://apexservices-backend.onrender.com/api'
-    : 'http://localhost:8080/api')
-).replace(/\/+$/, '');
+const getApiBase = () => {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      return 'https://apexservices-backend.onrender.com/api';
+    }
+  }
+  return (
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+    (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
+    'https://apexservices-backend.onrender.com/api'
+  ).replace(/\/+$/, '');
+};
+
+const API_BASE = getApiBase();
 
 // Initial Authoritative Admin-Configured Document Requirements
 const DEFAULT_DOC_REQUIREMENTS = [
@@ -1341,6 +1349,13 @@ class ApiClient {
         const existing = state.partnerTickets || [];
         state.partnerTickets = [created, ...existing.filter(t => t.id !== created.id)];
         this.saveState(state);
+
+        try {
+          const ch = new BroadcastChannel('apex_services_sync');
+          ch.postMessage({ type: 'TICKET_UPDATED', ticket: created, timestamp: Date.now() });
+          ch.close();
+        } catch (e) {}
+
         return created;
       } else {
         console.error('Backend ticket creation error status:', res.status);
@@ -1397,6 +1412,13 @@ class ApiClient {
           state.partnerTickets = state.partnerTickets.map(t => t.id === ticketId ? updatedTicket : t);
           this.saveState(state);
         }
+
+        try {
+          const ch = new BroadcastChannel('apex_services_sync');
+          ch.postMessage({ type: 'TICKET_UPDATED', ticketId, timestamp: Date.now() });
+          ch.close();
+        } catch (e) {}
+
         return data;
       }
     } catch (err) {

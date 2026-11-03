@@ -43,20 +43,42 @@ export const HelpSupportScreen = () => {
   const [newMessage, setNewMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       const list = await api.getMyTickets();
       setTickets(Array.isArray(list) ? list : []);
     } catch (err) {
       console.warn('Error loading partner tickets:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchTickets();
+
+    let channel;
+    try {
+      channel = new BroadcastChannel('apex_services_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'TICKET_UPDATED') {
+          fetchTickets(true);
+        }
+      };
+    } catch (e) {}
+
+    // Auto-poll every 5s for bi-directional live sync
+    const interval = setInterval(() => fetchTickets(true), 5000);
+
+    const handleFocus = () => fetchTickets(true);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      if (channel) channel.close();
+    };
   }, []);
 
   const formatDateTime = (dateStr) => {

@@ -31,23 +31,30 @@ export default function SupportTicketManagementSection() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground) setLoading(true);
       const res = await adminFetch('/admin/tickets');
       if (res.ok) {
         const data = await res.json();
-        setTickets(Array.isArray(data) ? data : []);
+        const incoming = Array.isArray(data) ? data : [];
+        setTickets(incoming);
+        // If a ticket is currently selected, keep its messages updated in sync
+        setSelectedTicket((current) => {
+          if (!current) return null;
+          const fresh = incoming.find((t) => t.id === current.id);
+          return fresh || current;
+        });
       }
     } catch (e) {
       console.warn('Failed to load tickets:', e);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTickets();
+    fetchTickets(false);
 
     // Real-time cross-tab synchronization
     let channel;
@@ -55,16 +62,21 @@ export default function SupportTicketManagementSection() {
       channel = new BroadcastChannel('apex_services_sync');
       channel.onmessage = (event) => {
         if (event.data?.type === 'TICKET_UPDATED' || event.data?.type === 'DATA_UPDATED') {
-          fetchTickets();
+          fetchTickets(true);
         }
       };
     } catch (e) {}
 
-    // Background polling every 15s to auto-detect new partner tickets
-    const interval = setInterval(fetchTickets, 15000);
+    // Rapid background polling every 4s to catch cross-browser/cross-device partner tickets
+    const interval = setInterval(() => fetchTickets(true), 4000);
+
+    // Auto sync when admin tab regains focus
+    const handleFocus = () => fetchTickets(true);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
       if (channel) channel.close();
     };
   }, []);
@@ -143,6 +155,13 @@ export default function SupportTicketManagementSection() {
 
         toast.success(`Reply dispatched to ${getCustomerName(selectedTicket)}`, 'Message Sent');
         setReplyMessage('');
+
+        // Notify partner portal instantly if open in another tab
+        try {
+          const bc = new BroadcastChannel('apex_services_sync');
+          bc.postMessage({ type: 'TICKET_UPDATED', ticketId: selectedTicket.id });
+          bc.close();
+        } catch (err) {}
       } else {
         toast.error('Failed to send reply to backend');
       }
@@ -164,6 +183,13 @@ export default function SupportTicketManagementSection() {
           setSelectedTicket((prev) => ({ ...prev, status: 'RESOLVED' }));
         }
         toast.success(`Ticket ${ticketId} resolved and closed.`, 'Ticket Resolved');
+
+        // Notify partner portal instantly
+        try {
+          const bc = new BroadcastChannel('apex_services_sync');
+          bc.postMessage({ type: 'TICKET_UPDATED', ticketId });
+          bc.close();
+        } catch (err) {}
       }
     } catch (e) {
       toast.error('Network error updating ticket');
