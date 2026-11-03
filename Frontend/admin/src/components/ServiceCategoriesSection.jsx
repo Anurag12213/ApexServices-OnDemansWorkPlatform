@@ -22,7 +22,7 @@ import {
   Upload,
   FileImage,
 } from 'lucide-react';
-import CategoryIconSelector, { RenderIcon } from './CategoryIconSelector';
+import { RenderIcon } from './CategoryIconSelector';
 import { adminFetch, API_BASE_URL } from '../utils/api';
 import { useConfirm } from './ConfirmDialog';
 
@@ -43,13 +43,35 @@ export default function ServiceCategoriesSection() {
   const [newCategory, setNewCategory] = useState({
     name: '',
     slug: '',
-    iconId: 1,
-    iconName: 'Hammer',
-    customIconValue: '',
     description: '',
     tag: 'Popular',
     bannerImageUrl: '',
   });
+
+  // Load custom category images map from localStorage
+  const getCategoryImagesMap = () => {
+    try {
+      const saved = localStorage.getItem('apex_category_images');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveCategoryImage = (catIdOrName, imageUrl) => {
+    if (!catIdOrName) return;
+    try {
+      const map = getCategoryImagesMap();
+      if (!imageUrl) {
+        delete map[String(catIdOrName)];
+      } else {
+        map[String(catIdOrName)] = imageUrl;
+      }
+      localStorage.setItem('apex_category_images', JSON.stringify(map));
+    } catch (e) {
+      console.warn('Failed to save category image to storage:', e);
+    }
+  };
 
   // Direct manual image upload handler for New Category
   const handleNewCategoryFileUpload = (e) => {
@@ -64,7 +86,7 @@ export default function ServiceCategoriesSection() {
       const base64 = event.target?.result;
       if (base64) {
         setNewCategory((prev) => ({ ...prev, bannerImageUrl: base64 }));
-        showToast(`Imported banner image: ${file.name}`);
+        showToast(`Imported image: ${file.name}`);
       }
     };
     reader.readAsDataURL(file);
@@ -83,7 +105,7 @@ export default function ServiceCategoriesSection() {
       const base64 = event.target?.result;
       if (base64) {
         setEditingCategory((prev) => ({ ...prev, bannerImageUrl: base64 }));
-        showToast(`Imported banner image: ${file.name}`);
+        showToast(`Imported image: ${file.name}`);
       }
     };
     reader.readAsDataURL(file);
@@ -98,16 +120,25 @@ export default function ServiceCategoriesSection() {
   const fetchCategories = async () => {
     setIsLoading(true);
     try {
+      const imgMap = getCategoryImagesMap();
       const res = await adminFetch('/admin/service-categories');
       if (res.ok) {
         const list = await res.json();
-        setCategories(list);
+        const merged = (Array.isArray(list) ? list : []).map((c) => ({
+          ...c,
+          bannerImageUrl: c.bannerImageUrl || imgMap[String(c.id)] || imgMap[c.name] || imgMap[c.slug] || '',
+        }));
+        setCategories(merged);
       } else {
         // Fallback to public categories
         const publicRes = await fetch(`${API_BASE_URL}/categories`);
         if (publicRes.ok) {
           const publicList = await publicRes.json();
-          setCategories(publicList);
+          const merged = (Array.isArray(publicList) ? publicList : []).map((c) => ({
+            ...c,
+            bannerImageUrl: c.bannerImageUrl || imgMap[String(c.id)] || imgMap[c.name] || imgMap[c.slug] || '',
+          }));
+          setCategories(merged);
         }
       }
     } catch (e) {
@@ -156,31 +187,53 @@ export default function ServiceCategoriesSection() {
     }
 
     try {
+      const payload = {
+        name: newCategory.name.trim(),
+        slug: newCategory.slug || newCategory.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        description: newCategory.description || '',
+        tag: newCategory.tag || 'Popular',
+        iconId: 1,
+        iconName: 'Hammer',
+        customIconValue: null,
+      };
+
       const res = await adminFetch('/admin/service-categories', {
         method: 'POST',
-        body: JSON.stringify(newCategory),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         const saved = await res.json();
-        setCategories((prev) => [...prev, saved]);
+        
+        // Save banner image if provided
+        if (newCategory.bannerImageUrl) {
+          saveCategoryImage(saved.id, newCategory.bannerImageUrl);
+          saveCategoryImage(saved.name, newCategory.bannerImageUrl);
+          if (saved.slug) saveCategoryImage(saved.slug, newCategory.bannerImageUrl);
+        }
+
+        const savedWithImg = {
+          ...saved,
+          bannerImageUrl: newCategory.bannerImageUrl || '',
+        };
+
+        setCategories((prev) => [...prev, savedWithImg]);
         setShowAddModal(false);
         setNewCategory({
           name: '',
           slug: '',
-          iconId: 1,
-          iconName: 'Hammer',
-          customIconValue: '',
           description: '',
           tag: 'Popular',
           bannerImageUrl: '',
         });
+
         // Notify other tabs via sync channel
         try {
           const syncChannel = new BroadcastChannel('apex_services_sync');
           syncChannel.postMessage({ type: 'DATA_UPDATED' });
           syncChannel.close();
         } catch (err) {}
+
         showToast(`Category "${saved.name}" successfully created!`);
         fetchCategories(); // Refresh to guarantee sync
       } else {
@@ -199,20 +252,43 @@ export default function ServiceCategoriesSection() {
     if (!editingCategory || !editingCategory.id) return;
 
     try {
+      const payload = {
+        name: editingCategory.name.trim(),
+        slug: editingCategory.slug,
+        description: editingCategory.description,
+        tag: editingCategory.tag || 'Popular',
+        iconId: editingCategory.iconId || editingCategory.icon?.id || 1,
+        iconName: editingCategory.iconName || editingCategory.icon?.name || 'Hammer',
+        customIconValue: null,
+      };
+
       const res = await adminFetch(`/admin/service-categories/${editingCategory.id}`, {
         method: 'PUT',
-        body: JSON.stringify(editingCategory),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
         const updated = await res.json();
-        setCategories((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+
+        // Save updated banner image
+        saveCategoryImage(editingCategory.id, editingCategory.bannerImageUrl || '');
+        saveCategoryImage(editingCategory.name, editingCategory.bannerImageUrl || '');
+        if (editingCategory.slug) saveCategoryImage(editingCategory.slug, editingCategory.bannerImageUrl || '');
+
+        const updatedWithImg = {
+          ...updated,
+          bannerImageUrl: editingCategory.bannerImageUrl || '',
+        };
+
+        setCategories((prev) => prev.map((c) => (c.id === updated.id ? updatedWithImg : c)));
         setEditingCategory(null);
+
         try {
           const syncChannel = new BroadcastChannel('apex_services_sync');
           syncChannel.postMessage({ type: 'DATA_UPDATED' });
           syncChannel.close();
         } catch (err) {}
+
         showToast(`Category "${updated.name}" updated successfully!`);
         fetchCategories();
       } else {
@@ -692,7 +768,7 @@ export default function ServiceCategoriesSection() {
             <div className="px-5 py-4 border-b border-slate-200 shrink-0 bg-white sticky top-0 z-10 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Add New Service Category</h3>
-                <p className="text-[11px] text-slate-500">Configure title, URL identifier slug, badge tag, and icon representation.</p>
+                <p className="text-[11px] text-slate-500">Configure title, URL identifier slug, badge tag, and category image.</p>
               </div>
               <button
                 type="button"
@@ -829,23 +905,6 @@ export default function ServiceCategoriesSection() {
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Category Icon Representation</label>
-                <CategoryIconSelector
-                  selectedIconId={newCategory.iconId}
-                  selectedIconName={newCategory.iconName}
-                  customIconValue={newCategory.customIconValue}
-                  onSelectIcon={({ iconId, iconName, customIconValue }) => {
-                    setNewCategory((prev) => ({
-                      ...prev,
-                      iconId,
-                      iconName,
-                      customIconValue,
-                    }));
-                  }}
-                />
-              </div>
-
-              <div>
                 <label className="block font-bold text-slate-700 mb-1">
                   Service Scope Description <span className="text-rose-500">*</span>
                 </label>
@@ -895,7 +954,7 @@ export default function ServiceCategoriesSection() {
             <div className="px-5 py-4 border-b border-slate-200 shrink-0 bg-white sticky top-0 z-10 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">Edit: {editingCategory.name}</h3>
-                <p className="text-[11px] text-slate-500">Update category details, slug, badge tag, or assigned icon.</p>
+                <p className="text-[11px] text-slate-500">Update category details, slug, badge tag, and category image.</p>
               </div>
               <button
                 type="button"
@@ -1019,33 +1078,6 @@ export default function ServiceCategoriesSection() {
                     </div>
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Category Icon Representation</label>
-                <CategoryIconSelector
-                  selectedIconId={editingCategory.iconId || editingCategory.icon?.id}
-                  selectedIconName={editingCategory.iconName || editingCategory.icon?.iconValue}
-                  customIconValue={
-                    editingCategory.customIconValue ||
-                    (editingCategory.icon?.iconType === 'CUSTOM' ? editingCategory.icon?.iconValue : '')
-                  }
-                  onSelectIcon={({ iconId, iconName, customIconValue }) => {
-                    setEditingCategory((prev) => ({
-                      ...prev,
-                      iconId,
-                      iconName,
-                      customIconValue,
-                      icon: {
-                        ...(prev.icon || {}),
-                        id: iconId,
-                        name: iconName,
-                        iconValue: customIconValue || iconName,
-                        iconType: customIconValue ? 'CUSTOM' : 'SYSTEM',
-                      },
-                    }));
-                  }}
-                />
               </div>
 
               <div>

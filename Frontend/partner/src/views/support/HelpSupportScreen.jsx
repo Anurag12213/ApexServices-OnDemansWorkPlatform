@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePartner } from '../../context/PartnerContext';
 import { api } from '../../services/api';
 import {
@@ -34,6 +34,27 @@ export const HelpSupportScreen = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'nearest' });
+    } else if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom('smooth');
+  }, [selectedTicket?.messages?.length]);
+
+  useEffect(() => {
+    if (selectedTicket?.id) {
+      setTimeout(() => scrollToBottom('auto'), 60);
+    }
+  }, [selectedTicket?.id]);
 
   // New Ticket form state
   const [newSubject, setNewSubject] = useState('');
@@ -145,18 +166,22 @@ export const HelpSupportScreen = () => {
   };
 
   const handleSendReply = async (e) => {
-    e.preventDefault();
-    if (!replyText.trim() || !selectedTicket) return;
+    if (e) e.preventDefault();
+    const textToSend = replyText.trim();
+    if (!textToSend || !selectedTicket || isReplying) return;
 
+    // Immediately clear typing section for instant feedback
+    setReplyText('');
     setIsReplying(true);
+
     try {
-      const result = await api.replyTicket(selectedTicket.id, replyText.trim());
+      const result = await api.replyTicket(selectedTicket.id, textToSend);
       if (result) {
         const serverMsg = result.message || {};
         const newMsg = {
           id: serverMsg.id || Date.now(),
           senderName: partner?.fullName || partner?.name || 'Trade Partner (You)',
-          messageText: serverMsg.messageText || replyText.trim(),
+          messageText: serverMsg.messageText || textToSend,
           createdAt: serverMsg.createdAt || new Date().toISOString(),
           isStaff: false
         };
@@ -173,15 +198,24 @@ export const HelpSupportScreen = () => {
         setTickets((prev) =>
           prev.map((t) => (t.id === selectedTicket.id ? updatedTicket : t))
         );
-        setReplyText('');
         toast.success('Your message has been sent to the support desk.', 'Reply Sent');
+        setTimeout(() => scrollToBottom('smooth'), 50);
       } else {
+        setReplyText(textToSend);
         toast.error('Unable to send reply. Please try again.', 'Send Failed');
       }
     } catch (err) {
+      setReplyText(textToSend);
       toast.error('Network error sending message.', 'Reply Error');
     } finally {
       setIsReplying(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendReply(e);
     }
   };
 
@@ -462,7 +496,10 @@ export const HelpSupportScreen = () => {
                 )}
 
                 {/* Conversation Thread Bubbles */}
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                <div 
+                  ref={messagesContainerRef}
+                  className="space-y-3 max-h-80 overflow-y-auto pr-1 scroll-smooth"
+                >
                   {(selectedTicket.messages && selectedTicket.messages.length > 0) ? (
                     selectedTicket.messages.map((m, idx) => {
                       const isStaff = m.isStaff || m.staff;
@@ -504,6 +541,7 @@ export const HelpSupportScreen = () => {
                       <p className="text-[11px] leading-relaxed">{selectedTicket.lastReply || 'Ticket opened. Official staff is reviewing this request.'}</p>
                     </div>
                   )}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
 
@@ -513,18 +551,28 @@ export const HelpSupportScreen = () => {
                   rows="3"
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  placeholder="Type a message or response to the support officer..."
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:bg-white focus:border-[#3867FF] transition"
+                  onKeyDown={handleKeyDown}
+                  disabled={isReplying}
+                  placeholder="Type a message or response to the support officer... (Press Enter to send, Shift+Enter for new line)"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:bg-white focus:border-[#3867FF] transition disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <div className="flex justify-end gap-2 items-center">
                   <button
                     type="submit"
                     disabled={isReplying || !replyText.trim()}
-                    className="px-4 py-2 bg-[#3867FF] hover:bg-blue-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                    className="px-4 py-2 bg-[#3867FF] hover:bg-blue-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:cursor-not-allowed"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>{isReplying ? 'Sending...' : 'Send Reply'}</span>
+                    {isReplying ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send Reply</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>

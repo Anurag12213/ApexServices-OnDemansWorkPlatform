@@ -25,6 +25,25 @@ const initialBookingDraft = {
   termsAccepted: true,
 };
 
+const getCategoryImagesMap = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return {};
+  try {
+    const saved = localStorage.getItem('apex_category_images');
+    return saved ? JSON.parse(saved) : {};
+  } catch {
+    return {};
+  }
+};
+
+const mergeCategoryImages = (categories) => {
+  if (!Array.isArray(categories)) return categories;
+  const imgMap = getCategoryImagesMap();
+  return categories.map((c) => ({
+    ...c,
+    bannerImageUrl: c.bannerImageUrl || imgMap[String(c.id)] || imgMap[c.name] || imgMap[c.slug] || '',
+  }));
+};
+
 export const DataProvider = ({ children }) => {
   const [data, setData] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -33,6 +52,9 @@ export const DataProvider = ({ children }) => {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && parsed.heroSlides) {
+            if (parsed.categories) {
+              parsed.categories = mergeCategoryImages(parsed.categories);
+            }
             return parsed;
           }
         }
@@ -40,7 +62,11 @@ export const DataProvider = ({ children }) => {
         console.warn('Failed to read cached presentation data:', e);
       }
     }
-    return initialData;
+    const initialWithImages = { ...initialData };
+    if (initialWithImages.categories) {
+      initialWithImages.categories = mergeCategoryImages(initialWithImages.categories);
+    }
+    return initialWithImages;
   });
   const [activePage, setActivePage] = useState('home');
   const [loading, setLoading] = useState(true);
@@ -184,6 +210,9 @@ export const DataProvider = ({ children }) => {
       if (res.ok) {
         const result = await res.json();
         if (result && result.heroSlides) {
+          if (result.categories) {
+            result.categories = mergeCategoryImages(result.categories);
+          }
           setData(result);
           try {
             localStorage.setItem('apex_cached_presentation_data', JSON.stringify(result));
@@ -248,7 +277,7 @@ export const DataProvider = ({ children }) => {
 
     const handleFocus = () => fetchApiData();
     const handleStorage = (e) => {
-      if (e.key === 'apex_custom_branding') {
+      if (e.key === 'apex_custom_branding' || e.key === 'apex_category_images') {
         fetchApiData();
       }
     };

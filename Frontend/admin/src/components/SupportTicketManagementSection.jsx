@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LifeBuoy,
   MessageSquare,
@@ -30,6 +30,28 @@ export default function SupportTicketManagementSection() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
+
+  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
+
+  const scrollToBottom = (behavior = 'smooth') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior, block: 'nearest' });
+    } else if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
+  };
+
+  useEffect(() => {
+    scrollToBottom('smooth');
+  }, [selectedTicket?.messages?.length]);
+
+  useEffect(() => {
+    if (selectedTicket?.id) {
+      setTimeout(() => scrollToBottom('auto'), 60);
+    }
+  }, [selectedTicket?.id]);
 
   const fetchTickets = async (isBackground = false) => {
     try {
@@ -113,13 +135,18 @@ export default function SupportTicketManagementSection() {
   });
 
   const handleSendReply = async (e) => {
-    e.preventDefault();
-    if (!replyMessage.trim() || !selectedTicket) return;
+    if (e) e.preventDefault();
+    const textToSend = replyMessage.trim();
+    if (!textToSend || !selectedTicket || isSendingReply) return;
+
+    // Immediately clear typing section for instant user feedback
+    setReplyMessage('');
+    setIsSendingReply(true);
 
     try {
       const res = await adminFetch(`/admin/tickets/${selectedTicket.id}/reply`, {
         method: 'POST',
-        body: JSON.stringify({ text: replyMessage })
+        body: JSON.stringify({ text: textToSend })
       });
 
       if (res.ok) {
@@ -127,7 +154,7 @@ export default function SupportTicketManagementSection() {
         const serverMsg = data.message || {};
         const newMessage = {
           senderName: serverMsg.senderName || 'ApexServices Official Support',
-          messageText: serverMsg.messageText || replyMessage,
+          messageText: serverMsg.messageText || textToSend,
           createdAt: serverMsg.createdAt || new Date().toISOString(),
           isStaff: true
         };
@@ -154,7 +181,7 @@ export default function SupportTicketManagementSection() {
         }));
 
         toast.success(`Reply dispatched to ${getCustomerName(selectedTicket)}`, 'Message Sent');
-        setReplyMessage('');
+        setTimeout(() => scrollToBottom('smooth'), 50);
 
         // Notify partner portal instantly if open in another tab
         try {
@@ -163,10 +190,23 @@ export default function SupportTicketManagementSection() {
           bc.close();
         } catch (err) {}
       } else {
+        // Restore message on failure so text is not lost
+        setReplyMessage(textToSend);
         toast.error('Failed to send reply to backend');
       }
     } catch (e) {
+      // Restore message on failure
+      setReplyMessage(textToSend);
       toast.error('Network error sending response');
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendReply(e);
     }
   };
 
@@ -392,7 +432,10 @@ export default function SupportTicketManagementSection() {
                 </div>
 
                 {/* Conversation Thread */}
-                <div className="my-4 space-y-3 max-h-72 overflow-y-auto pr-2">
+                <div 
+                  ref={messagesContainerRef}
+                  className="my-4 space-y-3 max-h-80 overflow-y-auto pr-2 scroll-smooth"
+                >
                   {(selectedTicket.messages || []).map((msg, idx) => {
                     const isStaff = msg.isStaff || msg.staff;
                     const sender = msg.senderName || msg.sender || (isStaff ? 'Official Support Desk' : getCustomerName(selectedTicket));
@@ -418,6 +461,7 @@ export default function SupportTicketManagementSection() {
                       </div>
                     );
                   })}
+                  <div ref={messagesEndRef} />
                 </div>
               </div>
 
@@ -427,16 +471,28 @@ export default function SupportTicketManagementSection() {
                   rows="3"
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
-                  placeholder={`Write official support reply to ${getCustomerName(selectedTicket)}...`}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:bg-white focus:border-blue-500 transition"
+                  onKeyDown={handleKeyDown}
+                  disabled={isSendingReply}
+                  placeholder={`Write official support reply to ${getCustomerName(selectedTicket)}... (Press Enter to send, Shift+Enter for new line)`}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:bg-white focus:border-blue-500 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+                    disabled={isSendingReply || !replyMessage.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:cursor-not-allowed"
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    <span>Send Support Response</span>
+                    {isSendingReply ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Sending Reply...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send Support Response</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
