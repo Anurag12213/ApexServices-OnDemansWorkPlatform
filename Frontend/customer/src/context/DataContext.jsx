@@ -210,12 +210,23 @@ export const DataProvider = ({ children }) => {
     }
   };
 
-  // Fetch Public Presentation Data
+  const isFetchingRef = React.useRef(false);
+  const lastDataHashRef = React.useRef('');
+
+  // Fetch Public Presentation Data with Deduplication
   const fetchApiData = async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const res = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
       if (res.ok) {
-        const result = await res.json();
+        const text = await res.text();
+        // Skip re-rendering if server data has not changed
+        if (text === lastDataHashRef.current) {
+          return;
+        }
+        lastDataHashRef.current = text;
+        const result = JSON.parse(text);
         if (result && result.heroSlides) {
           const serverCategoryImages =
             result.siteBranding?.categoryImages ||
@@ -235,6 +246,7 @@ export const DataProvider = ({ children }) => {
     } catch (err) {
       console.warn('Backend API server unreachable, using cached data:', err);
     } finally {
+      isFetchingRef.current = false;
       setLoading(false);
     }
   };
@@ -295,7 +307,8 @@ export const DataProvider = ({ children }) => {
     window.addEventListener('focus', handleFocus);
     window.addEventListener('storage', handleStorage);
 
-    const interval = setInterval(fetchApiData, 4000);
+    // 30s background heartbeat (instead of heavy 4s spam) - sync is instant on focus/broadcast
+    const interval = setInterval(fetchApiData, 30000);
 
     return () => {
       clearInterval(interval);

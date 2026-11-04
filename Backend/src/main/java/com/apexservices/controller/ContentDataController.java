@@ -262,7 +262,13 @@ public class ContentDataController {
         full.put("categories", getCategories().getBody());
         full.put("reviews", reviews);
         full.put("siteBranding", siteBranding);
-        full.put("publicConfig", siteBranding);
+
+        // Lightweight publicConfig to prevent duplicating multi-megabyte base64 images
+        Map<String, Object> lightPublicConfig = new LinkedHashMap<>(siteBranding);
+        lightPublicConfig.remove("categoryImages");
+        lightPublicConfig.remove("logoImageUrl");
+        full.put("publicConfig", lightPublicConfig);
+
         return ResponseEntity.ok(full);
     }
 
