@@ -18,7 +18,11 @@ import {
   Clock,
   ArrowLeft,
   User,
-  Shield
+  Shield,
+  Copy,
+  Check,
+  CheckCheck,
+  Sparkles
 } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 
@@ -34,9 +38,36 @@ export const HelpSupportScreen = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  const CANNED_REPLIES = [
+    "I have arrived at the customer location.",
+    "Customer is currently unavailable at the address.",
+    "Required spare parts are being procured.",
+    "Work has been completed. Awaiting completion verification OTP.",
+  ];
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+
+  const handleCopyTicketId = (id) => {
+    if (!id) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(id);
+      }
+      setCopiedId(true);
+      toast.info(`Ticket ID ${id} copied to clipboard!`, 'Copied');
+      setTimeout(() => setCopiedId(false), 2000);
+    } catch (e) {
+      toast.info(`Ticket ID: ${id}`, 'Ticket Reference');
+    }
+  };
+
+  const handleQuickReply = (text) => {
+    setReplyText((prev) => (prev ? `${prev} ${text}` : text));
+  };
 
   const scrollToBottom = (behavior = 'smooth') => {
     if (messagesEndRef.current) {
@@ -95,8 +126,8 @@ export const HelpSupportScreen = () => {
       };
     } catch (e) {}
 
-    // Auto-poll every 5s for bi-directional live sync
-    const interval = setInterval(() => fetchTickets(true), 5000);
+    // Auto-poll every 25s for bi-directional live sync (instant on focus and BroadcastChannel)
+    const interval = setInterval(() => fetchTickets(true), 25000);
 
     const handleFocus = () => fetchTickets(true);
     window.addEventListener('focus', handleFocus);
@@ -336,11 +367,12 @@ export const HelpSupportScreen = () => {
       {activeTab === 'TICKETS' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in fade-in">
           {/* Left Column: Tickets List */}
-          <div className={`${selectedTicket ? 'hidden lg:block lg:col-span-5' : 'col-span-12'} space-y-3`}>
-            <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className={`${selectedTicket ? 'hidden lg:flex lg:col-span-5' : 'col-span-12 lg:flex lg:col-span-5'} flex-col h-[640px] sm:h-[700px] space-y-3`}>
+            {/* List Header */}
+            <div className="shrink-0 flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs">
               <div className="flex items-center gap-2">
-                <h3 className="font-black text-slate-900 text-sm">Submitted Support & Dispute Tickets</h3>
-                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                <h3 className="font-black text-slate-900 text-sm">Support Tickets</h3>
+                <span className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
                   {tickets.length}
                 </span>
               </div>
@@ -348,34 +380,39 @@ export const HelpSupportScreen = () => {
                 <button
                   onClick={fetchTickets}
                   disabled={loading}
-                  className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer"
+                  className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition cursor-pointer"
                   title="Refresh tickets"
                 >
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#3867FF]' : ''}`} />
                 </button>
                 <button
-                  onClick={() => setActiveTab('CREATE')}
-                  className="text-xs font-bold text-[#3867FF] hover:underline cursor-pointer"
+                  onClick={() => {
+                    setSelectedTicket(null);
+                    setActiveTab('CREATE');
+                  }}
+                  className="text-xs font-bold text-[#3867FF] hover:underline cursor-pointer flex items-center gap-1"
                 >
-                  + Create Ticket
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New Ticket</span>
                 </button>
               </div>
             </div>
 
+            {/* List Content */}
             {loading ? (
-              <div className="bg-white p-12 text-center rounded-2xl border border-slate-200 shadow-xs flex flex-col items-center justify-center gap-2 text-slate-400">
+              <div className="flex-1 bg-white p-12 text-center rounded-2xl border border-slate-200/90 shadow-xs flex flex-col items-center justify-center gap-2 text-slate-400">
                 <Loader2 className="w-6 h-6 animate-spin text-[#3867FF]" />
-                <span className="text-xs font-semibold">Loading support tickets...</span>
+                <span className="text-xs font-semibold">Loading tickets...</span>
               </div>
             ) : tickets.length === 0 ? (
-              <div className="bg-white p-10 text-center rounded-2xl border border-slate-200 shadow-xs space-y-3">
+              <div className="flex-1 bg-white p-10 text-center rounded-2xl border border-slate-200/90 shadow-xs flex flex-col items-center justify-center space-y-3">
                 <div className="w-12 h-12 bg-blue-50 text-[#3867FF] rounded-2xl flex items-center justify-center mx-auto">
                   <MessageSquare className="w-6 h-6" />
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-slate-800">No support tickets yet</h4>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
-                    Have an issue with an active job, escrow deposit, or payout settlement? Submit an official ticket to get priority assistance.
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto mt-1 leading-relaxed">
+                    Have an issue with an active job, escrow deposit, or payout settlement? Submit an official ticket for fast dispatch assistance.
                   </p>
                 </div>
                 <button
@@ -386,7 +423,7 @@ export const HelpSupportScreen = () => {
                 </button>
               </div>
             ) : (
-              <div className="space-y-2.5">
+              <div className="flex-1 min-h-0 overflow-y-auto space-y-2.5 pr-1">
                 {tickets.map((t) => {
                   const isSelected = selectedTicket?.id === t.id;
                   const isResolved = t.status === 'RESOLVED';
@@ -396,17 +433,19 @@ export const HelpSupportScreen = () => {
                     <div
                       key={t.id}
                       onClick={() => setSelectedTicket(t)}
-                      className={`p-4 rounded-2xl border transition text-left cursor-pointer ${
+                      className={`p-4 rounded-2xl border transition-all text-left cursor-pointer group ${
                         isSelected
-                          ? 'bg-blue-50/70 border-blue-300 shadow-xs ring-1 ring-[#3867FF]'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 shadow-xs'
+                          ? 'bg-blue-50/80 border-blue-400 shadow-xs ring-2 ring-[#3867FF]/20'
+                          : 'bg-white border-slate-200/90 hover:border-slate-300 hover:bg-slate-50/80 shadow-xs'
                       }`}
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-xs text-slate-900">{t.id}</span>
+                          <span className="font-mono font-bold text-xs text-slate-900 group-hover:text-[#3867FF] transition-colors">
+                            {t.id}
+                          </span>
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase inline-flex items-center gap-1 ${
                               isResolved
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                 : isInProgress
@@ -414,21 +453,24 @@ export const HelpSupportScreen = () => {
                                 : 'bg-blue-50 text-blue-700 border border-blue-200'
                             }`}
                           >
+                            {isInProgress && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />}
                             {t.status || 'OPEN'}
                           </span>
                         </div>
                         <span className="text-slate-400 text-[11px]">{formatDateTime(t.createdAt)}</span>
                       </div>
 
-                      <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1">{t.subject}</h4>
+                      <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1 group-hover:text-slate-950">
+                        {t.subject}
+                      </h4>
 
                       {t.workRequestId && (
-                        <span className="inline-block text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded mt-1">
+                        <span className="inline-block text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded mt-1.5">
                           Ref: {t.workRequestId}
                         </span>
                       )}
 
-                      <p className="text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[11px] mt-2 line-clamp-2">
+                      <p className="text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-100 text-[11px] mt-2 line-clamp-2 leading-relaxed">
                         {getLastMessageText(t)}
                       </p>
                     </div>
@@ -438,144 +480,311 @@ export const HelpSupportScreen = () => {
             )}
           </div>
 
-          {/* Right Column: Ticket Conversation Thread */}
+          {/* Right Column: Desktop Placeholder when no ticket is selected */}
+          {!selectedTicket && (
+            <div className="hidden lg:flex lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm h-[640px] sm:h-[700px] flex-col items-center justify-center p-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#3867FF] flex items-center justify-center mb-4 ring-8 ring-blue-50/60">
+                <MessageSquare className="w-8 h-8" />
+              </div>
+              <h3 className="text-base font-black text-slate-900">Select a Ticket to Open Conversation</h3>
+              <p className="text-xs text-slate-500 max-w-sm mt-1.5 leading-relaxed">
+                Choose an existing support or dispute ticket from the list on the left to review the discussion, or start a new grievance.
+              </p>
+              <button
+                onClick={() => setActiveTab('CREATE')}
+                className="mt-5 px-4 py-2 bg-[#3867FF] hover:bg-blue-600 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Open New Ticket</span>
+              </button>
+            </div>
+          )}
+
+          {/* Right Column: Active Ticket Conversation Thread (REDESIGNED CHATBOX) */}
           {selectedTicket && (
-            <div className="col-span-12 lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 flex flex-col justify-between min-h-[520px] animate-in fade-in">
-              <div className="space-y-4">
-                {/* Thread Header */}
-                <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setSelectedTicket(null)}
-                        className="lg:hidden p-1 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 mr-1"
-                        title="Back to list"
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                      </button>
-                      <span className="font-mono font-bold text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-                        {selectedTicket.id}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          selectedTicket.status === 'RESOLVED'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : selectedTicket.status === 'IN_PROGRESS'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}
-                      >
-                        {selectedTicket.status || 'OPEN'}
-                      </span>
-                      {selectedTicket.workRequestId && (
-                        <span className="text-[11px] font-bold text-slate-500">
-                          Ref: {selectedTicket.workRequestId}
-                        </span>
+            <div className="col-span-12 lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm flex flex-col h-[640px] sm:h-[700px] overflow-hidden relative animate-in fade-in">
+              {/* 1. STICKY HEADER (Fixed, shrink-0, never moves) */}
+              <div className="shrink-0 p-3.5 sm:p-4 border-b border-slate-100 bg-white/95 backdrop-blur-md z-10 flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Mobile Back Button */}
+                    <button
+                      onClick={() => setSelectedTicket(null)}
+                      className="lg:hidden p-1 text-slate-500 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition mr-0.5 cursor-pointer"
+                      title="Back to tickets list"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+
+                    {/* Ticket ID Chip with Copy */}
+                    <button
+                      type="button"
+                      onClick={() => handleCopyTicketId(selectedTicket.id)}
+                      className="font-mono font-bold text-xs text-[#3867FF] bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1 transition cursor-pointer"
+                      title="Click to copy Ticket ID"
+                    >
+                      <span>{selectedTicket.id}</span>
+                      {copiedId ? (
+                        <Check className="w-3 h-3 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-blue-500 opacity-70" />
                       )}
-                    </div>
-                    <h3 className="text-base font-black text-slate-900 mt-1.5">{selectedTicket.subject}</h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Category: <span className="font-semibold text-slate-700">{selectedTicket.category || 'General'}</span> • Created {formatDateTime(selectedTicket.createdAt)}
-                    </p>
+                    </button>
+
+                    {/* Status Badge */}
+                    <span
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase inline-flex items-center gap-1.5 ${
+                        selectedTicket.status === 'RESOLVED'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : selectedTicket.status === 'IN_PROGRESS'
+                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                          : 'bg-blue-50 text-blue-700 border border-blue-200'
+                      }`}
+                    >
+                      {selectedTicket.status === 'IN_PROGRESS' && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                      )}
+                      {selectedTicket.status === 'RESOLVED' && (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      )}
+                      {selectedTicket.status || 'OPEN'}
+                    </span>
+
+                    {/* Work Request Reference */}
+                    {selectedTicket.workRequestId && (
+                      <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                        Ref: <strong className="text-slate-700">{selectedTicket.workRequestId}</strong>
+                      </span>
+                    )}
                   </div>
+
+                  {/* Subject Title */}
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 mt-2 truncate">
+                    {selectedTicket.subject}
+                  </h3>
+
+                  {/* Meta Subtitle */}
+                  <p className="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-1.5">
+                    <span className="font-semibold text-slate-700">{selectedTicket.category || 'General Issue'}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      {formatDateTime(selectedTicket.createdAt)}
+                    </span>
+                  </p>
+                </div>
+
+                {/* Header Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => fetchTickets(false)}
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                    title="Refresh conversation"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#3867FF]' : ''}`} />
+                  </button>
                   <button
                     onClick={() => setSelectedTicket(null)}
-                    className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+                    className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                     title="Close discussion view"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
 
-                {/* Status Notice if Resolved */}
-                {selectedTicket.status === 'RESOLVED' && (
-                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center gap-2">
+              {/* Status Notice if Resolved */}
+              {selectedTicket.status === 'RESOLVED' && (
+                <div className="shrink-0 mx-4 mt-3 p-3 bg-emerald-50 border border-emerald-200/80 rounded-2xl text-emerald-800 text-xs flex items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>This ticket has been officially resolved by the ApexServices Support & Compliance Team.</span>
+                    <span>This ticket has been officially resolved. You can send a message below to reopen it anytime.</span>
                   </div>
-                )}
+                </div>
+              )}
 
-                {/* Conversation Thread Bubbles */}
-                <div 
-                  ref={messagesContainerRef}
-                  className="space-y-3 max-h-80 overflow-y-auto pr-1 scroll-smooth"
-                >
-                  {(selectedTicket.messages && selectedTicket.messages.length > 0) ? (
-                    selectedTicket.messages.map((m, idx) => {
-                      const isStaff = m.isStaff || m.staff;
-                      return (
+              {/* 2. SCROLLABLE MESSAGES VIEWPORT (flex-1 min-h-0, scrollable independently) */}
+              <div
+                ref={messagesContainerRef}
+                onScroll={(e) => {
+                  const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+                  setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 80);
+                }}
+                className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5 space-y-4 bg-gradient-to-b from-slate-50/50 to-white"
+              >
+                {/* Initial Ticket Summary Card */}
+                <div className="p-3.5 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-xs space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 border-b border-slate-100 pb-1.5">
+                    <span className="flex items-center gap-1.5 text-[#3867FF]">
+                      <FileQuestion className="w-3.5 h-3.5" />
+                      <span>Original Grievance Record</span>
+                    </span>
+                    <span className="text-slate-400">{formatDateTime(selectedTicket.createdAt)}</span>
+                  </div>
+                  <p className="font-extrabold text-slate-900 text-xs">{selectedTicket.subject}</p>
+                  <p className="text-[11px] text-slate-600 leading-relaxed whitespace-pre-wrap">
+                    {selectedTicket.lastReply || 'Ticket initialized. Official support officer assigned to case.'}
+                  </p>
+                </div>
+
+                {/* Timeline Separator */}
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-slate-200/70"></div>
+                  <span className="flex-shrink mx-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100">
+                    Official Conversation Thread
+                  </span>
+                  <div className="flex-grow border-t border-slate-200/70"></div>
+                </div>
+
+                {/* Messages List */}
+                {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
+                  selectedTicket.messages.map((m, idx) => {
+                    const isStaff = m.isStaff || m.staff;
+                    return (
+                      <div
+                        key={m.id || idx}
+                        className={`flex flex-col ${isStaff ? 'items-start mr-4 sm:mr-10' : 'items-end ml-4 sm:ml-10'}`}
+                      >
+                        {/* Bubble */}
                         <div
-                          key={m.id || idx}
-                          className={`p-3.5 rounded-2xl text-xs space-y-1 ${
+                          className={`p-3.5 rounded-2xl text-xs space-y-1.5 max-w-[92%] sm:max-w-[85%] shadow-xs ${
                             isStaff
-                              ? 'bg-blue-50/80 border border-blue-200 text-blue-950 ml-6 sm:ml-10'
-                              : 'bg-slate-50 border border-slate-200 text-slate-800 mr-6 sm:mr-10'
+                              ? 'bg-white border border-blue-100 text-slate-800 rounded-tl-sm ring-1 ring-blue-50'
+                              : 'bg-gradient-to-r from-[#3867FF] to-blue-600 text-white rounded-tr-sm shadow-blue-500/10'
                           }`}
                         >
-                          <div className="flex items-center justify-between text-[10px]">
-                            <span className={`font-bold flex items-center gap-1 ${isStaff ? 'text-blue-700' : 'text-slate-700'}`}>
+                          {/* Sender Info Row */}
+                          <div
+                            className={`flex items-center justify-between gap-4 text-[10px] pb-1 border-b ${
+                              isStaff ? 'border-slate-100 text-slate-500' : 'border-blue-400/40 text-blue-100'
+                            }`}
+                          >
+                            <span className={`font-bold flex items-center gap-1.5 ${isStaff ? 'text-[#3867FF]' : 'text-white'}`}>
                               {isStaff ? (
                                 <>
-                                  <Shield className="w-3 h-3 text-blue-600" />
+                                  <span className="w-5 h-5 rounded-full bg-blue-100 text-[#3867FF] flex items-center justify-center shrink-0">
+                                    <Shield className="w-3 h-3" />
+                                  </span>
                                   <span>{m.senderName || 'ApexServices Support Desk'}</span>
-                                  <span className="text-[9px] bg-blue-200/60 text-blue-800 px-1 rounded font-bold uppercase">Staff</span>
+                                  <span className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0.2 rounded font-extrabold uppercase">
+                                    Staff
+                                  </span>
                                 </>
                               ) : (
                                 <>
-                                  <User className="w-3 h-3 text-slate-500" />
-                                  <span>{m.senderName || 'You (Trade Partner)'}</span>
+                                  <span className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center shrink-0">
+                                    <User className="w-3 h-3" />
+                                  </span>
+                                  <span>{m.senderName || 'You (Partner)'}</span>
                                 </>
                               )}
                             </span>
-                            <span className="text-slate-400">{formatDateTime(m.createdAt)}</span>
+                            <span className={isStaff ? 'text-slate-400' : 'text-blue-100 text-[9px]'}>
+                              {formatDateTime(m.createdAt)}
+                            </span>
                           </div>
-                          <p className="leading-relaxed whitespace-pre-wrap text-[11px] sm:text-xs">
+
+                          {/* Message Body */}
+                          <p className={`leading-relaxed whitespace-pre-wrap text-xs ${isStaff ? 'text-slate-700' : 'text-white'}`}>
                             {m.messageText || m.text}
                           </p>
+
+                          {/* Partner checkmark indicator */}
+                          {!isStaff && (
+                            <div className="flex justify-end pt-0.5">
+                              <span className="text-blue-200 text-[10px] flex items-center gap-0.5" title="Delivered to support desk">
+                                <CheckCheck className="w-3.5 h-3.5 text-blue-200" />
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      );
-                    })
-                  ) : (
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-600">
-                      <p className="font-semibold text-slate-700 mb-1">Ticket Summary:</p>
-                      <p className="text-[11px] leading-relaxed">{selectedTicket.lastReply || 'Ticket opened. Official staff is reviewing this request.'}</p>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-8 text-center text-slate-400 text-xs">
+                    <p className="font-semibold text-slate-600">No additional replies yet.</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Type your message below to send direct notes or questions to the support officer.
+                    </p>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Reply Form (Partner Response) */}
-              <form onSubmit={handleSendReply} className="pt-3 border-t border-slate-100 space-y-2 mt-4">
-                <textarea
-                  rows="3"
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={isReplying}
-                  placeholder="Type a message or response to the support officer... (Press Enter to send, Shift+Enter for new line)"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs outline-none focus:bg-white focus:border-[#3867FF] transition disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                <div className="flex justify-end gap-2 items-center">
-                  <button
-                    type="submit"
-                    disabled={isReplying || !replyText.trim()}
-                    className="px-4 py-2 bg-[#3867FF] hover:bg-blue-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    {isReplying ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Sending...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        <span>Send Reply</span>
-                      </>
-                    )}
-                  </button>
+              {/* Floating Jump to Latest Button */}
+              {showScrollBottom && (
+                <button
+                  type="button"
+                  onClick={() => scrollToBottom('smooth')}
+                  className="absolute bottom-24 right-6 z-20 bg-slate-900/90 hover:bg-slate-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg backdrop-blur-sm flex items-center gap-1.5 transition-all cursor-pointer animate-in fade-in"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  <span>Scroll to latest</span>
+                </button>
+              )}
+
+              {/* 3. SOLID BOTTOM TYPING DOCK (Fixed, shrink-0, guaranteed never to move or jump) */}
+              <div className="shrink-0 p-3 sm:p-4 bg-white border-t border-slate-100 shadow-[0_-4px_16px_rgba(0,0,0,0.03)] z-10 space-y-2.5">
+                {/* Quick Canned Action Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] no-scrollbar">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#3867FF]" /> Quick:
+                  </span>
+                  {CANNED_REPLIES.map((text, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleQuickReply(text)}
+                      className="shrink-0 bg-slate-100 hover:bg-blue-50 hover:text-[#3867FF] hover:border-blue-200 border border-slate-200/80 text-slate-600 px-2.5 py-1 rounded-full text-[10px] font-semibold transition cursor-pointer"
+                    >
+                      {text}
+                    </button>
+                  ))}
                 </div>
-              </form>
+
+                {/* Input Field and Send Action */}
+                <form onSubmit={handleSendReply} className="relative">
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 focus-within:bg-white focus-within:border-[#3867FF] focus-within:ring-2 focus-within:ring-[#3867FF]/15 transition-all">
+                    <textarea
+                      rows="2"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isReplying}
+                      placeholder="Type a message or response to the support officer... (Press Enter to send, Shift+Enter for new line)"
+                      className="w-full bg-transparent text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 outline-none resize-none leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed"
+                    />
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 mt-1">
+                      <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">
+                        Press <kbd className="px-1 py-0.5 bg-slate-200/70 text-slate-600 rounded text-[9px] font-mono">Enter ↵</kbd> to send • <kbd className="px-1 py-0.5 bg-slate-200/70 text-slate-600 rounded text-[9px] font-mono">Shift+Enter</kbd> for new line
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium sm:hidden">
+                        {replyText.length} characters
+                      </span>
+
+                      <button
+                        type="submit"
+                        disabled={isReplying || !replyText.trim()}
+                        className="px-4 py-2 bg-gradient-to-r from-[#3867FF] to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-sm hover:shadow transition-all cursor-pointer"
+                      >
+                        {isReplying ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Send Reply</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>

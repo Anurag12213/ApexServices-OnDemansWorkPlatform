@@ -45,4 +45,7 @@ public class CategoryRequestDto {
 
     @Size(max = 50000, message = "Custom icon payload exceeds permitted size")
     private String customIconValue;
+
+    @Size(max = 200000, message = "Banner image URL or payload exceeds permitted size")
+    private String bannerImageUrl;
 }

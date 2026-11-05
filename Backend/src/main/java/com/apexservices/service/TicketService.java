@@ -1,19 +1,22 @@
 package com.apexservices.service;
 
+import com.apexservices.model.Role;
 import com.apexservices.model.SupportTicket;
 import com.apexservices.model.TicketMessage;
+import com.apexservices.model.User;
 import com.apexservices.repository.SupportTicketRepository;
 import com.apexservices.repository.TicketMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.Principal;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -24,6 +27,7 @@ public class TicketService {
     private final TicketMessageRepository messageRepository;
     private final AuditLogService auditLogService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserService userService;
 
     public List<SupportTicket> getAllTickets() {
         return ticketRepository.findAllByOrderByCreatedAtDesc();
@@ -180,5 +184,129 @@ public class TicketService {
         }
 
         return saved;
+    }
+
+    public SupportTicket submitTicket(Principal principal, Map<String, Object> req) {
+        String subject = (String) req.getOrDefault("subject", "Service Dispute / Inquiry");
+        String category = (String) req.getOrDefault("category", "GENERAL");
+        String priority = (String) req.getOrDefault("priority", "MEDIUM");
+
+        String initialMessage = (String) req.get("message");
+        if (initialMessage == null || initialMessage.isBlank()) {
+            initialMessage = (String) req.get("details");
+        }
+        if (initialMessage == null || initialMessage.isBlank()) {
+            initialMessage = (String) req.get("description");
+        }
+        if (initialMessage == null || initialMessage.isBlank()) {
+            initialMessage = (String) req.get("text");
+        }
+        if (initialMessage == null) initialMessage = "";
+
+        String workRequestId = (String) req.getOrDefault("workRequestId", (String) req.get("relatedOrder"));
+        String customerName = (String) req.getOrDefault("customerName", (String) req.getOrDefault("name", "User"));
+        String customerEmail = (String) req.getOrDefault("customerEmail", (String) req.get("email"));
+        String customerPhone = (String) req.getOrDefault("customerPhone", (String) req.getOrDefault("phone", (String) req.get("mobileNumber")));
+
+        Long userId = null;
+        String userType = (String) req.getOrDefault("userType", "CUSTOMER");
+
+        if (principal != null) {
+            Optional<User> uOpt = userService.findByIdentifier(principal.getName());
+            if (uOpt.isPresent()) {
+                User u = uOpt.get();
+                userId = u.getId();
+                userType = u.getRole() != null ? u.getRole().name().replace("ROLE_", "") : "CUSTOMER";
+                if (customerName == null || customerName.equals("User") || customerName.equals("Customer") || customerName.isBlank()) {
+                    customerName = u.getFullName();
+                }
+                if (customerEmail == null || customerEmail.isBlank()) customerEmail = u.getEmail();
+                if (customerPhone == null || customerPhone.isBlank()) customerPhone = u.getMobileNumber();
+            }
+        }
+
+        return createTicket(
+                userId,
+                userType,
+                customerName,
+                customerEmail,
+                customerPhone,
+                workRequestId,
+                subject,
+                category,
+                priority,
+                initialMessage
+        );
+    }
+
+    public List<SupportTicket> getMyTicketsForPrincipal(Principal principal, String email, Long userId) {
+        if (principal == null) {
+            throw new BadCredentialsException("Unauthenticated");
+        }
+        User u = userService.findByIdentifier(principal.getName())
+                .orElseThrow(() -> new BadCredentialsException("User not found"));
+        if (u.getRole() == Role.ROLE_ADMIN) {
+            if (userId != null) {
+                return getTicketsForUser(userId);
+            }
+            if (email != null && !email.isBlank()) {
+                return getTicketsByEmail(email.trim().toLowerCase());
+            }
+            return getAllTickets();
+        }
+        return getTicketsForUser(u.getId());
+    }
+
+    public SupportTicket getTicketDetailsForPrincipal(String ticketId, Principal principal) {
+        if (principal == null) {
+            throw new BadCredentialsException("Unauthenticated");
+        }
+        SupportTicket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new NoSuchElementException("Ticket not found: " + ticketId));
+        User u = userService.findByIdentifier(principal.getName())
+                .orElseThrow(() -> new BadCredentialsException("User not found"));
+        boolean isAdmin = u.getRole() == Role.ROLE_ADMIN;
+        boolean isOwner = (ticket.getUserId() != null && ticket.getUserId().equals(u.getId())) ||
+                (ticket.getCustomerEmail() != null && ticket.getCustomerEmail().equalsIgnoreCase(u.getEmail()));
+
+        if (!isAdmin && !isOwner) {
+            throw new AccessDeniedException("Access denied: You do not own this support ticket.");
+        }
+        return ticket;
+    }
+
+    public Map<String, Object> replyTicketForPrincipal(String ticketId, Map<String, String> req, Principal principal) {
+        if (principal == null) {
+            throw new BadCredentialsException("Unauthenticated");
+        }
+        String text = req.get("text");
+        if (text == null || text.isBlank()) {
+            text = req.get("message");
+        }
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("Reply message text is required");
+        }
+
+        SupportTicket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new NoSuchElementException("Ticket not found: " + ticketId));
+
+        User u = userService.findByIdentifier(principal.getName())
+                .orElseThrow(() -> new BadCredentialsException("User not found"));
+        boolean isStaff = u.getRole() == Role.ROLE_ADMIN;
+        boolean isOwner = (ticket.getUserId() != null && ticket.getUserId().equals(u.getId())) ||
+                (ticket.getCustomerEmail() != null && ticket.getCustomerEmail().equalsIgnoreCase(u.getEmail()));
+
+        if (!isStaff && !isOwner) {
+            throw new AccessDeniedException("Access denied: You cannot reply to another user's support ticket.");
+        }
+
+        TicketMessage msg = replyTicket(ticketId, u.getId(), u.getFullName(), isStaff, text);
+        SupportTicket updatedTicket = ticketRepository.findById(ticketId).orElse(ticket);
+
+        return Map.of(
+                "success", true,
+                "message", msg,
+                "ticket", updatedTicket
+        );
     }
 }

@@ -347,6 +347,24 @@ public class EmailOtpService {
     // Cryptographic Helpers
     // ==========================================
 
+    @Transactional
+    public void confirmEmailChange(String principalUsername, VerifyEmailOtpRequest request) {
+        request.setPurpose(OtpPurpose.EMAIL_CHANGE);
+        OtpApiResponse verifyResponse = verifyEmailOtp(request);
+
+        String newEmail = normalizeEmail(request.getEmail());
+        validateAndConsumeGrant(newEmail, OtpPurpose.EMAIL_CHANGE, verifyResponse.getVerificationGrant());
+
+        User user = userRepository.findByEmail(principalUsername)
+                .or(() -> userRepository.findByIdentifier(principalUsername))
+                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found."));
+
+        user.setEmail(newEmail);
+        userRepository.save(user);
+
+        log.info("[USER AUDIT] User [id={}] successfully updated email address", user.getId());
+    }
+
     private String generateSecureOtpCode() {
         return String.format("%06d", secureRandom.nextInt(1_000_000));
     }

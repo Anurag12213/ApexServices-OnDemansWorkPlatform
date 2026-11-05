@@ -34,16 +34,19 @@ public class PartnerProfileService {
     private final UserRepository userRepository;
     private final ReviewService reviewService;
     private final com.apexservices.repository.WorkRequestRepository workRequestRepository;
+    private final com.apexservices.service.media.MediaStorageService mediaStorageService;
 
     public PartnerProfileService(
             PartnerProfileRepository profileRepository,
             UserRepository userRepository,
             ReviewService reviewService,
-            com.apexservices.repository.WorkRequestRepository workRequestRepository) {
+            com.apexservices.repository.WorkRequestRepository workRequestRepository,
+            com.apexservices.service.media.MediaStorageService mediaStorageService) {
         this.profileRepository = profileRepository;
         this.userRepository = userRepository;
         this.reviewService = reviewService;
         this.workRequestRepository = workRequestRepository;
+        this.mediaStorageService = mediaStorageService;
     }
 
     public String getPartnerAvatarUrl(Long partnerId) {
@@ -91,20 +94,9 @@ public class PartnerProfileService {
         PartnerProfile profile = getOrCreatePartnerProfile(partnerId);
 
         try {
-            Path uploadPath = Paths.get(UPLOAD_DIR);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            String safeFileName = "partner_" + partnerId + "_" + UUID.randomUUID().toString().substring(0, 8);
+            String avatarUrl = mediaStorageService.uploadImage(file.getInputStream(), safeFileName, contentType, "avatars");
 
-            String ext = contentType.contains("png") ? "png" : (contentType.contains("webp") ? "webp" : "jpg");
-            String safeFileName = "partner_" + partnerId + "_" + UUID.randomUUID().toString().substring(0, 8) + "." + ext;
-            Path targetLocation = uploadPath.resolve(safeFileName);
-
-            try (InputStream is = file.getInputStream()) {
-                Files.copy(is, targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            }
-
-            String avatarUrl = "/api/public/avatars/" + safeFileName;
             profile.setAvatarKey(avatarUrl);
             profileRepository.save(profile);
 
@@ -118,7 +110,7 @@ public class PartnerProfileService {
             log.info("Uploaded avatar for partnerId: {} -> {}", partnerId, avatarUrl);
             return avatarUrl;
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to store uploaded avatar file", e);
+            throw new IllegalStateException("Failed to process uploaded avatar file", e);
         }
     }
 
@@ -152,5 +144,25 @@ public class PartnerProfileService {
 
         userRepository.save(user);
         return profileRepository.save(profile);
+    }
+
+    @Transactional
+    public String uploadAvatar(String principalEmail, MultipartFile file) {
+        User partner = userRepository.findByEmail(principalEmail.trim().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
+        return uploadAvatar(partner.getId(), file);
+    }
+
+    public PartnerProfile getOrCreatePartnerProfile(String principalEmail) {
+        User partner = userRepository.findByEmail(principalEmail.trim().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
+        return getOrCreatePartnerProfile(partner.getId());
+    }
+
+    @Transactional
+    public PartnerProfile updateProfile(String principalEmail, Map<String, Object> updates) {
+        User partner = userRepository.findByEmail(principalEmail.trim().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
+        return updateProfile(partner.getId(), updates);
     }
 }

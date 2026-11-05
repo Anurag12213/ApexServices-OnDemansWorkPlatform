@@ -22,6 +22,7 @@ public class ServiceCategoryDto {
     private boolean isSoftDeleted;
     private Long iconId;
     private String iconName;
+    private String bannerImageUrl;
     private long partnerCount;
     private long requestCount;
     private LocalDateTime createdAt;

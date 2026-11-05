@@ -2,6 +2,7 @@ package com.apexservices.service;
 
 import com.apexservices.model.Coupon;
 import com.apexservices.model.CouponRedemption;
+import com.apexservices.model.User;
 import com.apexservices.repository.CouponRedemptionRepository;
 import com.apexservices.repository.CouponRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class CouponService {
     private final CouponRepository couponRepository;
     private final CouponRedemptionRepository redemptionRepository;
     private final AuditLogService auditLogService;
+    private final UserService userService;
 
     public List<Coupon> getAllCoupons() {
         return couponRepository.findAll();
@@ -95,6 +97,31 @@ public class CouponService {
                 "Deleted coupon " + c.getCode(),
                 "127.0.0.1"
         );
+    }
+
+    /**
+     * Authoritative backend validation of coupon discounts for an authenticated or anonymous principal.
+     */
+    public Map<String, Object> validateCouponForPrincipal(
+            String code,
+            BigDecimal orderAmount,
+            String phone,
+            String principalIdentifier,
+            String category
+    ) {
+        Long userId = null;
+        String resolvedPhone = phone;
+        if (principalIdentifier != null && !principalIdentifier.isBlank()) {
+            Optional<User> uOpt = userService.findByIdentifier(principalIdentifier);
+            if (uOpt.isPresent()) {
+                User u = uOpt.get();
+                userId = u.getId();
+                if (resolvedPhone == null || resolvedPhone.isBlank()) {
+                    resolvedPhone = u.getMobileNumber();
+                }
+            }
+        }
+        return validateCoupon(code, orderAmount, resolvedPhone, userId, category);
     }
 
     /**

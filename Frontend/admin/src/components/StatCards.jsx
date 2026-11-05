@@ -6,6 +6,7 @@ export default function StatCards() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const res = await adminFetch('/work-requests');
         if (res.ok) {
@@ -20,8 +21,15 @@ export default function StatCards() {
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 10000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchStats, 30000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) fetchStats();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   const totalRevenue = requests

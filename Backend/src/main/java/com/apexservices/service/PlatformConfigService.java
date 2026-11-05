@@ -94,4 +94,40 @@ public class PlatformConfigService {
 
         return saved;
     }
+
+    public boolean isPlatformInMaintenance(String clientType) {
+        // 1. Check client-specific maintenance mode
+        if (clientType != null) {
+            Optional<AppVersion> ver = appVersionRepository.findById(clientType);
+            if (ver.isPresent() && ver.get().isMaintenanceMode()) {
+                return true;
+            }
+        }
+        // 2. Check global feature flag
+        Optional<PlatformFeatureFlag> flag = featureFlagRepository.findById("maintenance_lockdown");
+        return flag.isPresent() && flag.get().isEnabled();
+    }
+
+    public Map<String, Object> getMaintenanceStatus(String clientType) {
+        Optional<AppVersion> ver = clientType != null ? appVersionRepository.findById(clientType) : Optional.empty();
+        Optional<PlatformFeatureFlag> flag = featureFlagRepository.findById("maintenance_lockdown");
+
+        boolean isLockdown = (ver.isPresent() && ver.get().isMaintenanceMode()) ||
+                             (flag.isPresent() && flag.get().isEnabled());
+
+        Map<String, Object> maint = new LinkedHashMap<>();
+        maint.put("enabled", isLockdown);
+        if (isLockdown) {
+            String title = ver.map(AppVersion::getPromptTitle).filter(t -> t != null && !t.isBlank())
+                    .orElse("Platform Maintenance in Progress");
+            String message = ver.map(AppVersion::getPromptMessage).filter(m -> m != null && !m.isBlank())
+                    .orElse("ApexServices is currently undergoing scheduled platform upgrades to improve service dispatch performance. We apologize for the temporary inconvenience.");
+            maint.put("title", title);
+            maint.put("message", message);
+            maint.put("scope", "ALL");
+        } else {
+            maint.put("scope", "NONE");
+        }
+        return maint;
+    }
 }

@@ -31,11 +31,14 @@ public class Category {
     @Column(name = "tag", length = 50)
     private String tag = "Popular";
 
+    @Column(name = "banner_image_url", length = 1000)
+    private String bannerImageUrl;
+
     @Builder.Default
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "icon_id")
     private Icon icon;
 

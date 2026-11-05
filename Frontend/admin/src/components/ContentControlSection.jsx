@@ -188,79 +188,125 @@ export default function ContentControlSection({ onNavigateTab }) {
     setTimeout(() => setSavedNotice(false), 3500);
   };
 
-  // Handle local logo file upload (PNG, JPG, SVG, WebP)
-  const handleLogoFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Logo file size must be under 2MB.', 'File Size Exceeded');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (base64) {
-        setBrandingForm((prev) => ({ ...prev, logoImageUrl: base64 }));
-      }
-    };
-    reader.readAsDataURL(file);
+  // Client-side image compression & optional cloud upload helper
+  const compressAndUploadImage = async (file, maxWidth = 1000, quality = 0.8, folder = 'branding') => {
+    return new Promise((resolve) => {
+      // 1. First compress via HTML5 canvas to guarantee small footprint
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        if (file.type === 'image/svg+xml') {
+          resolve(event.target.result);
+          return;
+        }
+        const img = new Image();
+        img.onload = async () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth || height > maxWidth) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxWidth) / height);
+              height = maxWidth;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const compressedBase64 = canvas.toDataURL(mime, quality);
+
+          // 2. Try upload to backend cloud media endpoint
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('folder', folder);
+            const uploadRes = await adminFetch('/media/upload', {
+              method: 'POST',
+              body: formData,
+            });
+            if (uploadRes.ok) {
+              const uploadJson = await uploadRes.json();
+              if (uploadJson.url && uploadJson.url.startsWith('http')) {
+                resolve(uploadJson.url);
+                return;
+              }
+            }
+          } catch (e) {
+            // fallback to compressed base64
+          }
+
+          resolve(compressedBase64);
+        };
+        img.onerror = () => resolve(event.target.result);
+        img.src = event.target.result;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
   };
 
-  // Direct manual image file import for new hero slide
-  const handleNewSlideFileUpload = (e) => {
+  // Handle local logo file upload (compressed)
+  const handleLogoFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Slide image size must be under 5MB.', 'File Size Exceeded');
-      return;
+    try {
+      const url = await compressAndUploadImage(file, 400, 0.85, 'branding');
+      if (url) {
+        setBrandingForm((prev) => ({ ...prev, logoImageUrl: url }));
+        toast.success(`Logo updated: ${file.name}`, 'Logo Ready');
+      }
+    } catch {
+      toast.error('Failed to process logo file.');
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (base64) {
-        setNewSlide((prev) => ({ ...prev, imageUrl: base64 }));
+  };
+
+  // Direct manual image file import for new hero slide (compressed)
+  const handleNewSlideFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await compressAndUploadImage(file, 1200, 0.8, 'slides');
+      if (url) {
+        setNewSlide((prev) => ({ ...prev, imageUrl: url }));
         toast.success(`Imported image: ${file.name}`, 'Direct Import Ready');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      toast.error('Failed to process slide image.');
+    }
   };
 
-  // Direct manual image file import for editing existing slide
-  const handleEditSlideFileUpload = (e) => {
+  // Direct manual image file import for editing existing slide (compressed)
+  const handleEditSlideFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Slide image size must be under 5MB.', 'File Size Exceeded');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (base64) {
-        setEditingSlide((prev) => ({ ...prev, imageUrl: base64 }));
+    try {
+      const url = await compressAndUploadImage(file, 1200, 0.8, 'slides');
+      if (url) {
+        setEditingSlide((prev) => ({ ...prev, imageUrl: url }));
         toast.success(`Imported image: ${file.name}`, 'Direct Import Ready');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      toast.error('Failed to process slide image.');
+    }
   };
 
-  // Direct manual image file import for AI Founder photo
-  const handleOwnerFileUpload = (e) => {
+  // Direct manual image file import for AI Founder photo (compressed)
+  const handleOwnerFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Founder photo size must be under 5MB.', 'File Size Exceeded');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result;
-      if (base64) {
-        setOwnerForm((prev) => ({ ...prev, imageUrl: base64 }));
+    try {
+      const url = await compressAndUploadImage(file, 800, 0.8, 'founder');
+      if (url) {
+        setOwnerForm((prev) => ({ ...prev, imageUrl: url }));
         toast.success(`Imported founder image: ${file.name}`, 'Direct Import Ready');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      toast.error('Failed to process founder image.');
+    }
   };
 
   // 1. BRANDING & HEADER SETTINGS HANDLER

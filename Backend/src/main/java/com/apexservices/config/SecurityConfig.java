@@ -80,34 +80,40 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/reject").hasAnyRole("PARTNER", "ADMIN")
                 .requestMatchers("/api/partners/**").hasAnyRole("PARTNER", "ADMIN")
 
-                // Public Read Operations (Catalog, Slides, Reviews, Branding, Avatars, Presentation Data, Completion OTP)
+                // Public Read Operations (Catalog, Slides, Reviews, Branding, Avatars, Presentation Data)
                 .requestMatchers(HttpMethod.GET, "/api/data", "/api/settings").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/icons/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/slides/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/work-requests/**").permitAll()
                 .requestMatchers("/api/config/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/coupons/validate").permitAll()
 
                 // Work Request Submission (Public for guest / customer creation)
                 .requestMatchers(HttpMethod.POST, "/api/work-requests").permitAll()
 
+                // Authenticated Work Request Operations
+                .requestMatchers(HttpMethod.GET, "/api/work-requests").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/work-requests/*").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/work-requests/*/completion-otp").hasAnyRole("CUSTOMER", "ADMIN")
+
                 // Technician Execution & Completion Operations
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/advance-stage").hasAnyRole("PARTNER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/verify-completion").hasAnyRole("PARTNER", "ADMIN")
 
                 // Cancellation, Payment Settlement & Customer Review Operations
-                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/cancel").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/cancel").hasAnyRole("CUSTOMER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/pay").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/review").hasAnyRole("CUSTOMER", "ADMIN")
 
-                // Support Tickets Module across Portals (Public submission, replies, and reading)
-                .requestMatchers(HttpMethod.POST, "/api/tickets", "/api/tickets/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/tickets", "/api/tickets/**").permitAll()
-                .requestMatchers(HttpMethod.PATCH, "/api/tickets/**").permitAll()
-                .requestMatchers("/api/tickets", "/api/tickets/**").permitAll()
+                // Support Tickets Module across Portals
+                .requestMatchers(HttpMethod.POST, "/api/tickets").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/tickets/my-tickets").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/tickets/*").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/tickets/*/reply").authenticated()
+                .requestMatchers(HttpMethod.PATCH, "/api/tickets/**").hasRole("ADMIN")
+                .requestMatchers("/api/tickets/**").authenticated()
 
                 // Actuator Security (Only health and info are public; metrics/env require ADMIN)
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
@@ -183,8 +189,11 @@ public class SecurityConfig {
             "X-Requested-With", 
             "Origin", 
             "Access-Control-Request-Method", 
-            "Access-Control-Request-Headers"
+            "Access-Control-Request-Headers",
+            "If-None-Match",
+            "If-Match"
         ));
+        configuration.setExposedHeaders(List.of("ETag", "Cache-Control", "Content-Disposition"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

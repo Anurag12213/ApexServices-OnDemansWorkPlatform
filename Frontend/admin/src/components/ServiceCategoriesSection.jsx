@@ -26,10 +26,51 @@ import { RenderIcon, SYSTEM_ICONS } from './CategoryIconSelector';
 import { adminFetch, API_BASE_URL } from '../utils/api';
 import { useConfirm } from './ConfirmDialog';
 
+const ADMIN_CACHE_KEY = 'apex_admin_categories_cache';
+
+const getCachedAdminCategories = () => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return [];
+  try {
+    const saved = sessionStorage.getItem(ADMIN_CACHE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+const TableRowSkeleton = () => (
+  <tr className="animate-pulse border-b border-slate-100">
+    <td className="p-3.5">
+      <div className="flex items-center space-x-3">
+        <div className="w-10 h-10 rounded-lg bg-slate-200 shrink-0" />
+        <div className="space-y-1.5 w-36">
+          <div className="h-3.5 bg-slate-200 rounded-md w-3/4" />
+          <div className="h-2.5 bg-slate-100 rounded-md w-full" />
+        </div>
+      </div>
+    </td>
+    <td className="p-3.5">
+      <div className="h-3 bg-slate-200 rounded-md w-24" />
+    </td>
+    <td className="p-3.5">
+      <div className="h-3 bg-slate-200 rounded-md w-16" />
+    </td>
+    <td className="p-3.5">
+      <div className="h-5 bg-slate-200 rounded-full w-20" />
+    </td>
+    <td className="p-3.5 text-right">
+      <div className="h-7 bg-slate-200 rounded-lg w-20 ml-auto" />
+    </td>
+  </tr>
+);
+
 export default function ServiceCategoriesSection() {
   const confirm = useConfirm();
-  const [categories, setCategories] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [categories, setCategories] = useState(() => getCachedAdminCategories());
+  const [isLoading, setIsLoading] = useState(() => {
+    const cached = getCachedAdminCategories();
+    return cached.length === 0;
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'active' | 'archived'
   const [notification, setNotification] = useState('');
@@ -60,63 +101,52 @@ export default function ServiceCategoriesSection() {
     }
   };
 
-  const compressImage = (file, maxWidth = 900, quality = 0.82) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new window.Image();
-        img.onload = () => {
-          let width = img.width;
-          let height = img.height;
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-          resolve(dataUrl);
-        };
-        img.onerror = () => resolve(e.target.result);
-        img.src = e.target.result;
-      };
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(file);
+  const uploadCategoryImage = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', 'categories');
+    const uploadRes = await adminFetch('/media/upload', {
+      method: 'POST',
+      body: formData,
     });
+    if (!uploadRes.ok) {
+      const err = await uploadRes.json().catch(() => ({}));
+      throw new Error(err.message || 'Permanent media upload failed. Please ensure cloud storage is configured.');
+    }
+    const json = await uploadRes.json();
+    if (!json.url) {
+      throw new Error('Upload succeeded but no image URL was returned.');
+    }
+    return json.url;
   };
 
   const saveCategoryImage = async (catIdOrName, imageUrl) => {
     if (!catIdOrName) return;
     try {
-      const map = getCategoryImagesMap();
-      if (!imageUrl) {
-        delete map[String(catIdOrName)];
-      } else {
-        map[String(catIdOrName)] = imageUrl;
-      }
-      localStorage.setItem('apex_category_images', JSON.stringify(map));
-
-      // 1. Sync to backend MySQL database via /admin/settings so customer website receives it
+      // 1. Sync to backend MySQL database via /admin/settings for backward compatibility
       try {
+        const map = getCategoryImagesMap();
+        if (!imageUrl) {
+          delete map[String(catIdOrName)];
+        } else {
+          map[String(catIdOrName)] = imageUrl;
+        }
         await adminFetch('/admin/settings', {
           method: 'PUT',
           body: JSON.stringify({ categoryImages: map }),
         });
       } catch (err) {
-        console.warn('Backend sync failed:', err);
+        console.warn('Backend settings sync notice:', err);
       }
 
       // 2. Broadcast to other open tabs
       try {
         const syncChannel = new BroadcastChannel('apex_services_sync');
-        syncChannel.postMessage({ type: 'DATA_UPDATED', categoryImages: map });
+        syncChannel.postMessage({ type: 'DATA_UPDATED' });
         syncChannel.close();
       } catch (err) {}
     } catch (e) {
-      console.warn('Failed to save category image to storage:', e);
+      console.warn('Failed to broadcast category image update:', e);
     }
   };
 
@@ -125,13 +155,12 @@ export default function ServiceCategoriesSection() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compressed = await compressImage(file);
-      if (compressed) {
-        setNewCategory((prev) => ({ ...prev, bannerImageUrl: compressed }));
-        showToast(`Imported & optimized: ${file.name}`);
-      }
-    } catch {
-      showToast('Failed to process image file.');
+      showToast('Uploading banner to permanent cloud storage...');
+      const url = await uploadCategoryImage(file);
+      setNewCategory((prev) => ({ ...prev, bannerImageUrl: url }));
+      showToast(`Banner uploaded successfully: ${file.name}`);
+    } catch (err) {
+      showToast(err.message || 'Failed to upload image file.');
     }
   };
 
@@ -140,13 +169,12 @@ export default function ServiceCategoriesSection() {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compressed = await compressImage(file);
-      if (compressed) {
-        setEditingCategory((prev) => ({ ...prev, bannerImageUrl: compressed }));
-        showToast(`Imported & optimized: ${file.name}`);
-      }
-    } catch {
-      showToast('Failed to process image file.');
+      showToast('Uploading banner to permanent cloud storage...');
+      const url = await uploadCategoryImage(file);
+      setEditingCategory((prev) => ({ ...prev, bannerImageUrl: url }));
+      showToast(`Banner uploaded successfully: ${file.name}`);
+    } catch (err) {
+      showToast(err.message || 'Failed to upload image file.');
     }
   };
 
@@ -159,48 +187,52 @@ export default function ServiceCategoriesSection() {
   const fetchCategories = async () => {
     setIsLoading(true);
     try {
-      let imgMap = getCategoryImagesMap();
-
-      // Load server settings to merge existing category images from database
+      // 1. Check and migrate any legacy browser-local Base64 images to MySQL / Cloudinary
       try {
-        const settingsRes = await adminFetch('/admin/settings');
-        if (settingsRes.ok) {
-          const settings = await settingsRes.json();
-          if (settings.categoryImages && typeof settings.categoryImages === 'object') {
-            imgMap = { ...settings.categoryImages, ...imgMap };
-            localStorage.setItem('apex_category_images', JSON.stringify(imgMap));
-          } else if (Object.keys(imgMap).length > 0) {
-            // Automatically push local images to server if server doesn't have them yet
-            adminFetch('/admin/settings', {
-              method: 'PUT',
-              body: JSON.stringify({ categoryImages: imgMap }),
-            }).catch(() => {});
+        const saved = localStorage.getItem('apex_category_images');
+        if (saved) {
+          const map = JSON.parse(saved);
+          const base64Entries = Object.entries(map).filter(([_, v]) => typeof v === 'string' && v.startsWith('data:image/'));
+          if (base64Entries.length > 0) {
+            const payload = Object.fromEntries(base64Entries);
+            const migRes = await adminFetch('/media/migrate-browser-images', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+            });
+            if (migRes.ok) {
+              const resJson = await migRes.json();
+              if (resJson.migratedUrls) {
+                // Remove successfully migrated Base64 strings from localStorage
+                Object.keys(resJson.migratedUrls).forEach((k) => delete map[k]);
+                localStorage.setItem('apex_category_images', JSON.stringify(map));
+                console.info('Migrated browser Base64 category images to MySQL:', resJson.migratedUrls);
+              }
+            }
           }
         }
-      } catch (e) {}
+      } catch (migErr) {
+        console.warn('Browser Base64 migration notice:', migErr);
+      }
 
+      // 2. Fetch authoritative categories from MySQL database
       const res = await adminFetch('/admin/service-categories');
       if (res.ok) {
         const list = await res.json();
-        const merged = (Array.isArray(list) ? list : []).map((c) => ({
-          ...c,
-          bannerImageUrl: c.bannerImageUrl || imgMap[String(c.id)] || imgMap[c.name] || imgMap[c.slug] || '',
-        }));
-        setCategories(merged);
+        const validList = Array.isArray(list) ? list : [];
+        setCategories(validList);
+        setCategoryError('');
+        try {
+          sessionStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(validList));
+        } catch {}
+      } else if (res.status === 401 || res.status === 403) {
+        // Strictly DO NOT fall back to public categories on auth failure!
+        setCategoryError('Your admin session has expired or you lack permissions. Please log in again to manage service categories.');
       } else {
-        // Fallback to public categories
-        const publicRes = await fetch(`${API_BASE_URL}/categories`);
-        if (publicRes.ok) {
-          const publicList = await publicRes.json();
-          const merged = (Array.isArray(publicList) ? publicList : []).map((c) => ({
-            ...c,
-            bannerImageUrl: c.bannerImageUrl || imgMap[String(c.id)] || imgMap[c.name] || imgMap[c.slug] || '',
-          }));
-          setCategories(merged);
-        }
+        setCategoryError(`Failed to load service categories. Server returned HTTP ${res.status}.`);
       }
     } catch (e) {
       console.warn('Failed to fetch categories:', e);
+      setCategoryError('Network error connecting to backend server. Serving from local session cache if available.');
     } finally {
       setIsLoading(false);
     }
@@ -253,6 +285,7 @@ export default function ServiceCategoriesSection() {
         iconId: newCategory.iconId || 1,
         iconName: newCategory.iconName || 'Hammer',
         customIconValue: null,
+        bannerImageUrl: newCategory.bannerImageUrl || null,
       };
 
       const res = await adminFetch('/admin/service-categories', {
@@ -272,7 +305,7 @@ export default function ServiceCategoriesSection() {
 
         const savedWithImg = {
           ...saved,
-          bannerImageUrl: newCategory.bannerImageUrl || '',
+          bannerImageUrl: newCategory.bannerImageUrl || saved.bannerImageUrl || '',
         };
 
         setCategories((prev) => [...prev, savedWithImg]);
@@ -320,6 +353,7 @@ export default function ServiceCategoriesSection() {
         iconId: editingCategory.iconId || editingCategory.icon?.id || 1,
         iconName: editingCategory.iconName || editingCategory.icon?.name || 'Hammer',
         customIconValue: null,
+        bannerImageUrl: editingCategory.bannerImageUrl || null,
       };
 
       const res = await adminFetch(`/admin/service-categories/${editingCategory.id}`, {
@@ -628,8 +662,45 @@ export default function ServiceCategoriesSection() {
         </div>
       </div>
 
+      {/* Category Error Notice (e.g. 401/403 or network failure) */}
+      {categoryError && (
+        <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex items-start justify-between shadow-xs">
+          <div className="flex items-center space-x-3">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+            <span className="text-xs font-semibold">{categoryError}</span>
+          </div>
+          <button
+            onClick={fetchCategories}
+            className="text-xs bg-red-100 hover:bg-red-200 text-red-800 font-bold px-3 py-1 rounded-lg transition shrink-0 cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Categories Data Table (Clean, Compact List matching Payment & Transactions) */}
-      {filteredCategories.length === 0 ? (
+      {isLoading && categories.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs min-w-[700px]">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="p-3.5">Category & Trade</th>
+                  <th className="p-3.5">Slug URL</th>
+                  <th className="p-3.5">Allocations</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <TableRowSkeleton key={i} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : filteredCategories.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
           <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <h3 className="text-sm font-bold text-slate-800">No categories found</h3>

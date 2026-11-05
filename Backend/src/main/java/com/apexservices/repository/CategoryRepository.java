@@ -11,8 +11,10 @@ import java.util.Optional;
 
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"icon"})
     List<Category> findAllByOrderByIdAsc();
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"icon"})
     List<Category> findByActiveTrueOrderByIdAsc();
 
     Optional<Category> findBySlug(String slug);

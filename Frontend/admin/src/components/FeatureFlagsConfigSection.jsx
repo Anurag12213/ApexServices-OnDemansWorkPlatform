@@ -120,6 +120,13 @@ export default function FeatureFlagsConfigSection() {
       });
       if (res.ok) {
         toast.success('App configurations and feature flags synchronized across all client applications.', 'Settings Saved');
+        try {
+          const syncChannel = new BroadcastChannel('apex_services_sync');
+          syncChannel.postMessage({ type: 'DATA_UPDATED' });
+          syncChannel.close();
+        } catch (e) {
+          console.warn('BroadcastChannel sync failed:', e);
+        }
       } else {
         toast.warning('Updated locally, server returned non-200 status.');
       }

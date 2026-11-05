@@ -1,8 +1,6 @@
 package com.apexservices.controller;
 
 import com.apexservices.model.PartnerDocument;
-import com.apexservices.model.User;
-import com.apexservices.repository.UserRepository;
 import com.apexservices.service.PartnerManagementService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @RestController
@@ -23,15 +20,12 @@ import java.util.Optional;
 public class PartnerDocumentController {
 
     private final PartnerManagementService partnerManagementService;
-    private final UserRepository userRepository;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
     public ResponseEntity<List<PartnerDocument>> getMyDocuments(Principal principal) {
         if (principal == null) return ResponseEntity.ok(List.of());
-        return userRepository.findByIdentifier(principal.getName())
-                .map(u -> ResponseEntity.ok(partnerManagementService.getPartnerDocuments(u.getId())))
-                .orElse(ResponseEntity.ok(List.of()));
+        return ResponseEntity.ok(partnerManagementService.getPartnerDocumentsByPrincipal(principal.getName()));
     }
 
     @PostMapping("/upload")
@@ -39,14 +33,15 @@ public class PartnerDocumentController {
     public ResponseEntity<?> uploadDocument(@RequestBody Map<String, String> req, Principal principal) {
         if (principal == null) return ResponseEntity.status(401).build();
 
-        Optional<User> uOpt = userRepository.findByIdentifier(principal.getName());
-        if (uOpt.isEmpty()) return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
-
         String docType = req.getOrDefault("documentType", "AADHAAR");
         String docName = req.getOrDefault("documentName", "Identification Certificate");
         String docUrl = req.get("documentUrl");
 
-        PartnerDocument doc = partnerManagementService.uploadDocument(uOpt.get().getId(), docType, docName, docUrl);
-        return ResponseEntity.ok(doc);
+        try {
+            PartnerDocument doc = partnerManagementService.uploadDocumentByPrincipal(principal.getName(), docType, docName, docUrl);
+            return ResponseEntity.ok(doc);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 }

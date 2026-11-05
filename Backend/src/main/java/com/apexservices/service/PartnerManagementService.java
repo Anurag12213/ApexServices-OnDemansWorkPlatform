@@ -30,8 +30,25 @@ public class PartnerManagementService {
         return documentRepository.findByPartnerIdOrderByUploadedAtDesc(partnerId);
     }
 
+    public List<PartnerDocument> getPartnerDocumentsByPrincipal(String identifier) {
+        if (identifier == null || identifier.isBlank()) return List.of();
+        return userRepository.findByIdentifier(identifier.trim())
+                .map(u -> getPartnerDocuments(u.getId()))
+                .orElse(List.of());
+    }
+
     public List<PartnerDocument> getAllDocuments() {
         return documentRepository.findAll();
+    }
+
+    @Transactional
+    public PartnerDocument uploadDocumentByPrincipal(String identifier, String docType, String docName, String docUrl) {
+        if (identifier == null || identifier.isBlank()) {
+            throw new IllegalArgumentException("Principal identifier cannot be blank");
+        }
+        User partner = userRepository.findByIdentifier(identifier.trim())
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + identifier));
+        return uploadDocument(partner.getId(), docType, docName, docUrl);
     }
 
     @Transactional

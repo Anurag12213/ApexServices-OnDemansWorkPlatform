@@ -1,387 +1,135 @@
 package com.apexservices.controller;
 
-import com.apexservices.dto.CategoryRequestDto;
-import com.apexservices.dto.CategoryStatusRequest;
-import com.apexservices.dto.ServiceCategoryDto;
-import com.apexservices.dto.WorkRequestClaimResponseDto;
-import com.apexservices.dto.WorkRequestDto;
-import com.apexservices.dto.WorkRequestResponseDto;
+import com.apexservices.dto.*;
 import com.apexservices.model.Category;
 import com.apexservices.model.Icon;
-import com.apexservices.model.SiteSetting;
-import com.apexservices.repository.CategoryRepository;
-import com.apexservices.repository.IconRepository;
-import com.apexservices.repository.SiteSettingRepository;
+import com.apexservices.model.PartnerProfile;
+import com.apexservices.model.Review;
 import com.apexservices.security.InputSanitizer;
-import com.apexservices.service.PartnerPresenceService;
-import com.apexservices.service.WorkRequestService;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.apexservices.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import jakarta.annotation.PostConstruct;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.Principal;
-import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176"})
+@CrossOrigin(exposedHeaders = {"ETag", "Cache-Control"})
 public class ContentDataController {
 
-    private final CategoryRepository categoryRepository;
-    private final IconRepository iconRepository;
+    private final SiteContentService siteContentService;
+    private final CategoryService categoryService;
+    private final IconService iconService;
     private final WorkRequestService workRequestService;
     private final PartnerPresenceService presenceService;
-    private final com.apexservices.service.ReviewService reviewService;
-    private final com.apexservices.service.PartnerProfileService partnerProfileService;
-    private final com.apexservices.repository.UserRepository userRepository;
-    private final SiteSettingRepository siteSettingRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ReviewService reviewService;
+    private final PartnerProfileService partnerProfileService;
+    private final ContentVersionService contentVersionService;
+    private final PlatformConfigService platformConfigService;
 
-    private final Map<String, Object> siteBranding = new ConcurrentHashMap<>();
-    private final Map<String, Object> announcement = new ConcurrentHashMap<>();
-    private final Map<String, Object> aiOwnerSection = new ConcurrentHashMap<>();
-    private final List<Map<String, Object>> heroSlides = new CopyOnWriteArrayList<>();
-    private final List<Map<String, Object>> reviews = new CopyOnWriteArrayList<>();
-    private final List<Map<String, Object>> workRequests = new CopyOnWriteArrayList<>();
-
-    @PostConstruct
-    public void init() {
-        initDefaultData();
-        loadPersistedContentState();
-    }
-
-    @SuppressWarnings("unchecked")
-    private synchronized void persistContentState() {
-        try {
-            if (siteSettingRepository != null && objectMapper != null) {
-                siteSettingRepository.save(new SiteSetting("siteBranding", objectMapper.writeValueAsString(siteBranding)));
-                siteSettingRepository.save(new SiteSetting("announcement", objectMapper.writeValueAsString(announcement)));
-                siteSettingRepository.save(new SiteSetting("aiOwnerSection", objectMapper.writeValueAsString(aiOwnerSection)));
-                siteSettingRepository.save(new SiteSetting("heroSlides", objectMapper.writeValueAsString(heroSlides)));
-                siteSettingRepository.save(new SiteSetting("reviews", objectMapper.writeValueAsString(reviews)));
-                log.info("Site content state successfully saved to MySQL database (brandName={}).", siteBranding.get("brandName"));
-            }
-        } catch (Exception e) {
-            log.warn("Failed to persist site content state to database: {}", e.getMessage());
-        }
-
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("site_content_config.dat"))) {
-            Map<String, Object> state = new HashMap<>();
-            state.put("siteBranding", new HashMap<>(siteBranding));
-            state.put("announcement", new HashMap<>(announcement));
-            state.put("aiOwnerSection", new HashMap<>(aiOwnerSection));
-            state.put("heroSlides", new ArrayList<>(heroSlides));
-            state.put("reviews", new ArrayList<>(reviews));
-            oos.writeObject(state);
-            log.info("Site content state successfully saved to disk.");
-        } catch (Exception e) {
-            log.warn("Failed to persist site content state to disk: {}", e.getMessage());
+    public void bumpContentVersion() {
+        if (contentVersionService != null) {
+            contentVersionService.bumpVersion();
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private synchronized void loadPersistedContentState() {
-        boolean loadedFromDb = false;
-        try {
-            if (siteSettingRepository != null && objectMapper != null) {
-                Optional<SiteSetting> brandingOpt = siteSettingRepository.findById("siteBranding");
-                if (brandingOpt.isPresent() && brandingOpt.get().getValue() != null) {
-                    Map<String, Object> m = objectMapper.readValue(brandingOpt.get().getValue(), Map.class);
-                    siteBranding.putAll(m);
-                    loadedFromDb = true;
-                }
-                Optional<SiteSetting> annOpt = siteSettingRepository.findById("announcement");
-                if (annOpt.isPresent() && annOpt.get().getValue() != null) {
-                    Map<String, Object> m = objectMapper.readValue(annOpt.get().getValue(), Map.class);
-                    announcement.putAll(m);
-                }
-                Optional<SiteSetting> aiOpt = siteSettingRepository.findById("aiOwnerSection");
-                if (aiOpt.isPresent() && aiOpt.get().getValue() != null) {
-                    Map<String, Object> m = objectMapper.readValue(aiOpt.get().getValue(), Map.class);
-                    aiOwnerSection.putAll(m);
-                }
-                Optional<SiteSetting> slidesOpt = siteSettingRepository.findById("heroSlides");
-                if (slidesOpt.isPresent() && slidesOpt.get().getValue() != null) {
-                    List<Map<String, Object>> l = objectMapper.readValue(slidesOpt.get().getValue(), List.class);
-                    if (!l.isEmpty()) {
-                        heroSlides.clear();
-                        heroSlides.addAll(l);
-                    }
-                }
-                Optional<SiteSetting> revOpt = siteSettingRepository.findById("reviews");
-                if (revOpt.isPresent() && revOpt.get().getValue() != null) {
-                    List<Map<String, Object>> l = objectMapper.readValue(revOpt.get().getValue(), List.class);
-                    if (!l.isEmpty()) {
-                        reviews.clear();
-                        reviews.addAll(l);
-                    }
-                }
-                if (loadedFromDb) {
-                    log.info("Loaded site branding from MySQL database: brandName={}", siteBranding.get("brandName"));
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Database content settings load failed, falling back to disk: {}", e.getMessage());
-        }
-
-        if (!loadedFromDb) {
-            try {
-                File file = new File("site_content_config.dat");
-                if (file.exists() && file.length() > 0) {
-                    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-                        Object obj = ois.readObject();
-                        if (obj instanceof Map<?, ?> state) {
-                            if (state.get("siteBranding") instanceof Map<?, ?> m) {
-                                siteBranding.putAll((Map<String, Object>) m);
-                            }
-                            if (state.get("announcement") instanceof Map<?, ?> m) {
-                                announcement.putAll((Map<String, Object>) m);
-                            }
-                            if (state.get("aiOwnerSection") instanceof Map<?, ?> m) {
-                                aiOwnerSection.putAll((Map<String, Object>) m);
-                            }
-                            if (state.get("heroSlides") instanceof List<?> l && !l.isEmpty()) {
-                                heroSlides.clear();
-                                heroSlides.addAll((List<Map<String, Object>>) l);
-                            }
-                            if (state.get("reviews") instanceof List<?> l && !l.isEmpty()) {
-                                reviews.clear();
-                                reviews.addAll((List<Map<String, Object>>) l);
-                            }
-                            log.info("Persisted site content state loaded from disk: brandDotColor={}", siteBranding.get("brandDotColor"));
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.warn("Failed to load persisted site content state from disk: {}", e.getMessage());
-            }
-        }
-    }
-
-    private void initDefaultData() {
-        // 1. Site Branding
-        siteBranding.put("brandName", "ApexServices");
-        siteBranding.put("brandDotColor", "#ff3b47");
-        siteBranding.put("logoImageUrl", "");
-        siteBranding.put("headerCtaText", "REQUEST NOW");
-        siteBranding.put("headerOperatingHours", "MON - SAT: 7:00 AM - 9:00 PM | SUN: EMERGENCY DISPATCH");
-        siteBranding.put("supportPhone", "+91 1800 200 4567");
-        siteBranding.put("supportEmail", "support@apexservices.com");
-        siteBranding.put("categoriesBadge", "OUR SPECIALTIES");
-        siteBranding.put("categoriesHeading", "Featured Service Categories");
-        siteBranding.put("categoriesSubtitle", "From custom carpentry to emergency plumbing and electrical care.");
-        siteBranding.put("reviewsBadge", "VERIFIED REVIEWS");
-        siteBranding.put("reviewsHeading", "What Our Customers Say");
-        siteBranding.put("footerTagline", "Premium home repair, custom carpentry, plumbing, and electrical solutions.");
-        siteBranding.put("footerAddress", "124 Executive Parkway, Suite 400");
-        siteBranding.put("footerCopyright", "ApexServices. All rights reserved.");
-
-        // 2. Announcement
-        announcement.put("enabled", true);
-        announcement.put("text", "🔥 Seasonal Offer: Get 20% OFF on all Carpentry, Plumbing & AC Services this week! Use Code: APEX20");
-
-        // 3. AI Owner Section
-        aiOwnerSection.put("ownerName", "Anurag Vijaywargiy");
-        aiOwnerSection.put("ownerTitle", "Founder & Master Operations Director");
-        aiOwnerSection.put("badge", "FOUNDER'S DIRECT GUARANTEE");
-        aiOwnerSection.put("headingText", "Your Peace of Mind is Our Top Priority!");
-        aiOwnerSection.put("indicatedText", "We personally guarantee top-quality workmanship on every job. If you're not 100% satisfied with our carpentry, plumbing, or electrical repair, we'll fix it completely free of charge!");
-        aiOwnerSection.put("buttonText", "REQUEST NOW");
-        aiOwnerSection.put("imageUrl", "/anurag_founder.jpg");
-
-        // 4. Hero Slides
-        Map<String, Object> s1 = new LinkedHashMap<>();
-        s1.put("id", "slide-1");
-        s1.put("badge", "PRO APPROVED SERVICES");
-        s1.put("title", "Expert Home Services At Your Doorstep");
-        s1.put("subtitle", "From precision carpentry to emergency plumbing and electrical solutions — reliable professionals ready 24/7.");
-        s1.put("buttonText", "Request Service Now");
-        s1.put("imageUrl", "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1400&q=80");
-        heroSlides.add(s1);
-
-        Map<String, Object> s2 = new LinkedHashMap<>();
-        s2.put("id", "slide-2");
-        s2.put("badge", "CRAFT & REPAIR EXCELLENCE");
-        s2.put("title", "Master Carpentry & Custom Woodwork");
-        s2.put("subtitle", "Custom furniture fitting, door restoration, cabinetry, and structural repair by certified craftsmen.");
-        s2.put("buttonText", "Book Woodwork Special");
-        s2.put("imageUrl", "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=1400&q=80");
-        heroSlides.add(s2);
-
-        Map<String, Object> s3 = new LinkedHashMap<>();
-        s3.put("id", "slide-3");
-        s3.put("badge", "RAPID RESPONSE");
-        s3.put("title", "Fast Plumbing & Electrical Repairs");
-        s3.put("subtitle", "Zero hassle leakage repair, wiring upgrades, breaker fixes, and full maintenance packages.");
-        s3.put("buttonText", "Explore Emergency Care");
-        s3.put("imageUrl", "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1400&q=80");
-        heroSlides.add(s3);
-
-        // 5. Reviews
-        addReview("rev-1", "Sarah Jenkins", "Homeowner", 5, "The carpentry team redesigned our custom kitchen cabinets flawlessly! Fast, polite, and very clean work.", "Custom Carpentry", "2 days ago", "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80");
-        addReview("rev-2", "David Miller", "Property Manager", 5, "Called their emergency plumbing team at 11 PM for a burst pipe. They arrived in 25 minutes and fixed it completely!", "Emergency Plumbing", "1 week ago", "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80");
-        addReview("rev-3", "Elena Rostova", "Interior Designer", 5, "Outstanding electrical and lighting installation. Their attention to safety and detail is unmatched in the area.", "Electrical Maintenance", "3 weeks ago", "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80");
-    }
-
-    private void addReview(String id, String name, String role, int rating, String comment, String serviceUsed, String date, String avatar) {
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("id", id);
-        r.put("name", name);
-        r.put("role", role);
-        r.put("rating", rating);
-        r.put("comment", comment);
-        r.put("serviceUsed", serviceUsed);
-        r.put("date", date);
-        r.put("avatar", avatar);
-        reviews.add(r);
-    }
-
-    // --- FULL PRESENTATION DATA ENDPOINT ---
+    // --- FULL PRESENTATION DATA ENDPOINT WITH ETAG & DTO ---
     @GetMapping("/data")
-    public ResponseEntity<Map<String, Object>> getFullData() {
-        Map<String, Object> full = new LinkedHashMap<>();
-        full.put("announcement", announcement);
-        full.put("heroSlides", heroSlides);
-        full.put("aiOwnerSection", aiOwnerSection);
-        full.put("categories", getCategories().getBody());
-        full.put("reviews", reviews);
-        full.put("siteBranding", siteBranding);
+    public ResponseEntity<BootstrapDataResponseDto> getFullData(
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        String etag = contentVersionService.getDataEtag();
+        if (contentVersionService.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header("Cache-Control", "public, max-age=60, must-revalidate")
+                    .build();
+        }
 
-        // Lightweight publicConfig to prevent duplicating multi-megabyte base64 images
-        Map<String, Object> lightPublicConfig = new LinkedHashMap<>(siteBranding);
-        lightPublicConfig.remove("categoryImages");
-        lightPublicConfig.remove("logoImageUrl");
-        full.put("publicConfig", lightPublicConfig);
+        List<Map<String, Object>> categories = categoryService.getCategories();
+        BootstrapDataResponseDto dto = siteContentService.buildBootstrapDto(categories);
 
-        return ResponseEntity.ok(full);
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header("Cache-Control", "public, max-age=60, must-revalidate")
+                .body(dto);
+    }
+
+    // --- MODULAR PUBLIC ENDPOINTS ---
+    @GetMapping("/bootstrap/config")
+    public ResponseEntity<Map<String, Object>> getBootstrapConfig(
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        String etag = contentVersionService.getConfigEtag();
+        if (contentVersionService.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+        Map<String, Object> cfg = siteContentService.buildModularConfig();
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header("Cache-Control", "public, max-age=60, must-revalidate")
+                .body(cfg);
+    }
+
+    @GetMapping("/catalog/categories")
+    public ResponseEntity<List<Map<String, Object>>> getCatalogCategories(
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        String etag = contentVersionService.getCategoryEtag();
+        if (contentVersionService.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
+        }
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header("Cache-Control", "public, max-age=60, must-revalidate")
+                .body(categoryService.getCategories());
     }
 
     // --- ADMIN SETTINGS & BRANDING ---
     @GetMapping({"/admin/settings", "/settings"})
     public ResponseEntity<Map<String, Object>> getSettings() {
-        return ResponseEntity.ok(siteBranding);
+        return ResponseEntity.ok(siteContentService.getSettings());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping({"/admin/settings", "/settings"})
     public ResponseEntity<Map<String, Object>> updateSettings(@RequestBody Map<String, Object> updates) {
-        siteBranding.putAll(updates);
-        persistContentState();
-        return ResponseEntity.ok(siteBranding);
+        return ResponseEntity.ok(siteContentService.updateSettings(updates));
     }
 
-    // --- ICONS REPOSITORY CRUD (SYSTEM & CUSTOM) ---
+    // --- ICONS CRUD (SYSTEM & CUSTOM) ---
     @GetMapping("/icons")
     public ResponseEntity<List<Icon>> getIcons() {
-        return ResponseEntity.ok(iconRepository.findAll());
+        return ResponseEntity.ok(iconService.getAllIcons());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/icons")
     public ResponseEntity<Icon> addIcon(@RequestBody Map<String, Object> body) {
-        String name = (String) body.getOrDefault("name", "Custom Icon");
-        String iconType = (String) body.getOrDefault("iconType", "CUSTOM");
         String iconValue = (String) body.get("iconValue");
         if (iconValue == null || iconValue.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        Icon icon = Icon.builder()
-                .name(name)
-                .iconType(iconType)
-                .iconValue(iconValue)
-                .build();
-        Icon saved = iconRepository.save(icon);
+        Icon saved = iconService.addIcon(body);
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     // --- CATEGORIES CRUD WITH ICON RELATIONSHIP ---
     @GetMapping("/categories")
     public ResponseEntity<List<Map<String, Object>>> getCategories() {
-        List<Category> dbCategories = categoryRepository.findAllByOrderByIdAsc();
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Category c : dbCategories) {
-            Map<String, Object> map = new LinkedHashMap<>();
-            map.put("id", c.getId());
-            map.put("name", c.getName());
-            map.put("slug", c.getSlug());
-            map.put("description", c.getDescription());
-            map.put("tag", c.getTag());
-            map.put("active", c.isActive());
-            map.put("isSoftDeleted", !c.isActive());
-            if (c.getIcon() != null) {
-                map.put("iconId", c.getIcon().getId());
-                map.put("iconName", c.getIcon().getIconValue());
-                map.put("icon", c.getIcon());
-            } else {
-                map.put("iconId", null);
-                map.put("iconName", "Hammer");
-                map.put("icon", null);
-            }
-            result.add(map);
-        }
-        return ResponseEntity.ok(result);
-    }
-
-    private ServiceCategoryDto toServiceCategoryDto(Category c) {
-        long partnerCount = categoryRepository.countPartnersByCategoryId(c.getId());
-        long requestCount = categoryRepository.countRequestsByCategoryIdAndName(c.getId(), c.getName());
-        return ServiceCategoryDto.builder()
-                .id(c.getId())
-                .name(c.getName())
-                .slug(c.getSlug())
-                .description(c.getDescription())
-                .tag(c.getTag())
-                .active(c.isActive())
-                .isSoftDeleted(!c.isActive())
-                .iconId(c.getIcon() != null ? c.getIcon().getId() : null)
-                .iconName(c.getIcon() != null ? c.getIcon().getIconValue() : "Hammer")
-                .partnerCount(partnerCount)
-                .requestCount(requestCount)
-                .createdAt(c.getCreatedAt())
-                .updatedAt(c.getUpdatedAt())
-                .build();
-    }
-
-    private Icon resolveIcon(CategoryRequestDto body, String categoryName) {
-        if (body.getCustomIconValue() != null && !body.getCustomIconValue().isBlank()) {
-            String customValue = body.getCustomIconValue();
-            String iconName = body.getCustomIconName() != null && !body.getCustomIconName().isBlank()
-                    ? InputSanitizer.sanitize(body.getCustomIconName())
-                    : categoryName + " Icon";
-            Icon icon = Icon.builder()
-                    .name(iconName)
-                    .iconType("CUSTOM")
-                    .iconValue(customValue)
-                    .build();
-            return iconRepository.save(icon);
-        } else if (body.getIconId() != null) {
-            try {
-                return iconRepository.findById(body.getIconId()).orElse(null);
-            } catch (Exception ignored) {
-                return null;
-            }
-        } else if (body.getIconName() != null && !body.getIconName().isBlank()) {
-            String iconName = InputSanitizer.sanitize(body.getIconName());
-            return iconRepository.findByIconValue(iconName)
-                    .orElseGet(() -> iconRepository.save(Icon.builder().name(iconName).iconType("SYSTEM").iconValue(iconName).build()));
-        }
-        return null;
+        return ResponseEntity.ok(categoryService.getCategories());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -389,216 +137,41 @@ public class ContentDataController {
     public ResponseEntity<List<ServiceCategoryDto>> getAdminServiceCategories(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Boolean active) {
-        List<Category> all = categoryRepository.findAllByOrderByIdAsc();
-        List<ServiceCategoryDto> result = new ArrayList<>();
-        for (Category c : all) {
-            if (active != null && c.isActive() != active) {
-                continue;
-            }
-            if (search != null && !search.isBlank()) {
-                String term = search.trim().toLowerCase();
-                boolean matches = (c.getName() != null && c.getName().toLowerCase().contains(term))
-                        || (c.getDescription() != null && c.getDescription().toLowerCase().contains(term))
-                        || (c.getSlug() != null && c.getSlug().toLowerCase().contains(term));
-                if (!matches) {
-                    continue;
-                }
-            }
-            result.add(toServiceCategoryDto(c));
-        }
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(categoryService.getAdminServiceCategories(search, active));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/admin/service-categories")
     public ResponseEntity<?> createAdminServiceCategory(@Valid @RequestBody CategoryRequestDto body) {
-        String name = InputSanitizer.sanitize(body.getName());
-        if (categoryRepository.existsByNameIgnoreCase(name)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "A service category with this name already exists."));
-        }
-
-        String slug = body.getSlug() != null && !body.getSlug().isBlank()
-                ? InputSanitizer.sanitize(body.getSlug()).toLowerCase().replaceAll("[^a-z0-9]+", "-")
-                : name.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-");
-
-        if (categoryRepository.existsBySlug(slug)) {
-            slug = slug + "-" + (System.currentTimeMillis() % 1000);
-        }
-
-        String description = InputSanitizer.sanitize(body.getDescription());
-        String tag = body.getTag() != null && !body.getTag().isBlank() ? InputSanitizer.sanitize(body.getTag()) : "Popular";
-        boolean active = body.getActive() != null ? body.getActive() : true;
-
-        Icon icon = resolveIcon(body, name);
-
-        Category cat = Category.builder()
-                .name(name)
-                .slug(slug)
-                .description(description)
-                .tag(tag)
-                .active(active)
-                .icon(icon)
-                .build();
-
-        Category saved = categoryRepository.save(cat);
-        return ResponseEntity.status(HttpStatus.CREATED).body(toServiceCategoryDto(saved));
+        ServiceCategoryDto dto = categoryService.createAdminServiceCategory(body);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/admin/service-categories/{id}")
     public ResponseEntity<?> updateAdminServiceCategory(@PathVariable Long id, @Valid @RequestBody CategoryRequestDto body) {
-        Category category = categoryRepository.findById(id).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String name = InputSanitizer.sanitize(body.getName());
-        if (categoryRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "Another category already exists with the name: " + name));
-        }
-
-        String slug = body.getSlug() != null && !body.getSlug().isBlank()
-                ? InputSanitizer.sanitize(body.getSlug()).toLowerCase().replaceAll("[^a-z0-9]+", "-")
-                : name.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-");
-
-        if (categoryRepository.existsBySlugAndIdNot(slug, id)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("message", "Another category already uses the slug: " + slug));
-        }
-
-        category.setName(name);
-        category.setSlug(slug);
-        if (body.getDescription() != null) category.setDescription(InputSanitizer.sanitize(body.getDescription()));
-        if (body.getTag() != null) category.setTag(InputSanitizer.sanitize(body.getTag()));
-        if (body.getActive() != null) category.setActive(body.getActive());
-
-        Icon icon = resolveIcon(body, name);
-        if (icon != null) {
-            category.setIcon(icon);
-        }
-
-        Category saved = categoryRepository.save(category);
-        return ResponseEntity.ok(toServiceCategoryDto(saved));
+        ServiceCategoryDto dto = categoryService.updateAdminServiceCategory(id, body);
+        return ResponseEntity.ok(dto);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping({"/admin/service-categories/{id}/status", "/categories/{id}/status"})
     public ResponseEntity<?> toggleCategoryStatus(@PathVariable Long id, @RequestBody(required = false) CategoryStatusRequest req) {
-        Category category = categoryRepository.findById(id).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-        boolean newStatus = (req != null && req.getActive() != null) ? req.getActive() : !category.isActive();
-        category.setActive(newStatus);
-        Category saved = categoryRepository.save(category);
-        return ResponseEntity.ok(toServiceCategoryDto(saved));
+        ServiceCategoryDto dto = categoryService.toggleCategoryStatus(id, req);
+        return ResponseEntity.ok(dto);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/categories")
     public ResponseEntity<Map<String, Object>> addCategory(@Valid @RequestBody CategoryRequestDto body) {
-        String name = InputSanitizer.sanitize(body.getName());
-        String description = InputSanitizer.sanitize(body.getDescription());
-        String tag = body.getTag() != null && !body.getTag().isBlank() ? InputSanitizer.sanitize(body.getTag()) : "Popular";
-
-        Icon icon = null;
-        // Case 1: Custom Icon uploaded (Base64 / URL)
-        if (body.getCustomIconValue() != null && !body.getCustomIconValue().isBlank()) {
-            String customValue = body.getCustomIconValue();
-            String iconName = body.getCustomIconName() != null && !body.getCustomIconName().isBlank()
-                    ? InputSanitizer.sanitize(body.getCustomIconName())
-                    : name + " Icon";
-            icon = Icon.builder()
-                    .name(iconName)
-                    .iconType("CUSTOM")
-                    .iconValue(customValue)
-                    .build();
-            icon = iconRepository.save(icon);
-        }
-        // Case 2: Selected from existing icon library via iconId
-        else if (body.getIconId() != null) {
-            try {
-                icon = iconRepository.findById(body.getIconId()).orElse(null);
-            } catch (Exception ignored) {}
-        }
-        // Case 3: Provided by iconName (Lucide icon identifier)
-        else if (body.getIconName() != null && !body.getIconName().isBlank()) {
-            String iconName = InputSanitizer.sanitize(body.getIconName());
-            icon = iconRepository.findByIconValue(iconName)
-                    .orElseGet(() -> iconRepository.save(Icon.builder().name(iconName).iconType("SYSTEM").iconValue(iconName).build()));
-        }
-
-        Category category = Category.builder()
-                .name(name)
-                .description(description)
-                .tag(tag)
-                .icon(icon)
-                .build();
-        Category saved = categoryRepository.save(category);
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", saved.getId());
-        map.put("name", saved.getName());
-        map.put("description", saved.getDescription());
-        map.put("tag", saved.getTag());
-        if (saved.getIcon() != null) {
-            map.put("iconId", saved.getIcon().getId());
-            map.put("iconName", saved.getIcon().getIconValue());
-            map.put("icon", saved.getIcon());
-        }
+        Map<String, Object> map = categoryService.addCategory(body);
         return ResponseEntity.status(HttpStatus.CREATED).body(map);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/categories/{id}")
     public ResponseEntity<Map<String, Object>> updateCategory(@PathVariable Long id, @Valid @RequestBody CategoryRequestDto body) {
-        Category category = categoryRepository.findById(id).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        if (body.getName() != null) category.setName(InputSanitizer.sanitize(body.getName()));
-        if (body.getDescription() != null) category.setDescription(InputSanitizer.sanitize(body.getDescription()));
-        if (body.getTag() != null) category.setTag(InputSanitizer.sanitize(body.getTag()));
-
-        // Update Icon if provided
-        if (body.getCustomIconValue() != null && !body.getCustomIconValue().isBlank()) {
-            String customValue = body.getCustomIconValue();
-            String iconName = body.getCustomIconName() != null && !body.getCustomIconName().isBlank()
-                    ? InputSanitizer.sanitize(body.getCustomIconName())
-                    : category.getName() + " Icon";
-            Icon newIcon = Icon.builder()
-                    .name(iconName)
-                    .iconType("CUSTOM")
-                    .iconValue(customValue)
-                    .build();
-            newIcon = iconRepository.save(newIcon);
-            category.setIcon(newIcon);
-        } else if (body.getIconId() != null) {
-            try {
-                iconRepository.findById(body.getIconId()).ifPresent(category::setIcon);
-            } catch (Exception ignored) {}
-        } else if (body.getIconName() != null && !body.getIconName().isBlank()) {
-            String iconName = InputSanitizer.sanitize(body.getIconName());
-            Icon matched = iconRepository.findByIconValue(iconName)
-                    .orElseGet(() -> iconRepository.save(Icon.builder().name(iconName).iconType("SYSTEM").iconValue(iconName).build()));
-            category.setIcon(matched);
-        }
-
-        Category saved = categoryRepository.save(category);
-
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", saved.getId());
-        map.put("name", saved.getName());
-        map.put("description", saved.getDescription());
-        map.put("tag", saved.getTag());
-        if (saved.getIcon() != null) {
-            map.put("iconId", saved.getIcon().getId());
-            map.put("iconName", saved.getIcon().getIconValue());
-            map.put("icon", saved.getIcon());
-        }
+        Map<String, Object> map = categoryService.updateCategory(id, body);
         return ResponseEntity.ok(map);
     }
 
@@ -607,71 +180,43 @@ public class ContentDataController {
     public ResponseEntity<?> deleteCategory(
             @PathVariable Long id,
             @RequestParam(required = false, defaultValue = "false") boolean permanent) {
-        Category category = categoryRepository.findById(id).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
+        Map<String, Object> res = categoryService.deleteCategory(id, permanent);
         if (permanent) {
-            categoryRepository.deleteById(id);
-            return ResponseEntity.ok(Map.of("message", "Category permanently deleted", "id", id));
+            return ResponseEntity.ok(res);
         } else {
-            category.setActive(false);
-            Category saved = categoryRepository.save(category);
-            return ResponseEntity.ok(toServiceCategoryDto(saved));
+            return ResponseEntity.ok(res.get("serviceCategory"));
         }
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping({"/admin/service-categories/{id}/restore", "/categories/{id}/restore"})
     public ResponseEntity<?> restoreCategory(@PathVariable Long id) {
-        Category category = categoryRepository.findById(id).orElse(null);
-        if (category == null) {
-            return ResponseEntity.notFound().build();
-        }
-        category.setActive(true);
-        Category saved = categoryRepository.save(category);
-        return ResponseEntity.ok(toServiceCategoryDto(saved));
+        ServiceCategoryDto dto = categoryService.restoreCategory(id);
+        return ResponseEntity.ok(dto);
     }
 
     // --- SLIDES CRUD ---
     @GetMapping({"/slides", "/admin/slides"})
     public ResponseEntity<List<Map<String, Object>>> getSlides() {
-        return ResponseEntity.ok(heroSlides);
+        return ResponseEntity.ok(siteContentService.getSlides());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping({"/slides", "/admin/slides"})
     public ResponseEntity<Map<String, Object>> addSlide(@RequestBody Map<String, Object> slide) {
-        if (!slide.containsKey("id") || slide.get("id") == null) {
-            slide.put("id", "slide-" + System.currentTimeMillis());
-        }
-        heroSlides.add(slide);
-        persistContentState();
-        return ResponseEntity.status(HttpStatus.CREATED).body(slide);
+        return ResponseEntity.status(HttpStatus.CREATED).body(siteContentService.addSlide(slide));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping({"/slides/{id}", "/admin/slides/{id}"})
     public ResponseEntity<Map<String, Object>> updateSlide(@PathVariable String id, @RequestBody Map<String, Object> slide) {
-        for (int i = 0; i < heroSlides.size(); i++) {
-            if (id.equals(heroSlides.get(i).get("id"))) {
-                slide.put("id", id);
-                heroSlides.set(i, slide);
-                persistContentState();
-                return ResponseEntity.ok(slide);
-            }
-        }
-        slide.put("id", id);
-        heroSlides.add(slide);
-        persistContentState();
-        return ResponseEntity.ok(slide);
+        return ResponseEntity.ok(siteContentService.updateSlide(id, slide));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping({"/slides/{id}", "/admin/slides/{id}"})
     public ResponseEntity<Void> deleteSlide(@PathVariable String id) {
-        heroSlides.removeIf(s -> id.equals(s.get("id")));
-        persistContentState();
+        siteContentService.deleteSlide(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -679,33 +224,25 @@ public class ContentDataController {
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping({"/ai-owner", "/admin/ai-owner"})
     public ResponseEntity<Map<String, Object>> updateAiOwner(@RequestBody Map<String, Object> owner) {
-        aiOwnerSection.putAll(owner);
-        persistContentState();
-        return ResponseEntity.ok(aiOwnerSection);
+        return ResponseEntity.ok(siteContentService.updateAiOwner(owner));
     }
 
     // --- REVIEWS CRUD ---
     @GetMapping({"/reviews", "/admin/reviews"})
     public ResponseEntity<List<Map<String, Object>>> getReviews() {
-        return ResponseEntity.ok(reviews);
+        return ResponseEntity.ok(siteContentService.getReviews());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PostMapping({"/reviews", "/admin/reviews"})
     public ResponseEntity<Map<String, Object>> addReview(@RequestBody Map<String, Object> review) {
-        if (!review.containsKey("id") || review.get("id") == null) {
-            review.put("id", "rev-" + System.currentTimeMillis());
-        }
-        reviews.add(review);
-        persistContentState();
-        return ResponseEntity.status(HttpStatus.CREATED).body(review);
+        return ResponseEntity.status(HttpStatus.CREATED).body(siteContentService.addReview(review));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping({"/reviews/{id}", "/admin/reviews/{id}"})
     public ResponseEntity<Void> deleteReview(@PathVariable String id) {
-        reviews.removeIf(r -> id.equals(r.get("id")));
-        persistContentState();
+        siteContentService.deleteReview(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -713,35 +250,52 @@ public class ContentDataController {
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping({"/announcement", "/admin/announcement"})
     public ResponseEntity<Map<String, Object>> updateAnnouncement(@RequestBody Map<String, Object> ann) {
-        announcement.putAll(ann);
-        persistContentState();
-        return ResponseEntity.ok(announcement);
+        return ResponseEntity.ok(siteContentService.updateAnnouncement(ann));
     }
 
     // --- WORK REQUESTS ---
     @GetMapping("/work-requests")
-    public ResponseEntity<List<WorkRequestResponseDto>> getWorkRequests(@RequestParam(required = false) String email) {
+    public ResponseEntity<List<WorkRequestResponseDto>> getWorkRequests(
+            @RequestParam(required = false) String email,
+            Principal principal) {
         if (email != null && (!InputSanitizer.isSqlSafe(email) || !InputSanitizer.isXssSafe(email))) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(workRequestService.getWorkRequests(email));
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(workRequestService.getWorkRequests(principal.getName(), email));
     }
 
     @PostMapping("/work-requests")
-    public ResponseEntity<WorkRequestResponseDto> createWorkRequest(
+    public ResponseEntity<?> createWorkRequest(
             @Valid @RequestBody WorkRequestDto requestDto,
             Principal principal) {
+        if (platformConfigService != null && platformConfigService.isPlatformInMaintenance("customer_web")) {
+            Map<String, Object> maint = platformConfigService.getMaintenanceStatus("customer_web");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                    "error", "Service booking is currently unavailable due to maintenance.",
+                    "code", "MAINTENANCE_ACTIVE",
+                    "maintenanceTitle", maint.getOrDefault("title", "Platform Maintenance in Progress"),
+                    "message", maint.getOrDefault("message", "We are currently performing scheduled maintenance.")
+            ));
+        }
         String authEmail = principal != null ? principal.getName() : null;
         WorkRequestResponseDto created = workRequestService.createWorkRequest(requestDto, authEmail);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/work-requests/{id}")
-    public ResponseEntity<WorkRequestResponseDto> getWorkRequestById(@PathVariable String id) {
+    public ResponseEntity<WorkRequestResponseDto> getWorkRequestById(
+            @PathVariable String id,
+            Principal principal) {
         if (!InputSanitizer.isSqlSafe(id)) {
             return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(workRequestService.getWorkRequestById(id));
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(workRequestService.getWorkRequestById(id, principal.getName()));
     }
 
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
@@ -812,12 +366,14 @@ public class ContentDataController {
         if (!InputSanitizer.isSqlSafe(id)) {
             return ResponseEntity.badRequest().build();
         }
-        String customerEmail = principal != null ? principal.getName() : null;
-        return ResponseEntity.ok(workRequestService.getCustomerCompletionOtp(id, customerEmail));
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(workRequestService.getCustomerCompletionOtp(id, principal.getName()));
     }
 
     @PostMapping("/work-requests/{id}/review")
-    public ResponseEntity<com.apexservices.model.Review> submitReview(
+    public ResponseEntity<Review> submitReview(
             @PathVariable String id,
             @RequestBody Map<String, Object> payload,
             Principal principal) {
@@ -832,13 +388,11 @@ public class ContentDataController {
     }
 
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
-    @PostMapping(value = "/partners/profile/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/partners/profile/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> uploadPartnerAvatar(
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam("file") MultipartFile file,
             Principal principal) {
-        com.apexservices.model.User partner = userRepository.findByEmail(principal.getName().trim().toLowerCase())
-                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
-        String avatarUrl = partnerProfileService.uploadAvatar(partner.getId(), file);
+        String avatarUrl = partnerProfileService.uploadAvatar(principal.getName(), file);
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("success", true);
         res.put("avatarUrl", avatarUrl);
@@ -847,34 +401,30 @@ public class ContentDataController {
 
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
     @GetMapping("/partners/profile")
-    public ResponseEntity<com.apexservices.model.PartnerProfile> getPartnerProfile(Principal principal) {
-        com.apexservices.model.User partner = userRepository.findByEmail(principal.getName().trim().toLowerCase())
-                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
-        return ResponseEntity.ok(partnerProfileService.getOrCreatePartnerProfile(partner.getId()));
+    public ResponseEntity<PartnerProfile> getPartnerProfile(Principal principal) {
+        return ResponseEntity.ok(partnerProfileService.getOrCreatePartnerProfile(principal.getName()));
     }
 
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
     @PutMapping("/partners/profile")
-    public ResponseEntity<com.apexservices.model.PartnerProfile> updatePartnerProfile(
+    public ResponseEntity<PartnerProfile> updatePartnerProfile(
             @RequestBody Map<String, Object> updates,
             Principal principal) {
-        com.apexservices.model.User partner = userRepository.findByEmail(principal.getName().trim().toLowerCase())
-                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
-        return ResponseEntity.ok(partnerProfileService.updateProfile(partner.getId(), updates));
+        return ResponseEntity.ok(partnerProfileService.updateProfile(principal.getName(), updates));
     }
 
     @GetMapping("/public/avatars/{fileName:.+}")
-    public ResponseEntity<org.springframework.core.io.Resource> getAvatarFile(@PathVariable String fileName) {
+    public ResponseEntity<Resource> getAvatarFile(@PathVariable String fileName) {
         if (!InputSanitizer.isSqlSafe(fileName) || fileName.contains("..")) {
             return ResponseEntity.badRequest().build();
         }
         try {
-            java.nio.file.Path filePath = java.nio.file.Paths.get("uploads/avatars").resolve(fileName).normalize();
-            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(filePath.toUri());
+            Path filePath = Paths.get("uploads/avatars").resolve(fileName).normalize();
+            Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists() && resource.isReadable()) {
-                String contentType = java.nio.file.Files.probeContentType(filePath);
+                String contentType = Files.probeContentType(filePath);
                 return ResponseEntity.ok()
-                        .contentType(org.springframework.http.MediaType.parseMediaType(contentType != null ? contentType : "image/jpeg"))
+                        .contentType(MediaType.parseMediaType(contentType != null ? contentType : "image/jpeg"))
                         .body(resource);
             } else {
                 return ResponseEntity.notFound().build();
@@ -891,8 +441,10 @@ public class ContentDataController {
         if (!InputSanitizer.isSqlSafe(id)) {
             return ResponseEntity.badRequest().build();
         }
-        String userEmail = principal != null ? principal.getName() : null;
-        return ResponseEntity.ok(workRequestService.cancelWorkRequest(id, userEmail));
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        return ResponseEntity.ok(workRequestService.cancelWorkRequest(id, principal.getName()));
     }
 
     @PostMapping("/work-requests/{id}/pay")

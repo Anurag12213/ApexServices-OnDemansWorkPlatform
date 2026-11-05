@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import {
   Wrench,
@@ -94,6 +94,26 @@ export const RequestWorkPage = () => {
       });
     }
   };
+
+  // Pure memoized available dates (ARCH-03: prevents impure Date.now() during JSX render)
+  const availableDateOptions = useMemo(() => {
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    const baseTime = base.getTime();
+    return [0, 1, 2, 3].map((daysAhead) => {
+      const dateObj = new Date(baseTime + daysAhead * 86400000);
+      const dateStr = dateObj.toISOString().split('T')[0];
+      const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+      const monthDay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      return {
+        daysAhead,
+        dateStr,
+        dayName,
+        monthDay,
+        label: daysAhead === 0 ? 'Today' : daysAhead === 1 ? 'Tomorrow' : dayName,
+      };
+    });
+  }, []);
 
   // Search filter for Screen 1
   const [categorySearch, setCategorySearch] = useState('');
@@ -471,8 +491,7 @@ export const RequestWorkPage = () => {
       }
     };
 
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
+    const interval = setInterval(fetchStatus, 15000);
 
     return () => {
       isMounted = false;
@@ -480,17 +499,42 @@ export const RequestWorkPage = () => {
     };
   }, [activeTrackingRequestId, customerToken, activeBookingStep]);
 
-  // Handle Photo upload
+  // Handle Photo upload with client-side canvas compression (keeps photo under 80KB)
   const handlePhotoUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result);
-        updateBookingDraft({ photoUrl: reader.result });
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 800;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+        setPhotoPreview(compressedBase64);
+        updateBookingDraft({ photoUrl: compressedBase64 });
       };
-      reader.readAsDataURL(file);
-    }
+      img.onerror = () => {
+        setPhotoPreview(event.target.result);
+        updateBookingDraft({ photoUrl: event.target.result });
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleRemovePhoto = () => {
@@ -2241,11 +2285,7 @@ export const RequestWorkPage = () => {
                         Available Dates
                       </label>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                        {[0, 1, 2, 3].map((daysAhead) => {
-                          const dateObj = new Date(Date.now() + daysAhead * 86400000);
-                          const dateStr = dateObj.toISOString().split('T')[0];
-                          const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
-                          const monthDay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        {availableDateOptions.map(({ daysAhead, dateStr, label, monthDay }) => {
                           const isSelected = bookingDraft.preferredDate === dateStr;
 
                           return (
@@ -2263,7 +2303,7 @@ export const RequestWorkPage = () => {
                               }`}
                             >
                               <span className="text-[10px] uppercase tracking-wider block opacity-75">
-                                {daysAhead === 0 ? 'Today' : daysAhead === 1 ? 'Tomorrow' : dayName}
+                                {label}
                               </span>
                               <span className="text-xs font-black block mt-0.5">
                                 {monthDay}

@@ -1,8 +1,35 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initialData } from '../data/initialData';
 import { API_BASE_URL } from '../utils/apiConfig';
 
 const DataContext = createContext();
+
+const CACHE_KEY = 'apex_bootstrap_v2';
+const LEGACY_CACHE_KEYS = ['apex_cached_presentation_data', 'apex_etag'];
+
+const defaultPublicConfig = {
+  appName: 'InstantWork Services Hub',
+  supportEmail: 'support@instantwork.com',
+  supportPhone: '+91 1800 200 4567',
+  defaultCountry: 'India',
+  defaultCurrency: 'INR',
+  currencySymbol: '₹',
+  defaultLocale: 'en-IN',
+  timezone: 'Asia/Kolkata',
+  baseVisitFee: 299,
+  maintenance: {
+    enabled: false,
+    title: "We'll be back shortly.",
+    message: 'InstantWork is undergoing scheduled maintenance.',
+    scope: 'ALL',
+  },
+  bookingRules: {
+    minNoticeHours: 2,
+    maxAttachmentSizeMb: 5,
+    requirePhotos: false,
+    cancellationAllowedWindowHours: 1,
+  },
+};
 
 const initialBookingDraft = {
   serviceCategory: 'Emergency Plumbing',
@@ -51,23 +78,49 @@ const mergeCategoryImages = (categories, serverMap = {}) => {
   }));
 };
 
+const readCachedBootstrap = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return null;
+  try {
+    // Purge legacy cache keys
+    for (const key of LEGACY_CACHE_KEYS) {
+      localStorage.removeItem(key);
+    }
+    const saved = localStorage.getItem(CACHE_KEY);
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed && parsed.data && parsed.data.heroSlides && Array.isArray(parsed.data.categories)) {
+      return parsed; // { etag, timestamp, data }
+    }
+  } catch (e) {
+    console.warn('Failed to parse cached bootstrap:', e);
+  }
+  return null;
+};
+
+const writeCachedBootstrap = (etag, data) => {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({
+        etag: etag || null,
+        timestamp: Date.now(),
+        data,
+      })
+    );
+  } catch (e) {
+    console.warn('Failed to write cached presentation data:', e);
+  }
+};
+
 export const DataProvider = ({ children }) => {
   const [data, setData] = useState(() => {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const cached = localStorage.getItem('apex_cached_presentation_data');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.heroSlides) {
-            if (parsed.categories) {
-              parsed.categories = mergeCategoryImages(parsed.categories);
-            }
-            return parsed;
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to read cached presentation data:', e);
+    const cachedEntry = readCachedBootstrap();
+    if (cachedEntry && cachedEntry.data) {
+      if (cachedEntry.data.categories) {
+        cachedEntry.data.categories = mergeCategoryImages(cachedEntry.data.categories);
       }
+      return cachedEntry.data;
     }
     const initialWithImages = { ...initialData };
     if (initialWithImages.categories) {
@@ -76,7 +129,10 @@ export const DataProvider = ({ children }) => {
     return initialWithImages;
   });
   const [activePage, setActivePage] = useState('home');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    const cachedEntry = readCachedBootstrap();
+    return !Boolean(cachedEntry?.data);
+  });
 
   // Customer Authentication State
   const [customerUser, setCustomerUser] = useState(() => {
@@ -210,23 +266,67 @@ export const DataProvider = ({ children }) => {
     }
   };
 
-  const isFetchingRef = React.useRef(false);
-  const lastDataHashRef = React.useRef('');
+  const isFetchingRef = useRef(false);
+  const lastDataHashRef = useRef('');
+  const retryCountRef = useRef(0);
+  const abortControllerRef = useRef(null);
+  const [coldStartStatus, setColdStartStatus] = useState({ isWaking: false, retryCount: 0 });
 
-  // Fetch Public Presentation Data with Deduplication
-  const fetchApiData = async () => {
+  // Fetch Public Presentation Data with SWR (apex_bootstrap_v2), ETag and Cold-Start Recovery
+  const fetchApiData = async (isRetry = false) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
+
+    // In-flight request cancellation setup
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch {}
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const res = await fetch(`${API_BASE_URL}/data`, { cache: 'no-store' });
+      const cached = readCachedBootstrap();
+      const headers = {};
+      // Strict coupling: Send If-None-Match ONLY if both cached ETag and valid cached data exist
+      if (cached?.etag && cached?.data) {
+        headers['If-None-Match'] = cached.etag;
+      }
+
+      const res = await fetch(`${API_BASE_URL}/data`, {
+        headers,
+        signal: controller.signal,
+      });
+
+      // 1. HTTP 304 Not Modified: Cache is perfectly fresh; touch timestamp without React re-render
+      if (res.status === 304) {
+        if (cached?.data) {
+          writeCachedBootstrap(cached.etag, cached.data);
+        }
+        setColdStartStatus({ isWaking: false, retryCount: 0 });
+        retryCountRef.current = 0;
+        return;
+      }
+
+      // 2. HTTP 200 OK: Process and cache new server payload
       if (res.ok) {
+        const etagHeader = res.headers.get('ETag') || res.headers.get('etag');
         const text = await res.text();
+
         // Skip re-rendering if server data has not changed
         if (text === lastDataHashRef.current) {
+          if (cached?.data) {
+            writeCachedBootstrap(etagHeader || cached.etag, cached.data);
+          }
+          setColdStartStatus({ isWaking: false, retryCount: 0 });
+          retryCountRef.current = 0;
           return;
         }
+
         lastDataHashRef.current = text;
         const result = JSON.parse(text);
+
         if (result && result.heroSlides) {
           const serverCategoryImages =
             result.siteBranding?.categoryImages ||
@@ -235,19 +335,47 @@ export const DataProvider = ({ children }) => {
           if (result.categories) {
             result.categories = mergeCategoryImages(result.categories, serverCategoryImages);
           }
+          // Store coupled ETag + timestamp + normalized data
+          writeCachedBootstrap(etagHeader, result);
           setData(result);
-          try {
-            localStorage.setItem('apex_cached_presentation_data', JSON.stringify(result));
-          } catch (e) {
-            console.warn('Failed to cache presentation data:', e);
-          }
         }
+        setColdStartStatus({ isWaking: false, retryCount: 0 });
+        retryCountRef.current = 0;
+      } else if (res.status >= 500 && retryCountRef.current < 3) {
+        // Render cold start (502/503/504): exponential backoff (2s, 4s, 8s)
+        handleColdStartRetry();
       }
     } catch (err) {
-      console.warn('Backend API server unreachable, using cached data:', err);
+      if (err.name === 'AbortError') {
+        return; // Normal cancellation
+      }
+      if (retryCountRef.current < 3) {
+        handleColdStartRetry();
+      } else {
+        console.warn('Backend API server unreachable, serving from local cache:', err);
+        setColdStartStatus({ isWaking: false, retryCount: retryCountRef.current, error: 'Server unreachable' });
+      }
     } finally {
       isFetchingRef.current = false;
       setLoading(false);
+    }
+  };
+
+  const handleColdStartRetry = () => {
+    retryCountRef.current += 1;
+    const backoffMs = Math.min(8000, Math.pow(2, retryCountRef.current) * 1000);
+    setColdStartStatus({ isWaking: true, retryCount: retryCountRef.current });
+    setTimeout(() => {
+      fetchApiData(true);
+    }, backoffMs);
+  };
+
+  // Revalidate only when cache is older than minAgeMs (default 60s)
+  const revalidateIfStale = (minAgeMs = 60000) => {
+    const cached = readCachedBootstrap();
+    const age = Date.now() - (cached?.timestamp || 0);
+    if (age > minAgeMs) {
+      fetchApiData();
     }
   };
 
@@ -267,12 +395,13 @@ export const DataProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    // Initial fetch (if cache exists, this acts as background revalidation)
     fetchApiData();
     if (customerUser?.email) {
       fetchCustomerRequests(customerUser.email);
     }
 
-    // Cross-tab real-time sync
+    // Cross-tab real-time sync via BroadcastChannel
     let syncChannel;
     try {
       syncChannel = new BroadcastChannel('apex_services_sync');
@@ -298,21 +427,33 @@ export const DataProvider = ({ children }) => {
       console.warn('BroadcastChannel error', e);
     }
 
-    const handleFocus = () => fetchApiData();
+    // Throttled revalidation on focus & visibility changes (minimum 60s interval)
+    const handleFocus = () => revalidateIfStale(60000);
+    const handleVisibility = () => {
+      if (!document.hidden) revalidateIfStale(60000);
+    };
     const handleStorage = (e) => {
       if (e.key === 'apex_custom_branding' || e.key === 'apex_category_images') {
         fetchApiData();
       }
     };
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('storage', handleStorage);
 
-    // 30s background heartbeat (instead of heavy 4s spam) - sync is instant on focus/broadcast
-    const interval = setInterval(fetchApiData, 30000);
+    // 60s background heartbeat (only if tab is visible)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      revalidateIfStale(60000);
+    }, 60000);
 
     return () => {
+      if (abortControllerRef.current) {
+        try { abortControllerRef.current.abort(); } catch {}
+      }
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('storage', handleStorage);
       if (syncChannel) syncChannel.close();
     };
@@ -403,18 +544,24 @@ export const DataProvider = ({ children }) => {
   // Customer Logout
   const logoutCustomer = () => {
     const name = customerUser?.fullName || 'Customer';
-    const currentToken = customerToken || localStorage.getItem('apex_customer_token');
+    const currentToken = customerToken || (typeof window !== 'undefined' ? localStorage.getItem('apex_customer_token') : null);
     
-    // Invalidate session on server
-    if (currentToken) {
-      fetch(`${API_BASE}/auth/logout`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${currentToken}` }
-      }).catch(err => console.warn('Server logout notification failed', err));
+    // Invalidate session on server (fire & forget, don't block client logout)
+    if (currentToken && typeof window !== 'undefined') {
+      try {
+        fetch(`${API_BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` }
+        }).catch(err => console.warn('Server logout notification failed', err));
+      } catch (err) {
+        console.warn('Logout fetch failed:', err);
+      }
     }
 
-    localStorage.removeItem('apex_customer_user');
-    localStorage.removeItem('apex_customer_token');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('apex_customer_user');
+      localStorage.removeItem('apex_customer_token');
+    }
     setCustomerUser(null);
     setCustomerToken(null);
     setCustomerRequests([]);
@@ -423,15 +570,15 @@ export const DataProvider = ({ children }) => {
   };
 
   // Live vs History request classification: only active in-flight jobs are live. Completed or cancelled requests go to history.
-  const isLiveRequest = (req) => {
+  const isLiveRequest = useCallback((req) => {
     if (!req) return false;
     if (req.status === 'CANCELLED' || req.status === 'EXPIRED') return false;
     if (req.status === 'COMPLETED') return false;
     return true;
-  };
+  }, []);
 
-  const liveRequests = customerRequests.filter(isLiveRequest);
-  const historyRequests = customerRequests.filter((req) => !isLiveRequest(req));
+  const liveRequests = useMemo(() => customerRequests.filter(isLiveRequest), [customerRequests, isLiveRequest]);
+  const historyRequests = useMemo(() => customerRequests.filter((req) => !isLiveRequest(req)), [customerRequests, isLiveRequest]);
   const hasLiveRequest = liveRequests.length > 0;
   const mostRecentLiveRequest = liveRequests[0] || null;
 
@@ -476,41 +623,14 @@ export const DataProvider = ({ children }) => {
     setActivePage('request-work');
   };
 
-  // Submit Work Request with Mandatory Backend Authentication
+  // Submit Work Request
   const submitWorkRequest = async (draftData) => {
-    let token = customerToken;
-    let user = customerUser;
-
-    // Auto-authenticate as verified customer if not signed in
-    if (!token) {
-      try {
-        const loginRes = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ identifier: 'customer@apexservices.com', password: 'customer123' })
-        });
-        if (loginRes.ok) {
-          const authData = await loginRes.json();
-          token = authData.token;
-          user = authData.user || { fullName: 'Valued Customer', email: 'customer@apexservices.com', mobileNumber: '9876543210' };
-          localStorage.setItem('apex_customer_token', token);
-          localStorage.setItem('apex_customer_user', JSON.stringify(user));
-          setCustomerToken(token);
-          setCustomerUser(user);
-        }
-      } catch (e) {
-        console.warn('Auto-login fallback error:', e);
-      }
-    }
-
-    if (!user) {
-      user = { fullName: 'Valued Customer', email: 'customer@apexservices.com', mobileNumber: '9876543210' };
-    }
+    const token = customerToken;
 
     // Sanitize phone number safely: extract digits
-    const rawContact = draftData.contactPhone || (customerUser && (customerUser.mobileNumber || customerUser.phone)) || '9876543210';
+    const rawContact = draftData.contactPhone || (customerUser && (customerUser.mobileNumber || customerUser.phone)) || '';
     const cleanedDigits = String(rawContact).replace(/\D/g, '');
-    const sanitizedPhone = cleanedDigits.length >= 10 ? (cleanedDigits.startsWith('91') && cleanedDigits.length > 10 ? `+${cleanedDigits}` : cleanedDigits.slice(-10)) : '9876543210';
+    const sanitizedPhone = cleanedDigits.length >= 10 ? (cleanedDigits.startsWith('91') && cleanedDigits.length > 10 ? `+${cleanedDigits}` : cleanedDigits.slice(-10)) : (draftData.contactPhone || '9876543210');
 
     try {
       // Find matching category object
@@ -523,11 +643,14 @@ export const DataProvider = ({ children }) => {
       const categoryName = matchedCategory ? matchedCategory.name : draftData.serviceCategory;
       const categoryId = draftData.serviceCategoryId || (matchedCategory ? matchedCategory.id : null);
 
+      const customerName = (customerUser && customerUser.fullName) || draftData.customerName || 'Valued Customer';
+      const customerEmail = (customerUser && customerUser.email) || draftData.customerEmail || (draftData.email ? draftData.email.trim() : null);
+
       const payload = {
         serviceCategoryId: categoryId,
         serviceCategory: categoryName,
-        customerName: (customerUser && customerUser.fullName) || (user && user.fullName) || 'Valued Customer',
-        customerEmail: (customerUser && customerUser.email) || (user && user.email) || 'customer@apexservices.com',
+        customerName: customerName,
+        customerEmail: customerEmail,
         contactPhone: sanitizedPhone,
         problemType: draftData.problemType,
         problemTitle: draftData.problemTitle,
@@ -548,18 +671,37 @@ export const DataProvider = ({ children }) => {
         notes: draftData.notes,
       };
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${API_BASE_URL}/work-requests`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || customerToken}`,
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
       const resData = await res.json();
 
       if (res.ok) {
+        if (resData.customerToken && !customerToken) {
+          const userObj = {
+            id: resData.customerId,
+            fullName: resData.customerName,
+            email: resData.customerEmail,
+            mobileNumber: resData.contactPhone,
+            role: 'ROLE_CUSTOMER'
+          };
+          setCustomerToken(resData.customerToken);
+          setCustomerUser(userObj);
+          try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+              localStorage.setItem('apex_customer_token', resData.customerToken);
+              localStorage.setItem('apex_customer_user', JSON.stringify(userObj));
+            }
+          } catch (e) {}
+        }
         setCustomerRequests((prev) => [resData, ...prev]);
         setActiveTrackingRequestId(resData.id);
         clearBookingDraft();
@@ -589,31 +731,11 @@ export const DataProvider = ({ children }) => {
     }
   };
 
-  const publicConfig = data?.publicConfig || {
-    appName: 'InstantWork Services Hub',
-    supportEmail: 'support@instantwork.com',
-    supportPhone: '+91 1800 200 4567',
-    defaultCountry: 'India',
-    defaultCurrency: 'INR',
-    currencySymbol: '₹',
-    defaultLocale: 'en-IN',
-    timezone: 'Asia/Kolkata',
-    baseVisitFee: 299,
-    maintenance: {
-      enabled: false,
-      title: "We'll be back shortly.",
-      message: 'InstantWork is undergoing scheduled maintenance.',
-      scope: 'ALL',
-    },
-    bookingRules: {
-      minNoticeHours: 2,
-      maxAttachmentSizeMb: 5,
-      requirePhotos: false,
-      cancellationAllowedWindowHours: 1,
-    },
-  };
+  const publicConfig = useMemo(() => {
+    return data?.publicConfig || defaultPublicConfig;
+  }, [data?.publicConfig]);
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = useCallback((amount) => {
     if (amount === undefined || amount === null || isNaN(Number(amount))) {
       return `${publicConfig.currencySymbol || '₹'}0`;
     }
@@ -628,78 +750,102 @@ export const DataProvider = ({ children }) => {
     } catch (e) {
       return `${publicConfig.currencySymbol || '₹'}${num.toFixed(0)}`;
     }
-  };
+  }, [publicConfig.currencySymbol, publicConfig.defaultLocale, publicConfig.defaultCurrency]);
 
-  const siteBranding = {
-    ...initialData.siteBranding,
-    ...(() => {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        try {
-          const cached = localStorage.getItem('apex_custom_branding');
-          return cached ? JSON.parse(cached) : {};
-        } catch {
-          return {};
-        }
-      }
-      return {};
-    })(),
-    ...(data?.publicConfig || {}),
-    ...(data?.siteBranding || {}),
-  };
+  const siteBranding = useMemo(() => {
+    let customBranding = {};
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const cached = localStorage.getItem('apex_custom_branding');
+        if (cached) customBranding = JSON.parse(cached);
+      } catch {}
+    }
+    return {
+      ...initialData.siteBranding,
+      ...customBranding,
+      ...(data?.publicConfig || {}),
+      ...(data?.siteBranding || {}),
+    };
+  }, [data?.publicConfig, data?.siteBranding]);
+
+  const contextValue = useMemo(() => ({
+    data,
+    activePage,
+    setActivePage,
+    loading,
+    coldStartStatus,
+    refreshData: fetchApiData,
+    // Public Config, Site Branding & Currency
+    publicConfig,
+    siteBranding,
+    formatCurrency,
+    // Customer Auth
+    customerUser,
+    customerToken,
+    selectedCategory,
+    setSelectedCategory,
+    customerRequests,
+    liveRequests,
+    historyRequests,
+    hasLiveRequest,
+    mostRecentLiveRequest,
+    customerViewMode,
+    setCustomerViewMode,
+    customerRequestsTab,
+    setCustomerRequestsTab,
+    handleViewAllRequests,
+    handleTrackLiveRequest,
+    loginCustomer,
+    registerCustomer,
+    logoutCustomer,
+    // Booking Flow & Draft
+    bookingDraft,
+    updateBookingDraft,
+    clearBookingDraft,
+    activeBookingStep,
+    setActiveBookingStep,
+    activeTrackingRequestId,
+    setActiveTrackingRequestId,
+    loginBannerMessage,
+    setLoginBannerMessage,
+    loginSuccessNotice,
+    setLoginSuccessNotice,
+    handleInitiateRequestWork,
+    submitWorkRequest,
+    fetchCustomerRequests,
+    // Toast Notifications
+    toasts,
+    showToast,
+    toast,
+    dismissToast,
+  }), [
+    data,
+    activePage,
+    loading,
+    coldStartStatus,
+    publicConfig,
+    siteBranding,
+    formatCurrency,
+    customerUser,
+    customerToken,
+    selectedCategory,
+    customerRequests,
+    liveRequests,
+    historyRequests,
+    hasLiveRequest,
+    mostRecentLiveRequest,
+    customerViewMode,
+    customerRequestsTab,
+    bookingDraft,
+    activeBookingStep,
+    activeTrackingRequestId,
+    loginBannerMessage,
+    loginSuccessNotice,
+    toasts,
+  ]);
 
   return (
-    <DataContext.Provider
-      value={{
-        data,
-        activePage,
-        setActivePage,
-        loading,
-        refreshData: fetchApiData,
-        // Public Config, Site Branding & Currency
-        publicConfig,
-        siteBranding,
-        formatCurrency,
-        // Customer Auth
-        customerUser,
-        customerToken,
-        selectedCategory,
-        setSelectedCategory,
-        customerRequests,
-        liveRequests,
-        historyRequests,
-        hasLiveRequest,
-        mostRecentLiveRequest,
-        customerViewMode,
-        setCustomerViewMode,
-        customerRequestsTab,
-        setCustomerRequestsTab,
-        handleViewAllRequests,
-        handleTrackLiveRequest,
-        loginCustomer,
-        registerCustomer,
-        logoutCustomer,
-        // Booking Flow & Draft
-        bookingDraft,
-        updateBookingDraft,
-        clearBookingDraft,
-        activeBookingStep,
-        setActiveBookingStep,
-        activeTrackingRequestId,
-        setActiveTrackingRequestId,
-        loginBannerMessage,
-        setLoginBannerMessage,
-        loginSuccessNotice,
-        setLoginSuccessNotice,
-        handleInitiateRequestWork,
-        submitWorkRequest,
-        fetchCustomerRequests,
-        // Toast Notifications
-        toasts,
-        showToast,
-        toast,
-        dismissToast,
-      }}
-    >
+    <DataContext.Provider value={contextValue}>
       {children}
     </DataContext.Provider>
   );

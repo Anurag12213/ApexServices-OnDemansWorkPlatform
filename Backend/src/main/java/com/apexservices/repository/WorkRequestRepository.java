@@ -24,6 +24,8 @@ public interface WorkRequestRepository extends JpaRepository<WorkRequest, String
 
     List<WorkRequest> findByAssignedPartnerIdOrderByCreatedAtDesc(Long partnerId);
 
+    List<WorkRequest> findAllByOrderByCreatedAtDesc();
+
     Page<WorkRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     List<WorkRequest> findByStatusOrderByCreatedAtDesc(WorkRequestStatus status);

@@ -8,6 +8,7 @@ export default function RecentActivity() {
 
   useEffect(() => {
     const fetchRequests = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       fetch(`${API_BASE_URL}/work-requests`)
         .then(res => res.json())
         .then(data => {
@@ -21,8 +22,15 @@ export default function RecentActivity() {
     };
 
     fetchRequests();
-    const interval = setInterval(fetchRequests, 3000);
-    return () => clearInterval(interval);
+    const interval = setInterval(fetchRequests, 30000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) fetchRequests();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   const defaultActivities = [

@@ -21,7 +21,7 @@ export const PartnerProvider = ({ children }) => {
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
   const [brandName, setBrandName] = useState(() => {
     try {
-      const cached = localStorage.getItem('apex_custom_branding');
+      const cached = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('apex_custom_branding') : null;
       return cached ? JSON.parse(cached).brandName || 'ApexServices' : 'ApexServices';
     } catch {
       return 'ApexServices';
@@ -59,7 +59,7 @@ export const PartnerProvider = ({ children }) => {
     const apiUrl = (
       (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
       (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
-      'https://apexservices-backend.onrender.com/api'
+      '/api'
     ).replace(/\/+$/, '');
 
     const fetchBranding = () => {
@@ -133,7 +133,7 @@ export const PartnerProvider = ({ children }) => {
             const apiUrl = (
               (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
               (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
-              'https://apexservices-backend.onrender.com/api'
+              '/api'
             ).replace(/\/+$/, '');
             fetch(`${apiUrl}/data`, { cache: 'no-store' })
               .then(res => res.json())
@@ -202,24 +202,38 @@ export const PartnerProvider = ({ children }) => {
     };
   }, [refreshState, toast]);
 
-  // Periodic poll to fetch live partner feed from backend and check for expiring offers
+  // Periodic poll to fetch live partner feed from backend and check for expiring offers (15s interval)
+  const isFeedPollingRef = React.useRef(false);
   useEffect(() => {
     let active = true;
-    const timer = setInterval(async () => {
-      if (partner?.isAvailable && partner?.depositStatus === 'VERIFIED') {
-        try {
-          await api.fetchLiveFeed(); // Poll for all incoming broadcasts across all categories
-        } catch (e) {
-          // Ignore transient poll error
+    const pollFeed = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (isFeedPollingRef.current) return;
+      isFeedPollingRef.current = true;
+      try {
+        if (partner?.isAvailable && partner?.depositStatus === 'VERIFIED') {
+          await api.fetchLiveFeed();
         }
+        if (active) {
+          refreshState();
+        }
+      } catch (e) {
+        // Ignore transient poll error
+      } finally {
+        isFeedPollingRef.current = false;
       }
-      if (active) {
-        refreshState();
-      }
-    }, 2000);
+    };
+
+    pollFeed();
+    const timer = setInterval(pollFeed, 20000);
+    const onVisibility = () => {
+      if (!document.hidden) pollFeed();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       active = false;
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [partner?.isAvailable, partner?.depositStatus, refreshState]);
 
@@ -263,7 +277,7 @@ export const PartnerProvider = ({ children }) => {
     const apiUrl = (
       (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
       (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
-      'https://apexservices-backend.onrender.com/api'
+      '/api'
     ).replace(/\/+$/, '');
     if (currentToken) {
       fetch(`${apiUrl}/auth/logout`, {

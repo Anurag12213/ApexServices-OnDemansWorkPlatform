@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Application Uploads & Runtime State ###
+uploads/
+*.dat

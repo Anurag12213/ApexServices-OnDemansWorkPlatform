@@ -62,6 +62,9 @@ public class WorkRequestResponseDto {
     // Secure Customer Completion Verification Code
     private String completionOtp;
 
+    // Customer JWT Token (populated for guest bookings to authenticate client session)
+    private String customerToken;
+
     public static WorkRequestResponseDto fromEntity(WorkRequest wr) {
         if (wr == null) return null;
 

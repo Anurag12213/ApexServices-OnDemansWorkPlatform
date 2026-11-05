@@ -8,15 +8,13 @@
 export const SERVER_BASE_URL = (
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SERVER_URL) ||
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SERVER_URL) ||
-  (typeof window !== 'undefined' && (process.env?.NODE_ENV === 'production' || import.meta?.env?.PROD)
-    ? 'https://apexservices-backend.onrender.com'
-    : 'http://localhost:8080')
+  ''
 ).replace(/\/+$/, '');
 
 export const API_BASE_URL = (
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
-  `${SERVER_BASE_URL}/api`
+  '/api'
 ).replace(/\/+$/, '');
 
 /**

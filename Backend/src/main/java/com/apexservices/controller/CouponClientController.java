@@ -1,7 +1,5 @@
 package com.apexservices.controller;
 
-import com.apexservices.model.User;
-import com.apexservices.repository.UserRepository;
 import com.apexservices.service.CouponService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.security.Principal;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @RestController
@@ -21,7 +18,6 @@ import java.util.Optional;
 public class CouponClientController {
 
     private final CouponService couponService;
-    private final UserRepository userRepository;
 
     @PostMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateCoupon(
@@ -41,18 +37,9 @@ public class CouponClientController {
 
         String phone = (String) req.get("phone");
         String category = (String) req.get("category");
-        Long userId = null;
+        String principalName = principal != null ? principal.getName() : null;
 
-        if (principal != null) {
-            Optional<User> uOpt = userRepository.findByIdentifier(principal.getName());
-            if (uOpt.isPresent()) {
-                User u = uOpt.get();
-                userId = u.getId();
-                if (phone == null || phone.isBlank()) phone = u.getMobileNumber();
-            }
-        }
-
-        Map<String, Object> validation = couponService.validateCoupon(code, orderAmount, phone, userId, category);
+        Map<String, Object> validation = couponService.validateCouponForPrincipal(code, orderAmount, phone, principalName, category);
         return ResponseEntity.ok(validation);
     }
 }

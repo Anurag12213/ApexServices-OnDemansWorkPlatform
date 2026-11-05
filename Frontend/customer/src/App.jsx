@@ -22,12 +22,12 @@ const MainContent = () => {
   const { activePage, publicConfig, refreshData, toasts, dismissToast } = useData();
 
   // 1. Check Full Platform Maintenance Lockout
-  if (publicConfig?.maintenance?.enabled && publicConfig?.maintenance?.scope === 'ALL') {
+  if (publicConfig?.maintenance?.enabled && (publicConfig?.maintenance?.scope === 'ALL' || !publicConfig?.maintenance?.scope || publicConfig?.maintenance?.scope === 'GLOBAL')) {
     return (
       <MaintenancePage
         config={publicConfig.maintenance}
-        supportEmail={publicConfig.supportEmail}
-        supportPhone={publicConfig.supportPhone}
+        supportEmail={publicConfig.supportEmail || 'support@apexservices.com'}
+        supportPhone={publicConfig.supportPhone || '+91 1800 200 4567'}
         onRefresh={refreshData}
       />
     );
@@ -39,8 +39,8 @@ const MainContent = () => {
       return (
         <MaintenancePage
           config={publicConfig.maintenance}
-          supportEmail={publicConfig.supportEmail}
-          supportPhone={publicConfig.supportPhone}
+          supportEmail={publicConfig.supportEmail || 'support@apexservices.com'}
+          supportPhone={publicConfig.supportPhone || '+91 1800 200 4567'}
           onRefresh={refreshData}
         />
       );

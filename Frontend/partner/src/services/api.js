@@ -3,16 +3,10 @@
 // and atomic persistence for all partner workflows.
 
 const getApiBase = () => {
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    if (host !== 'localhost' && host !== '127.0.0.1') {
-      return 'https://apexservices-backend.onrender.com/api';
-    }
-  }
   return (
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
     (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) ||
-    'https://apexservices-backend.onrender.com/api'
+    '/api'
   ).replace(/\/+$/, '');
 };
 
@@ -306,6 +300,23 @@ class ApiClient {
       console.warn('Backend partner register sync notice:', e);
     }
 
+    state.partner = newPartner;
+
+    // Seed welcoming notifications
+    state.notifications = [
+      {
+        id: 'NOTIF-' + Date.now(),
+        category: 'DEPOSIT',
+        title: 'Complete Security Deposit',
+        message: `Please complete your mandatory ₹${depositPolicy.amount.toLocaleString('en-IN')} security deposit to proceed with verification.`,
+        timestamp: new Date().toISOString(),
+        read: false,
+        actionLink: '/deposit'
+      }
+    ];
+
+    this.saveState(state);
+    return { success: true, partner: newPartner, token };
   }
 
   // Centralized Email OTP Verification Methods (Backend-only)
@@ -394,24 +405,6 @@ class ApiClient {
     } catch (err) {
       return { success: false, error: 'Network error resetting password.' };
     }
-
-    state.partner = newPartner;
-
-    // Seed welcoming notifications
-    state.notifications = [
-      {
-        id: 'NOTIF-' + Date.now(),
-        category: 'DEPOSIT',
-        title: 'Complete Security Deposit',
-        message: `Please complete your mandatory ₹${depositPolicy.amount.toLocaleString('en-IN')} security deposit to proceed with verification.`,
-        timestamp: new Date().toISOString(),
-        read: false,
-        actionLink: '/deposit'
-      }
-    ];
-
-    this.saveState(state);
-    return { success: true, partner: newPartner, token };
   }
 
   // 3. Auth: Login with Onboarding-Aware State and Backend Token Sync
@@ -448,13 +441,13 @@ class ApiClient {
           gstin: isOrg ? '27AABCA1234F1Z5' : null,
           category: userCategories.join(', '),
           serviceCategories: userCategories,
-          territory: 'Mumbai West (Andheri - Bandra)',
+          territory: user.operatingTerritory || 'Mumbai West (Andheri - Bandra)',
           serviceRadiusKm: 15,
-          onboardingState: 'APPROVED',
-          depositStatus: 'VERIFIED',
-          isAvailable: true,
-          rating: 5.0,
-          completedJobsCount: 0,
+          onboardingState: user.onboardingState || (user.isActive ? 'APPROVED' : 'UNDER_REVIEW'),
+          depositStatus: user.depositStatus || (user.isActive ? 'VERIFIED' : 'PAYMENT_PENDING'),
+          isAvailable: user.isActive !== false,
+          rating: user.rating != null ? user.rating : 5.0,
+          completedJobsCount: user.completedJobsCount || 0,
           walletBalance: 0,
           pendingEscrowBalance: 0,
           joinedDate: new Date().toISOString(),
@@ -1070,9 +1063,9 @@ class ApiClient {
           if (profile.avatarKey) {
             state.partner.avatarUrl = profile.avatarKey;
           }
-          state.partner.idVerificationStatus = profile.idVerificationStatus || 'VERIFIED';
-          state.partner.backgroundVerificationStatus = profile.backgroundVerificationStatus || 'VERIFIED';
-          state.partner.trainingVerificationStatus = profile.trainingVerificationStatus || 'VERIFIED';
+          state.partner.idVerificationStatus = profile.idVerificationStatus || 'PENDING';
+          state.partner.backgroundVerificationStatus = profile.backgroundVerificationStatus || 'PENDING';
+          state.partner.trainingVerificationStatus = profile.trainingVerificationStatus || 'PENDING';
           this.saveState(state);
         }
         return profile;

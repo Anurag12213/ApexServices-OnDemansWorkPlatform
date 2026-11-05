@@ -121,14 +121,18 @@ export default function ForceUpdateVersionControlSection() {
   };
 
   const handleToggleMaintenance = (platformKey) => {
+    const nextState = !platforms[platformKey].maintenanceMode;
     setPlatforms((prev) => ({
       ...prev,
       [platformKey]: {
         ...prev[platformKey],
-        maintenanceMode: !prev[platformKey].maintenanceMode
+        maintenanceMode: nextState
       }
     }));
-    toast.warning(`Maintenance mode ${!platforms[platformKey].maintenanceMode ? 'ACTIVATED' : 'DEACTIVATED'} on ${platforms[platformKey].name}`);
+    toast.warning(
+      `Maintenance mode ${nextState ? 'ACTIVATED' : 'DEACTIVATED'} on ${platforms[platformKey].name}. Click "Publish Version Rules" to deploy immediately across all active users.`,
+      'Maintenance Gate'
+    );
   };
 
   const handleSaveVersions = async (e) => {
@@ -141,6 +145,13 @@ export default function ForceUpdateVersionControlSection() {
       });
       if (res.ok) {
         toast.success('App version policies and update gates deployed globally.', 'Version Control Synchronized');
+        try {
+          const syncChannel = new BroadcastChannel('apex_services_sync');
+          syncChannel.postMessage({ type: 'DATA_UPDATED' });
+          syncChannel.close();
+        } catch (e) {
+          console.warn('BroadcastChannel sync failed:', e);
+        }
       } else {
         toast.warning('Saved locally, server returned non-200 status.');
       }

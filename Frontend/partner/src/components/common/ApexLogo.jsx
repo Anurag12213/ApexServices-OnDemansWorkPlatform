@@ -3,7 +3,7 @@ import React from 'react';
 export const ApexLogo = ({ portal = 'partner', className = '', brandName }) => {
   const resolvedBrand = brandName || (() => {
     try {
-      const cached = localStorage.getItem('apex_custom_branding');
+      const cached = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('apex_custom_branding') : null;
       return cached ? JSON.parse(cached).brandName || 'ApexServices' : 'ApexServices';
     } catch {
       return 'ApexServices';

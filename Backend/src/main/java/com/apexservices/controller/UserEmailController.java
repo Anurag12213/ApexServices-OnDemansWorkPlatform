@@ -4,8 +4,6 @@ import com.apexservices.dto.OtpApiResponse;
 import com.apexservices.dto.SendEmailOtpRequest;
 import com.apexservices.dto.VerifyEmailOtpRequest;
 import com.apexservices.model.OtpPurpose;
-import com.apexservices.model.User;
-import com.apexservices.repository.UserRepository;
 import com.apexservices.service.EmailOtpService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -16,7 +14,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,7 +33,6 @@ import java.util.Map;
 public class UserEmailController {
 
     private final EmailOtpService emailOtpService;
-    private final UserRepository userRepository;
 
     /**
      * Dispatch an OTP to the user's requested NEW email address.
@@ -65,7 +61,6 @@ public class UserEmailController {
      */
     @PostMapping("/confirm-change")
     @PreAuthorize("isAuthenticated()")
-    @Transactional
     public ResponseEntity<Map<String, String>> confirmEmailChange(
             @Valid @RequestBody VerifyEmailOtpRequest request,
             @AuthenticationPrincipal UserDetails userDetails
@@ -74,23 +69,7 @@ public class UserEmailController {
             throw new BadCredentialsException("Authentication required to finalize email update.");
         }
 
-        // Verify and obtain grant
-        request.setPurpose(OtpPurpose.EMAIL_CHANGE);
-        OtpApiResponse verifyResponse = emailOtpService.verifyEmailOtp(request);
-
-        // Consume grant and update email on authenticated account
-        String newEmail = request.getEmail().trim().toLowerCase();
-        emailOtpService.validateAndConsumeGrant(newEmail, OtpPurpose.EMAIL_CHANGE, verifyResponse.getVerificationGrant());
-
-        User user = userRepository.findByEmail(userDetails.getUsername())
-                .or(() -> userRepository.findByIdentifier(userDetails.getUsername()))
-                .orElseThrow(() -> new IllegalArgumentException("Authenticated user not found."));
-
-        user.setEmail(newEmail);
-        userRepository.save(user);
-
-        log.info("[USER AUDIT] User [id={}] successfully updated email address", user.getId());
-
+        emailOtpService.confirmEmailChange(userDetails.getUsername(), request);
         return ResponseEntity.ok(Map.of("message", "Email address updated successfully."));
     }
 

@@ -1,12 +1,12 @@
 // Admin Portal Secure API Client with Auto-Authentication Resilience
 export const SERVER_BASE_URL = (
   import.meta.env.VITE_SERVER_URL ||
-  (import.meta.env.PROD ? 'https://apexservices-backend.onrender.com' : 'http://localhost:8080')
+  (import.meta.env.PROD ? '' : 'http://localhost:8080')
 ).replace(/\/+$/, '');
 
 export const API_BASE_URL = (
   import.meta.env.VITE_API_URL ||
-  `${SERVER_BASE_URL}/api`
+  (SERVER_BASE_URL ? `${SERVER_BASE_URL}/api` : '/api')
 ).replace(/\/+$/, '');
 
 export const CUSTOMER_PORTAL_URL = (

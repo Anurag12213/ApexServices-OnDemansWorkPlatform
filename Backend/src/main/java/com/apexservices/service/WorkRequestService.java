@@ -39,6 +39,7 @@ public class WorkRequestService {
     private final PartnerProfileService partnerProfileService;
     private final PaymentAndLedgerService paymentAndLedgerService;
     private final com.apexservices.repository.WorkRequestEventRepository eventRepository;
+    private final com.apexservices.security.JwtService jwtService;
 
     public WorkRequestService(
             WorkRequestRepository workRequestRepository,
@@ -53,6 +54,26 @@ public class WorkRequestService {
             PartnerProfileService partnerProfileService,
             PaymentAndLedgerService paymentAndLedgerService,
             com.apexservices.repository.WorkRequestEventRepository eventRepository) {
+        this(workRequestRepository, rejectionRepository, broadcastRepository, userRepository, categoryRepository,
+                notificationService, presenceService, otpSecurityService, reviewService, partnerProfileService,
+                paymentAndLedgerService, eventRepository, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public WorkRequestService(
+            WorkRequestRepository workRequestRepository,
+            WorkRequestRejectionRepository rejectionRepository,
+            WorkRequestBroadcastRepository broadcastRepository,
+            UserRepository userRepository,
+            CategoryRepository categoryRepository,
+            DispatchNotificationService notificationService,
+            PartnerPresenceService presenceService,
+            OtpSecurityService otpSecurityService,
+            ReviewService reviewService,
+            PartnerProfileService partnerProfileService,
+            PaymentAndLedgerService paymentAndLedgerService,
+            com.apexservices.repository.WorkRequestEventRepository eventRepository,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) com.apexservices.security.JwtService jwtService) {
         this.workRequestRepository = workRequestRepository;
         this.rejectionRepository = rejectionRepository;
         this.broadcastRepository = broadcastRepository;
@@ -65,6 +86,7 @@ public class WorkRequestService {
         this.partnerProfileService = partnerProfileService;
         this.paymentAndLedgerService = paymentAndLedgerService;
         this.eventRepository = eventRepository;
+        this.jwtService = jwtService;
     }
 
     /**
@@ -99,6 +121,30 @@ public class WorkRequestService {
         User customer = null;
         if (email != null) {
             customer = userRepository.findByEmail(email).orElse(null);
+            if (customer == null) {
+                String sanitizedName = dto.getCustomerName() != null && !dto.getCustomerName().isBlank()
+                        ? InputSanitizer.sanitize(dto.getCustomerName())
+                        : "Valued Customer";
+                String phone = dto.getContactPhone() != null ? dto.getContactPhone().trim() : null;
+                if (phone != null && userRepository.findByMobileNumber(phone).isPresent()) {
+                    phone = null;
+                }
+                customer = User.builder()
+                        .fullName(sanitizedName)
+                        .email(email)
+                        .mobileNumber(phone)
+                        .password("$2a$10$" + java.util.UUID.randomUUID().toString().replace("-", "") + "UnUsAbLeGuEsT")
+                        .role(Role.ROLE_CUSTOMER)
+                        .provider(AuthProvider.LOCAL)
+                        .active(true)
+                        .build();
+                try {
+                    customer = userRepository.save(customer);
+                } catch (Exception ex) {
+                    log.warn("Customer auto-provision notice: {}", ex.getMessage());
+                    customer = userRepository.findByEmail(email).orElse(null);
+                }
+            }
         }
 
         BigDecimal cost = new BigDecimal("499.00");
@@ -190,6 +236,18 @@ public class WorkRequestService {
         }
 
         WorkRequestResponseDto responseDto = toResponseDto(wr);
+        if (jwtService != null && customer != null) {
+            try {
+                String token = jwtService.generateToken(
+                        new com.apexservices.security.CustomUserDetails(customer),
+                        customer.getId(),
+                        customer.getRole() != null ? customer.getRole().name() : "ROLE_CUSTOMER"
+                );
+                responseDto.setCustomerToken(token);
+            } catch (Exception e) {
+                log.warn("Could not generate customer token on work request creation: {}", e.getMessage());
+            }
+        }
         // Real-time broadcast to all eligible listening partners
         notificationService.broadcastNewRequest(responseDto);
 
@@ -342,38 +400,95 @@ public class WorkRequestService {
     }
 
     /**
-     * Gets a work request by ID with authoritative completion verification OTP.
+     * Gets a work request by ID with strict role-based ownership authorization.
+     * ONLY the customer who owns the request or an administrator can see the secret completion OTP.
+     * Partners assigned to the request receive the work request details with completionOtp set to NULL.
      */
     @Transactional
-    public WorkRequestResponseDto getWorkRequestById(String id) {
+    public WorkRequestResponseDto getWorkRequestById(String id, String callerEmail) {
         WorkRequest wr = workRequestRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + id));
-        WorkRequestResponseDto dto = toResponseDto(wr);
-        String activeOtp = otpSecurityService.getActiveOtpForCustomer(id);
-        if (activeOtp == null) {
-            activeOtp = otpSecurityService.generateAndStoreOtp(wr);
+
+        if (callerEmail == null || callerEmail.isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException("Authentication required to view work request details.");
         }
-        dto.setCompletionOtp(activeOtp);
+
+        User caller = userRepository.findByEmail(callerEmail.trim().toLowerCase())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+
+        boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
+        boolean isCustomer = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
+        boolean isAssignedPartner = wr.getAssignedPartner() != null && wr.getAssignedPartner().getId().equals(caller.getId());
+
+        if (!isAdmin && !isCustomer && !isAssignedPartner) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not authorized to view work request " + id);
+        }
+
+        WorkRequestResponseDto dto = toResponseDto(wr);
+
+        // Security requirement 2.2: NEVER reveal completion OTP to partner.
+        // Partner must ask customer at completion time; customer provides the OTP verbally/in-person.
+        if (isCustomer || isAdmin) {
+            if (wr.getStatus() != WorkRequestStatus.COMPLETED && wr.getStatus() != WorkRequestStatus.CANCELLED && wr.getStatus() != WorkRequestStatus.EXPIRED) {
+                String activeOtp = otpSecurityService.getActiveOtpForCustomer(id);
+                if (activeOtp == null) {
+                    activeOtp = otpSecurityService.generateAndStoreOtp(wr);
+                }
+                dto.setCompletionOtp(activeOtp);
+            }
+        } else {
+            dto.setCompletionOtp(null);
+        }
+
         return dto;
     }
 
+    public WorkRequestResponseDto getWorkRequestById(String id) {
+        return getWorkRequestById(id, null);
+    }
+
     /**
-     * Gets work requests, optionally filtered by customer email.
+     * Scoped, role-based retrieval of work requests.
+     * Customers only see their own requests.
+     * Partners only see requests assigned to them.
+     * Administrators see scoped or all requests.
+     * Never executes findAll() for unauthenticated or non-admin callers.
      */
     @Transactional(readOnly = true)
-    public List<WorkRequestResponseDto> getWorkRequests(String email) {
+    public List<WorkRequestResponseDto> getWorkRequests(String callerEmail, String filterEmail) {
+        if (callerEmail == null || callerEmail.isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException("Authentication required to access work requests.");
+        }
+
+        User caller = userRepository.findByEmail(callerEmail.trim().toLowerCase())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+
         List<WorkRequest> list;
-        if (email != null && !email.isBlank()) {
-            list = workRequestRepository.findByCustomerEmailOrderByCreatedAtDesc(email.trim().toLowerCase());
+        if (caller.getRole() == Role.ROLE_ADMIN) {
+            if (filterEmail != null && !filterEmail.isBlank()) {
+                list = workRequestRepository.findByCustomerEmailOrderByCreatedAtDesc(filterEmail.trim().toLowerCase());
+            } else {
+                list = workRequestRepository.findAllByOrderByCreatedAtDesc();
+            }
+        } else if (caller.getRole() == Role.ROLE_CUSTOMER) {
+            list = workRequestRepository.findByCustomerEmailOrderByCreatedAtDesc(caller.getEmail());
+        } else if (caller.getRole() == Role.ROLE_PARTNER) {
+            list = workRequestRepository.findByAssignedPartnerIdOrderByCreatedAtDesc(caller.getId());
         } else {
-            list = workRequestRepository.findAll();
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Unauthorized role.");
         }
 
         List<WorkRequestResponseDto> result = new ArrayList<>();
         for (WorkRequest wr : list) {
-            result.add(toResponseDto(wr));
+            WorkRequestResponseDto dto = toResponseDto(wr);
+            dto.setCompletionOtp(null);
+            result.add(dto);
         }
         return result;
+    }
+
+    public List<WorkRequestResponseDto> getWorkRequests(String email) {
+        return getWorkRequests(email, null);
     }
 
     /**
@@ -486,12 +601,31 @@ public class WorkRequestService {
     }
 
     /**
-     * Retrieves the active completion OTP for the customer owner.
+     * Retrieves the active completion OTP strictly for the verified customer owner or admin.
+     * Denies access to unauthenticated callers, partners, or cross-customer attackers.
      */
     @Transactional
     public Map<String, String> getCustomerCompletionOtp(String requestId, String customerEmail) {
+        if (customerEmail == null || customerEmail.isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException("Authentication required to access completion verification code.");
+        }
+
         WorkRequest wr = workRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        User caller = userRepository.findByEmail(customerEmail.trim().toLowerCase())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+
+        boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
+        boolean isOwner = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
+
+        if (!isAdmin && !isOwner) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: Only the customer who booked this service can view the completion OTP.");
+        }
+
+        if (wr.getStatus() == WorkRequestStatus.COMPLETED || wr.getStatus() == WorkRequestStatus.CANCELLED || wr.getStatus() == WorkRequestStatus.EXPIRED) {
+            throw new ConflictException("Completion OTP is not available for request in status: " + wr.getStatus(), "INVALID_STATUS");
+        }
 
         String activeOtp = otpSecurityService.getActiveOtpForCustomer(requestId);
         if (activeOtp == null) {
@@ -527,27 +661,56 @@ public class WorkRequestService {
     }
 
     /**
-     * Cancels a work request.
+     * Cancels a work request with strict caller ownership validation and status boundary enforcement.
      */
     @Transactional
     public WorkRequestResponseDto cancelWorkRequest(String requestId, String userEmail) {
+        if (userEmail == null || userEmail.isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException("Authentication required to cancel a work request.");
+        }
+
         WorkRequest wr = workRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
 
+        User caller = userRepository.findByEmail(userEmail.trim().toLowerCase())
+                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+
+        boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
+        boolean isOwner = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
+
+        if (!isAdmin && !isOwner) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not authorized to cancel this work request.");
+        }
+
+        if (wr.getStatus() == WorkRequestStatus.CANCELLED) {
+            return toResponseDto(wr);
+        }
+
+        if (wr.getStatus() == WorkRequestStatus.COMPLETED) {
+            throw new ConflictException("Cannot cancel an already completed work request.", "COMPLETED_REQUEST");
+        }
+
+        if (wr.getStatus() == WorkRequestStatus.IN_PROGRESS && !isAdmin) {
+            throw new ConflictException("Technician is currently performing service. Please contact customer support to cancel an in-progress request.", "IN_PROGRESS_DISPUTE");
+        }
+
         WorkRequestStatus prev = wr.getStatus();
         wr.setStatus(WorkRequestStatus.CANCELLED);
+        wr.setStage(6);
         wr = workRequestRepository.save(wr);
 
         eventRepository.save(WorkRequestEvent.builder()
                 .workRequest(wr)
                 .fromStatus(prev != null ? prev.name() : null)
                 .toStatus(WorkRequestStatus.CANCELLED.name())
-                .actor(wr.getCustomer())
-                .actorRole("CUSTOMER")
-                .notes("Work request cancelled by customer")
+                .actor(caller)
+                .actorRole(isAdmin ? "ADMIN" : "CUSTOMER")
+                .notes("Work request cancelled by " + (isAdmin ? "administrator" : "customer"))
                 .build());
 
-        return toResponseDto(wr);
+        WorkRequestResponseDto dto = toResponseDto(wr);
+        notificationService.notifyStageUpdated(requestId, dto);
+        return dto;
     }
 
     /**

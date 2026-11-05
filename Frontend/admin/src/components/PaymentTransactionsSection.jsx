@@ -260,6 +260,7 @@ export default function PaymentTransactionsSection() {
   useEffect(() => {
     let isMounted = true;
     const fetchLiveFinancials = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const res = await adminFetch('/work-requests');
         if (res.ok) {
@@ -329,10 +330,15 @@ export default function PaymentTransactionsSection() {
     };
 
     fetchLiveFinancials();
-    const interval = setInterval(fetchLiveFinancials, 6000);
+    const interval = setInterval(fetchLiveFinancials, 30000);
+    const onVisibility = () => {
+      if (!document.hidden) fetchLiveFinancials();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
       isMounted = false;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
 
