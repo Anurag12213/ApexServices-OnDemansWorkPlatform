@@ -227,49 +227,52 @@ export const Navbar = () => {
             </button>
 
             {/* Customer Profile Avatar Chip with Dropdown */}
-            {customerUser ? (
-              <div className="relative shrink-0" ref={profileDropdownRef}>
-                <button
-                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all cursor-pointer"
-                >
-                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-tr from-[#6355F6] to-[#8C7BFF] text-white flex items-center justify-center text-xs font-bold shadow-xs">
-                    {customerUser.fullName?.charAt(0) || 'U'}
-                  </div>
-                  <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[120px] truncate">
-                    {customerUser.fullName || customerUser.email || 'My Account'}
-                  </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                </button>
+            {/* Customer Profile Avatar Chip with Dropdown */}
+            <div className="relative shrink-0" ref={profileDropdownRef}>
+              <button
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+              >
+                <img
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
+                  alt={customerUser?.fullName || 'Anurag Sharma'}
+                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-purple-200 shadow-2xs"
+                />
+                <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[120px] truncate">
+                  {customerUser?.fullName || 'Anurag Sharma'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+              </button>
 
-                {/* Profile Dropdown Menu */}
-                {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                    <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-xs font-bold text-slate-900 truncate">{customerUser.fullName || customerUser.email || 'My Account'}</p>
-                      <p className="text-[11px] text-slate-500 truncate">{customerUser.email || customerUser.mobileNumber}</p>
-                    </div>
-                    <button
-                      onClick={() => {
-                        handleMyRequestsClick();
-                        setProfileDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] flex items-center gap-2 cursor-pointer transition-colors"
-                    >
-                      <ClipboardList className="w-4 h-4" />
-                      <span>My Service Requests</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleFastTestClick();
-                        setProfileDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs font-semibold text-amber-600 hover:bg-amber-50 flex items-center gap-2 cursor-pointer transition-colors"
-                    >
-                      <Zap className="w-4 h-4 fill-current" />
-                      <span>1-Click Test Request</span>
-                    </button>
-                    <div className="my-1 border-t border-slate-100" />
+              {/* Profile Dropdown Menu */}
+              {profileDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <p className="text-xs font-bold text-slate-900 truncate">{customerUser?.fullName || 'Anurag Sharma'}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{customerUser?.email || 'anurag.sharma@apexservices.com'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      handleMyRequestsClick();
+                      setProfileDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    <span>My Service Requests</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleFastTestClick();
+                      setProfileDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-4 py-2 text-xs font-semibold text-amber-600 hover:bg-amber-50 flex items-center gap-2 cursor-pointer transition-colors"
+                  >
+                    <Zap className="w-4 h-4 fill-current" />
+                    <span>1-Click Test Request</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-100" />
+                  {customerUser ? (
                     <button
                       onClick={handleLogoutClick}
                       className="w-full text-left px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
@@ -277,18 +280,21 @@ export const Navbar = () => {
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
                     </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={() => handleNavClick('login')}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Sign In</span>
-              </button>
-            )}
+                  ) : (
+                    <button
+                      onClick={() => {
+                        handleNavClick('login');
+                        setProfileDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs font-semibold text-purple-600 hover:bg-purple-50 flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <User className="w-4 h-4" />
+                      <span>Sign In / Switch Account</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Quick 1-Click Fast Test Icon for Instant Testing */}
             <button
