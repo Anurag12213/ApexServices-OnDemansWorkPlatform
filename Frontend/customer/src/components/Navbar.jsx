@@ -96,8 +96,8 @@ export const Navbar = () => {
       const testPayload = {
         serviceCategoryId: activeCat.id,
         serviceCategory: activeCat.name,
-        customerName: customerUser?.fullName || 'Rahul Sharma',
-        customerEmail: customerUser?.email || 'rahul.sharma@apexservices.com',
+        customerName: customerUser?.fullName || 'Verified Customer',
+        customerEmail: customerUser?.email || 'customer@apexservices.com',
         contactPhone: customerUser?.mobileNumber || customerUser?.phone || '+919876543210',
         problemType: 'General Maintenance & Diagnosis',
         problemTitle: `Fast Test: ${activeCat.name} Quick Inspection`,
@@ -237,7 +237,7 @@ export const Navbar = () => {
                     {customerUser.fullName?.charAt(0) || 'U'}
                   </div>
                   <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[120px] truncate">
-                    {customerUser.fullName || 'Rahul Sharma'}
+                    {customerUser.fullName || customerUser.email || 'My Account'}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
@@ -246,7 +246,7 @@ export const Navbar = () => {
                 {profileDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
                     <div className="px-4 py-2 border-b border-slate-100">
-                      <p className="text-xs font-bold text-slate-900 truncate">{customerUser.fullName || 'Rahul Sharma'}</p>
+                      <p className="text-xs font-bold text-slate-900 truncate">{customerUser.fullName || customerUser.email || 'My Account'}</p>
                       <p className="text-[11px] text-slate-500 truncate">{customerUser.email || customerUser.mobileNumber}</p>
                     </div>
                     <button

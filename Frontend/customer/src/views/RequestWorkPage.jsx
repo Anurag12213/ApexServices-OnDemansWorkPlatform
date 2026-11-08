@@ -56,59 +56,6 @@ import { CategoryIcon } from '../components/CategoryIcon';
 import { useConfirm } from '../components/ConfirmDialog';
 import { API_BASE_URL, getAssetUrl } from '../utils/apiConfig';
 
-const MOCK_SAMPLE_REQUESTS = [
-  {
-    id: '238814',
-    displayId: 'REQ-238814',
-    serviceCategory: 'AC Repair & Service',
-    serviceAddress: 'Sector 62, Noida, Uttar Pradesh',
-    preferredDate: '09 Nov 2026',
-    preferredTime: '9:00 AM – 12:00 PM',
-    status: 'IN_PROGRESS',
-    estimatedCost: 599,
-    paidAmount: 599,
-    assignedPartnerName: 'Ramesh Verma',
-    problemTitle: 'AC cooling issue and indoor unit deep cleaning',
-  },
-  {
-    id: '238809',
-    displayId: 'REQ-238809',
-    serviceCategory: 'Deep Cleaning Service',
-    serviceAddress: 'Indirapuram, Ghaziabad, Uttar Pradesh',
-    preferredDate: '07 Nov 2026',
-    preferredTime: '2:00 PM – 4:00 PM',
-    status: 'COMPLETED',
-    estimatedCost: 399,
-    paidAmount: 399,
-    paymentStatus: 'PAID',
-    assignedPartnerName: 'Sunil Kumar',
-    rating: 5,
-    problemTitle: 'Full home deep sanitization and bathroom cleaning',
-  },
-  {
-    id: '238795',
-    displayId: 'REQ-238795',
-    serviceCategory: 'Electrical Wiring Check',
-    serviceAddress: 'Sector 18, Noida, Uttar Pradesh',
-    preferredDate: '10 Nov 2026',
-    preferredTime: '11:00 AM – 1:00 PM',
-    status: 'POSTED',
-    estimatedCost: 799,
-    problemTitle: 'Master circuit breaker tripping intermittently',
-  },
-  {
-    id: '238760',
-    displayId: 'REQ-238760',
-    serviceCategory: 'Plumbing & Pipe Repair',
-    serviceAddress: 'Sector 50, Noida, Uttar Pradesh',
-    preferredDate: '05 Nov 2026',
-    preferredTime: '10:00 AM – 12:00 PM',
-    status: 'CANCELLED',
-    estimatedCost: 499,
-    problemTitle: 'Bathroom tap leaking beneath sink fixture',
-  },
-];
-
 const getCategoryThumbnail = (req) => {
   if (req?.bannerImageUrl) return req.bannerImageUrl;
   if (req?.categoryImageUrl) return req.categoryImageUrl;
@@ -139,7 +86,7 @@ const getCategoryThumbnail = (req) => {
 
 const getRequestCardMeta = (req) => {
   const status = (req?.status || '').toUpperCase();
-  const idDisplay = req?.displayId || (req?.id ? (String(req.id).startsWith('REQ-') ? req.id : `REQ-${req.id}`) : 'REQ-238814');
+  const idDisplay = req?.displayId || (req?.id ? (String(req.id).startsWith('REQ-') ? req.id : `REQ-${req.id}`) : 'REQ-NEW');
 
   if (status === 'CANCELLED' || status === 'EXPIRED') {
     return {
@@ -1526,8 +1473,7 @@ export const RequestWorkPage = () => {
             ) : (
               /* MAIN INDUSTRY-STANDARD MY SERVICE REQUESTS DASHBOARD */
               (() => {
-                const allRequestsSource = (customerRequests && customerRequests.length > 0) ? customerRequests : MOCK_SAMPLE_REQUESTS;
-                const isDemoData = (!customerRequests || customerRequests.length === 0);
+                const allRequestsSource = Array.isArray(customerRequests) ? customerRequests : [];
                 const totalCount = allRequestsSource.length;
                 const inProgressCount = allRequestsSource.filter(r => {
                   const s = (r.status || '').toUpperCase();
@@ -1763,7 +1709,7 @@ export const RequestWorkPage = () => {
                           </button>
 
                           {showFilterDropdown && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-30 animate-in fade-in duration-100">
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-30 animate-in fade-in duration-100 max-h-64 overflow-y-auto">
                               <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                                 Filter by Category
                               </div>
@@ -1777,83 +1723,118 @@ export const RequestWorkPage = () => {
                               >
                                 All Categories
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRequestsSearchQuery('AC');
-                                  setShowFilterDropdown(false);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
-                              >
-                                AC Repair & Service
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRequestsSearchQuery('Plumbing');
-                                  setShowFilterDropdown(false);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
-                              >
-                                Plumbing
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRequestsSearchQuery('Electrical');
-                                  setShowFilterDropdown(false);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
-                              >
-                                Electrical
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRequestsSearchQuery('Cleaning');
-                                  setShowFilterDropdown(false);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
-                              >
-                                Cleaning
-                              </button>
+                              {data?.categories && data.categories.length > 0 ? (
+                                data.categories.map((c) => (
+                                  <button
+                                    key={c.id || c.name}
+                                    type="button"
+                                    onClick={() => {
+                                      setRequestsSearchQuery(c.name);
+                                      setShowFilterDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer truncate"
+                                  >
+                                    {c.name}
+                                  </button>
+                                ))
+                              ) : (
+                                ['AC Repair', 'Cleaning', 'Plumbing', 'Electrical', 'Carpentry', 'Painting'].map((cat) => (
+                                  <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => {
+                                      setRequestsSearchQuery(cat);
+                                      setShowFilterDropdown(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
+                                  >
+                                    {cat}
+                                  </button>
+                                ))
+                              )}
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
 
-                    {/* Notice if displaying sample requests */}
-                    {isDemoData && (
-                      <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-3 sm:px-4 text-xs text-purple-900 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-[#6355F6] shrink-0" />
-                          <span>
-                            <strong>Demo Preview:</strong> Showing preview requests matching your exact industry design. Click <strong>1-Click Test</strong> or <strong>+ New Request</strong> to dispatch your live orders!
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
                     {/* 4. 2-COLUMN REQUEST CARDS GRID */}
                     {filteredRequests.length === 0 ? (
-                      <div className="text-center py-16 space-y-3 bg-white rounded-3xl border border-dashed border-slate-200">
-                        <FileText className="w-12 h-12 text-slate-300 mx-auto" />
-                        <h3 className="text-sm font-black text-slate-900 tracking-tight">No service requests found</h3>
-                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                          No requests matched your current search or status filter. Try clearing filters to see all requests.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setRequestsFilterTab('ALL');
-                            setRequestsSearchQuery('');
-                          }}
-                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-colors cursor-pointer"
-                        >
-                          Reset Filters
-                        </button>
-                      </div>
+                      !customerUser && allRequestsSource.length === 0 ? (
+                        <div className="text-center py-16 px-6 space-y-4 bg-white rounded-3xl border border-dashed border-slate-200">
+                          <div className="w-16 h-16 rounded-full bg-purple-50 text-[#6355F6] flex items-center justify-center mx-auto">
+                            <User className="w-8 h-8" />
+                          </div>
+                          <div className="space-y-1">
+                            <h3 className="text-base font-black text-slate-900 tracking-tight">Sign in to view your service requests</h3>
+                            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                              Sign in to your account to view live status updates, tracked technicians, and full service history.
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-center gap-3 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setActivePage('login')}
+                              className="px-6 py-2.5 bg-[#6355F6] hover:bg-[#5244E8] text-white text-xs font-bold rounded-full transition-all shadow-xs hover:shadow-md cursor-pointer"
+                            >
+                              Sign In to Account
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewMode('booking');
+                                setActiveBookingStep(1);
+                              }}
+                              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-colors cursor-pointer"
+                            >
+                              Book as Guest
+                            </button>
+                          </div>
+                        </div>
+                      ) : allRequestsSource.length === 0 ? (
+                        <div className="text-center py-16 px-6 space-y-4 bg-white rounded-3xl border border-dashed border-slate-200">
+                          <div className="w-16 h-16 rounded-full bg-purple-50 text-[#6355F6] flex items-center justify-center mx-auto">
+                            <FileText className="w-8 h-8" />
+                          </div>
+                          <div className="space-y-1">
+                            <h3 className="text-base font-black text-slate-900 tracking-tight">No service requests yet</h3>
+                            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                              You haven't requested any services yet. Choose from our verified professionals and book your first service today!
+                            </p>
+                          </div>
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewMode('booking');
+                                setActiveBookingStep(1);
+                              }}
+                              className="px-6 py-2.5 bg-[#6355F6] hover:bg-[#5244E8] text-white text-xs font-bold rounded-full transition-all shadow-xs hover:shadow-md cursor-pointer inline-flex items-center gap-2"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Request New Service</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-16 space-y-3 bg-white rounded-3xl border border-dashed border-slate-200">
+                          <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+                          <h3 className="text-sm font-black text-slate-900 tracking-tight">No service requests found</h3>
+                          <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                            No requests matched your current search or status filter. Try clearing filters to see all requests.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRequestsFilterTab('ALL');
+                              setRequestsSearchQuery('');
+                            }}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-colors cursor-pointer"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      )
                     ) : (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                         {filteredRequests.map((req) => {
@@ -1899,25 +1880,25 @@ export const RequestWorkPage = () => {
                                       </span>
                                     </div>
                                     <span className="text-base sm:text-lg font-black text-slate-900 shrink-0">
-                                      {formatCurrency(req.paidAmount || req.estimatedCost || 599)}
+                                      {req.paidAmount || req.estimatedCost ? formatCurrency(req.paidAmount || req.estimatedCost) : 'Quote on visit'}
                                     </span>
                                   </div>
 
                                   {/* Service Title */}
                                   <h3 className="text-sm sm:text-base font-bold text-slate-900 mt-1 truncate">
-                                    {req.serviceCategory || req.category || 'AC Repair & Service'}
+                                    {req.serviceCategory || req.category || req.problemTitle || 'Home Service'}
                                   </h3>
 
                                   {/* Address & Schedule */}
                                   <div className="text-xs text-slate-500 space-y-0.5 mt-1">
                                     <div className="flex items-center gap-1.5 truncate">
                                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                      <span className="truncate">{req.serviceAddress || req.address || 'Sector 62, Noida'}</span>
+                                      <span className="truncate">{req.serviceAddress || req.address || 'Address on file'}</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                       <span>
-                                        {req.preferredDate || '09 Nov 2026'} • {req.preferredTime || req.timeSlot || '9:00 AM – 12:00 PM'}
+                                        {req.preferredDate || (req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Flexible Date')} • {req.preferredTime || req.timeSlot || 'Flexible Time'}
                                       </span>
                                     </div>
                                   </div>

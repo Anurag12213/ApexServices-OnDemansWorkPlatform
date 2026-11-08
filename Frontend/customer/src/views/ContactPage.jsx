@@ -148,7 +148,7 @@ export const ContactPage = () => {
                     <input
                       required
                       type="text"
-                      placeholder="e.g. Rahul Sharma"
+                      placeholder="e.g. John Doe"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15 outline-none transition"

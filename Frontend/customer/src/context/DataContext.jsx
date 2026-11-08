@@ -145,7 +145,7 @@ export const DataProvider = ({ children }) => {
     return !Boolean(cachedEntry?.data);
   });
 
-  // Customer Authentication State (Defaults to Rahul Sharma from reference mockup)
+  // Customer Authentication State (Strictly real authenticated customer from localStorage / backend)
   const [customerUser, setCustomerUser] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
@@ -153,23 +153,34 @@ export const DataProvider = ({ children }) => {
         if (saved) return JSON.parse(saved);
       } catch {}
     }
-    return {
-      id: 101,
-      fullName: 'Rahul Sharma',
-      email: 'rahul.sharma@apexservices.com',
-      mobileNumber: '+91 98765 43210'
-    };
+    return null;
   });
 
   const [customerToken, setCustomerToken] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
-      return localStorage.getItem('apex_customer_token') || 'demo_customer_token';
+      return localStorage.getItem('apex_customer_token') || null;
     }
-    return 'demo_customer_token';
+    return null;
   });
 
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [customerRequests, setCustomerRequests] = useState([]);
+  const [customerRequests, setCustomerRequests] = useState(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = localStorage.getItem('apex_customer_requests');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        localStorage.setItem('apex_customer_requests', JSON.stringify(customerRequests));
+      } catch {}
+    }
+  }, [customerRequests]);
   
   const [activeBookingStep, setActiveBookingStep] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -620,6 +631,7 @@ export const DataProvider = ({ children }) => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('apex_customer_user');
       localStorage.removeItem('apex_customer_token');
+      localStorage.removeItem('apex_customer_requests');
     }
     setCustomerUser(null);
     setCustomerToken(null);
