@@ -202,11 +202,11 @@ export const Navbar = () => {
           </nav>
 
           {/* Desktop Right Actions matching Reference Image */}
-          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
             {/* [ My Requests ] Solid Purple Pill Button matching mockup */}
             <button
               onClick={handleMyRequestsClick}
-              className="inline-flex items-center px-4 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
+              className="inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-[11px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
               title="View all your service requests"
             >
               <span className="whitespace-nowrap">My Requests</span>
@@ -217,7 +217,7 @@ export const Navbar = () => {
               onClick={() => {
                 toast?.info('You are up to date! Real-time notifications will show here.', 'Notifications');
               }}
-              className="relative p-2 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+              className="hidden xs:inline-flex relative p-1.5 sm:p-2 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
               title="Notifications"
               aria-label="View notifications"
             >
@@ -226,11 +226,10 @@ export const Navbar = () => {
             </button>
 
             {/* Customer Profile Avatar Chip with Dropdown */}
-            {/* Customer Profile Avatar Chip with Dropdown */}
             <div className="relative shrink-0" ref={profileDropdownRef}>
               <button
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+                className="flex items-center gap-1 sm:gap-2 p-0.5 sm:pl-1 sm:pr-2.5 sm:py-1 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
               >
                 <img
                   src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
@@ -295,21 +294,10 @@ export const Navbar = () => {
               )}
             </div>
 
-            {/* Quick 1-Click Fast Test Icon for Instant Testing */}
-            <button
-              onClick={handleFastTestClick}
-              disabled={isFastTesting}
-              className="p-2 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 transition-colors cursor-pointer shrink-0"
-              title="1-Click Fast Test Dispatch"
-              aria-label="Instant test dispatch"
-            >
-              <Zap className={`w-4 h-4 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
-            </button>
-
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
+              className="lg:hidden p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
               aria-label="Toggle navigation menu"
             >
               {mobileMenuOpen ? <X className="w-5 h-5 text-slate-900" /> : <Menu className="w-5 h-5" />}

@@ -1002,11 +1002,11 @@ export const RequestWorkPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-4 sm:py-8 md:py-12 px-3 sm:px-6 lg:px-8 text-left font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 py-3 sm:py-6 md:py-10 px-2.5 sm:px-6 lg:px-8 text-left font-sans text-slate-900 overflow-x-hidden">
       <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
 
-        {/* TOP BAR / NAVIGATION HEADER (Hidden in Assigned Tracking View to match reference layout) */}
-        {!isAssignedTrackingView && (
+        {/* TOP BAR / NAVIGATION HEADER (ONLY visible during active multi-step booking form) */}
+        {!isAssignedTrackingView && viewMode === 'booking' && activeBookingStep <= 6 && (
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 pb-3 border-b border-slate-200">
             <div className="flex items-center gap-2.5 sm:gap-3">
               <button
@@ -1023,19 +1023,18 @@ export const RequestWorkPage = () => {
                 <span>Back</span>
               </button>
               <div className="min-w-0">
-                <h1 className="text-lg xs:text-xl sm:text-2xl font-black text-slate-900 tracking-tight truncate">
+                <h1 className="text-base sm:text-2xl font-black text-slate-900 tracking-tight truncate">
                   Apex Certified Service Requests
                 </h1>
-                <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
+                <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">
                   Vetted professionals • Verified arrival windows • 100% Satisfaction Guarantee
                 </p>
               </div>
             </div>
 
-            {/* Mode Switcher: + New Request | Live Requests | History */}
+            {/* Mode Switcher: + New Request | My Requests */}
             <div className="flex items-center w-full md:w-auto">
               <div className="flex bg-slate-200/70 p-1 rounded-xl gap-1 w-full sm:w-auto justify-between sm:justify-start overflow-x-auto no-scrollbar">
-                {/* 1. + New Request */}
                 <button
                   onClick={() => {
                     setViewMode('booking');
@@ -1052,71 +1051,13 @@ export const RequestWorkPage = () => {
                   + New Request
                 </button>
 
-                {/* 2. Live Requests (with real counter & blinking indicator) */}
                 <button
                   onClick={() => {
                     setViewMode('history');
-                    setRequestsSubTab('live');
                   }}
-                  className={`flex-1 sm:flex-initial text-center justify-center px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                    viewMode === 'history' && requestsSubTab === 'live'
-                      ? (hasLiveRequest ? 'bg-emerald-600 text-white shadow-xs' : 'bg-white text-slate-900 shadow-xs')
-                      : hasLiveRequest
-                      ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-300'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                  title={hasLiveRequest ? `${liveRequests.length} Active Live Request(s)` : 'No active live requests'}
+                  className="flex-1 sm:flex-initial text-center justify-center px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 text-slate-600 hover:text-slate-900"
                 >
-                  {hasLiveRequest && (
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                  )}
-                  <span>Live Requests</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    viewMode === 'history' && requestsSubTab === 'live'
-                      ? (hasLiveRequest ? 'bg-white/25 text-white' : 'bg-slate-700 text-white')
-                      : hasLiveRequest
-                      ? 'bg-emerald-200 text-emerald-950'
-                      : 'bg-slate-300 text-slate-700'
-                  }`}>
-                    {liveRequests.length}
-                  </span>
-                </button>
-
-                {/* 3. History (past orders) */}
-                <button
-                  onClick={() => {
-                    setViewMode('history');
-                    setRequestsSubTab('history');
-                  }}
-                  className={`flex-1 sm:flex-initial text-center justify-center px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${
-                    viewMode === 'history' && requestsSubTab === 'history'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>History</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    viewMode === 'history' && requestsSubTab === 'history'
-                      ? 'bg-slate-700 text-white'
-                      : 'bg-slate-300 text-slate-700'
-                  }`}>
-                    {historyRequests.length}
-                  </span>
-                </button>
-
-                {/* 4. Temporary: 1-Click Fast Test Dispatch */}
-                <button
-                  type="button"
-                  disabled={isFastTesting}
-                  onClick={handleFastTestDispatch}
-                  className="flex-1 sm:flex-initial text-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 bg-amber-500 hover:bg-amber-600 text-white shadow-xs"
-                  title="Instant 1-Click Request Dispatch for Fast Testing"
-                >
-                  <Zap className={`w-3.5 h-3.5 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
-                  <span>{isFastTesting ? 'Dispatching...' : '⚡ 1-Click Fast Test'}</span>
+                  My Requests
                 </button>
               </div>
             </div>
@@ -1140,61 +1081,6 @@ export const RequestWorkPage = () => {
               className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer"
             >
               <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* PROMINENT DEDICATED FAST TESTING MODE CARD (ALWAYS VISIBLE) */}
-        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-400 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-in fade-in">
-          <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Zap className="w-5 h-5 fill-current" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-md border border-amber-300">
-                  ⚡ Fast Testing Mode
-                </span>
-                <span className="text-[11px] font-bold text-amber-800">1-Click Instant Dispatch</span>
-              </div>
-              <p className="text-xs text-amber-900 font-medium mt-1">
-                Skip the 6-step form and dispatch a test request in 1 click.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            disabled={isFastTesting}
-            onClick={handleFastTestDispatch}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 shrink-0 whitespace-nowrap"
-          >
-            <Zap className={`w-4 h-4 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
-            <span>{isFastTesting ? 'Dispatching...' : '⚡ 1-Click Fast Test'}</span>
-          </button>
-        </div>
-
-        {/* COMPACT & CONCISE LIVE REQUESTS BAR */}
-        {hasLiveRequest && viewMode === 'booking' && activeBookingStep <= 6 && (
-          <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xs animate-in fade-in">
-            <div className="flex items-center gap-2.5">
-              <span className="relative flex h-2.5 w-2.5 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
-              </span>
-              <span className="text-xs sm:text-sm font-semibold text-emerald-950">
-                You have <strong className="font-bold text-emerald-700">{liveRequests.length} active live request{liveRequests.length > 1 ? 's' : ''}</strong> in progress
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                setViewMode('history');
-                setRequestsSubTab('live');
-              }}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer shadow-2xs"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>View ({liveRequests.length}) →</span>
             </button>
           </div>
         )}
@@ -1955,56 +1841,56 @@ export const RequestWorkPage = () => {
                     </div>
 
                     {/* 2. SUMMARY KPI STAT CARDS (4 Cards Horizontal Layout matching Mockup) */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
                       {/* Card 1: Total Requests */}
-                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#F3F0FF] text-[#6355F6] flex items-center justify-center shrink-0">
-                          <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <div className="bg-white rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-2 sm:gap-4 min-w-0">
+                        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-[#F3F0FF] text-[#6355F6] flex items-center justify-center shrink-0">
+                          <ClipboardList className="w-4 h-4 sm:w-6 sm:h-6" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Total Requests</div>
-                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{totalCount}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 whitespace-nowrap">Total Requests</div>
+                          <div className="text-lg sm:text-2xl font-black text-slate-900 leading-none mt-0.5">{totalCount}</div>
                         </div>
                       </div>
 
                       {/* Card 2: In Progress */}
-                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
-                          <Hourglass className="w-5 h-5 sm:w-6 sm:h-6" />
+                      <div className="bg-white rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-2 sm:gap-4 min-w-0">
+                        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+                          <Hourglass className="w-4 h-4 sm:w-6 sm:h-6" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">In Progress</div>
-                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{inProgressCount}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 whitespace-nowrap">In Progress</div>
+                          <div className="text-lg sm:text-2xl font-black text-slate-900 leading-none mt-0.5">{inProgressCount}</div>
                         </div>
                       </div>
 
                       {/* Card 3: Completed */}
-                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
-                          <Check className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3]" />
+                      <div className="bg-white rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-2 sm:gap-4 min-w-0">
+                        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+                          <Check className="w-4 h-4 sm:w-6 sm:h-6 stroke-[3]" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Completed</div>
-                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{completedCount}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 whitespace-nowrap">Completed</div>
+                          <div className="text-lg sm:text-2xl font-black text-slate-900 leading-none mt-0.5">{completedCount}</div>
                         </div>
                       </div>
 
                       {/* Card 4: Cancelled */}
-                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
-                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
-                          <X className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3]" />
+                      <div className="bg-white rounded-xl sm:rounded-2xl p-2.5 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-2 sm:gap-4 min-w-0">
+                        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+                          <X className="w-4 h-4 sm:w-6 sm:h-6 stroke-[3]" />
                         </div>
-                        <div className="min-w-0">
-                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Cancelled</div>
-                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{cancelledCount}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] sm:text-xs font-semibold text-slate-500 whitespace-nowrap">Cancelled</div>
+                          <div className="text-lg sm:text-2xl font-black text-slate-900 leading-none mt-0.5">{cancelledCount}</div>
                         </div>
                       </div>
                     </div>
 
                     {/* 3. FILTER TABS & SEARCH TOOLBAR */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 pt-1">
                       {/* Left Segmented Filter Tabs */}
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-none no-scrollbar">
                         <button
                           type="button"
                           onClick={() => setRequestsFilterTab('ALL')}
@@ -2228,36 +2114,36 @@ export const RequestWorkPage = () => {
                           return (
                             <div
                               key={req.id || meta.idDisplay}
-                              className="bg-white rounded-2xl border border-slate-200/90 hover:border-slate-300 p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                              className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 hover:border-slate-300 p-3.5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-3 sm:space-y-4"
                             >
                               {/* Top Info Section */}
-                              <div className="flex gap-4 sm:gap-5">
+                              <div className="flex gap-3 sm:gap-5">
                                 {/* Left Category Thumbnail with New badge */}
                                 <div className="relative shrink-0">
                                   <img
                                     src={thumbnail}
                                     alt={req.serviceCategory || req.category || 'Service'}
-                                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shrink-0 border border-slate-100 shadow-2xs"
+                                    className="w-16 h-16 sm:w-24 sm:h-24 rounded-xl sm:rounded-2xl object-cover shrink-0 border border-slate-100 shadow-2xs"
                                     onError={(e) => {
                                       e.target.src = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80';
                                     }}
                                   />
                                   {req.isNew && (
-                                    <span className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-[#FF6B00] text-white text-[10px] font-black rounded-full shadow-xs uppercase tracking-wider">
+                                    <span className="absolute top-1 left-1 sm:top-1.5 sm:left-1.5 px-1.5 sm:px-2 py-0.5 bg-[#FF6B00] text-white text-[9px] sm:text-[10px] font-black rounded-full shadow-xs uppercase tracking-wider">
                                       New
                                     </span>
                                   )}
                                 </div>
 
                                 {/* Right Details */}
-                                <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex-1 min-w-0 space-y-1">
                                   {/* Badge Row & Price */}
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#F3F0FF] text-[#6355F6] border border-[#E9E4FF]">
+                                  <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                      <span className="font-mono text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full bg-[#F3F0FF] text-[#6355F6] border border-[#E9E4FF]">
                                         {meta.idDisplay}
                                       </span>
-                                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full ${meta.statusClass}`}>
+                                      <span className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full ${meta.statusClass}`}>
                                         {meta.statusType === 'in_progress' || meta.statusType === 'assigned' ? (
                                           <RotateCcw className="w-3 h-3 animate-spin" />
                                         ) : meta.statusType === 'completed' ? (
@@ -2270,25 +2156,25 @@ export const RequestWorkPage = () => {
                                         <span>{meta.statusLabel}</span>
                                       </span>
                                     </div>
-                                    <span className="text-base sm:text-xl font-black text-slate-900 shrink-0">
+                                    <span className="text-sm xs:text-base sm:text-xl font-black text-slate-900 shrink-0">
                                       {req.paidAmount || req.estimatedCost ? formatCurrency(req.paidAmount || req.estimatedCost) : 'Quote on visit'}
                                     </span>
                                   </div>
 
                                   {/* Service Title */}
-                                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 truncate">
+                                  <h3 className="text-sm sm:text-lg font-extrabold text-slate-900 truncate">
                                     {req.serviceCategory || req.category || req.problemTitle || 'Home Service'}
                                   </h3>
 
                                   {/* Address & Schedule */}
-                                  <div className="text-xs text-slate-500 space-y-1">
+                                  <div className="text-[11px] sm:text-xs text-slate-500 space-y-0.5 sm:space-y-1">
                                     <div className="flex items-center gap-1.5 truncate">
-                                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
                                       <span className="truncate">{req.serviceAddress || req.address || 'Address on file'}</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                      <span>
+                                      <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-slate-400 shrink-0" />
+                                      <span className="truncate">
                                         {req.preferredDate || (req.createdAt ? new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Flexible Date')}, {req.preferredTime || req.timeSlot || 'Flexible Time'}
                                       </span>
                                     </div>
@@ -2297,17 +2183,17 @@ export const RequestWorkPage = () => {
                               </div>
 
                               {/* 5-Step Horizontal Progress Stepper */}
-                              <div className="py-3 px-2 border-t border-b border-slate-100">
+                              <div className="py-2.5 sm:py-3 px-1 sm:px-2 border-t border-b border-slate-100">
                                 <div className="relative flex items-center justify-between">
                                   {/* Base Gray Track */}
-                                  <div className="absolute left-4 right-4 top-3.5 -translate-y-1/2 h-[2px] bg-slate-200 z-0" />
+                                  <div className="absolute left-3 right-3 sm:left-4 sm:right-4 top-3 sm:top-3.5 md:top-4 -translate-y-1/2 h-[2px] bg-slate-200 z-0" />
 
                                   {/* Active Colored Track */}
                                   {meta.statusType === 'completed' ? (
-                                    <div className="absolute left-4 right-4 top-3.5 -translate-y-1/2 h-[2px] bg-emerald-500 z-0 transition-all duration-500" />
+                                    <div className="absolute left-3 right-3 sm:left-4 sm:right-4 top-3 sm:top-3.5 md:top-4 -translate-y-1/2 h-[2px] bg-emerald-500 z-0 transition-all duration-500" />
                                   ) : meta.activeStep > 1 ? (
                                     <div
-                                      className="absolute left-4 top-3.5 -translate-y-1/2 h-[2px] bg-[#6355F6] z-0 transition-all duration-500"
+                                      className="absolute left-3 sm:left-4 top-3 sm:top-3.5 md:top-4 -translate-y-1/2 h-[2px] bg-[#6355F6] z-0 transition-all duration-500"
                                       style={{
                                         width: `${((meta.activeStep - 1) / 4) * 100}%`
                                       }}
@@ -2323,7 +2209,7 @@ export const RequestWorkPage = () => {
                                     return (
                                       <div key={label} className="relative z-10 flex flex-col items-center">
                                         <div
-                                          className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                          className={`w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold transition-all ${
                                             isCancelled
                                               ? 'bg-slate-100 text-slate-400 border border-slate-200'
                                               : isReqCompleted
@@ -2334,13 +2220,13 @@ export const RequestWorkPage = () => {
                                           }`}
                                         >
                                           {isStepChecked ? (
-                                            <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
+                                            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 stroke-[3]" />
                                           ) : (
-                                            <span className="text-[10px] sm:text-xs font-bold text-slate-400">{stepNum}</span>
+                                            <span className="text-[9px] sm:text-xs font-bold text-slate-400">{stepNum}</span>
                                           )}
                                         </div>
                                         <span
-                                          className={`mt-1.5 text-[10px] sm:text-xs font-medium tracking-tight whitespace-nowrap ${
+                                          className={`mt-1 sm:mt-1.5 text-[8px] xs:text-[10px] sm:text-xs font-medium tracking-tight whitespace-nowrap ${
                                             isReqCompleted
                                               ? 'text-emerald-700 font-bold'
                                               : isStepChecked
@@ -2362,7 +2248,7 @@ export const RequestWorkPage = () => {
                                   <button
                                     type="button"
                                     onClick={() => setActiveTrackedRequest(req)}
-                                    className="px-5 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+                                    className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
                                   >
                                     <span>Track Live Status</span>
                                     <ArrowRight className="w-3.5 h-3.5" />
@@ -2371,7 +2257,7 @@ export const RequestWorkPage = () => {
                                   <button
                                     type="button"
                                     onClick={() => setActiveTrackedRequest(req)}
-                                    className="px-5 py-2 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                    className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                                   >
                                     <span>View Details</span>
                                   </button>
@@ -2379,7 +2265,7 @@ export const RequestWorkPage = () => {
                                   <button
                                     type="button"
                                     onClick={() => setActiveTrackedRequest(req)}
-                                    className="px-5 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+                                    className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
                                   >
                                     <Star className="w-3.5 h-3.5 fill-current text-amber-300" />
                                     <span>Rate & Review</span>
@@ -2388,7 +2274,7 @@ export const RequestWorkPage = () => {
                                   <button
                                     type="button"
                                     onClick={() => setActiveTrackedRequest(req)}
-                                    className="px-5 py-2 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                                    className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer justify-center flex items-center"
                                   >
                                     <span>View Details</span>
                                   </button>

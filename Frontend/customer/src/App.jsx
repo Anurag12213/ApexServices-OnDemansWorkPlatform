@@ -70,7 +70,7 @@ const MainContent = () => {
     <div className="min-h-screen bg-white flex flex-col justify-between selection:bg-[#ff3b47] selection:text-white">
       <ToastContainer toasts={toasts} onClose={dismissToast} />
       <div>
-        <TopBar />
+        {activePage !== 'request-work' && <TopBar />}
         <Navbar />
         <main>{renderPage()}</main>
       </div>
