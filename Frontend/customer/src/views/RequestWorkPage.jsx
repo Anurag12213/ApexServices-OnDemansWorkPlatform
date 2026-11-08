@@ -1821,9 +1821,9 @@ export const RequestWorkPage = () => {
                       <button
                         type="button"
                         onClick={() => setActivePage('contact')}
-                        className="px-4 py-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                        className="px-4 py-2.5 rounded-xl border border-[#6355F6]/40 hover:border-[#6355F6] hover:bg-purple-50 text-[#6355F6] font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                       >
-                        <Headphones className="w-3.5 h-3.5 text-slate-500" />
+                        <Headphones className="w-3.5 h-3.5 text-[#6355F6]" />
                         <span>Contact Support</span>
                       </button>
                     </div>
@@ -1925,10 +1925,10 @@ export const RequestWorkPage = () => {
                           </p>
                         </div>
 
-                        {/* Right Graphic: Stylized 3D House Illustration */}
-                        <div className="flex items-center gap-4 self-end md:self-auto">
-                          <div className="hidden md:flex items-center justify-center shrink-0 relative">
-                            <svg viewBox="0 0 160 120" className="w-40 h-28 drop-shadow-xl" fill="none">
+                        {/* Right Graphic: Stylized 3D House Illustration matching mockup */}
+                        <div className="flex items-center self-end md:self-auto shrink-0">
+                          <div className="flex items-center justify-center shrink-0 relative">
+                            <svg viewBox="0 0 160 120" className="w-36 sm:w-44 h-24 sm:h-28 drop-shadow-xl" fill="none">
                               <ellipse cx="80" cy="100" rx="65" ry="16" fill="rgba(0,0,0,0.18)" />
                               <path d="M40 70 L80 48 L120 70 L120 100 L40 100 Z" fill="#FFFFFF" />
                               <path d="M35 70 L80 40 L125 70 L115 75 L80 50 L45 75 Z" fill="#FFB74D" />
@@ -1950,74 +1950,53 @@ export const RequestWorkPage = () => {
                               </g>
                             </svg>
                           </div>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setViewMode('booking');
-                              setActiveTrackingRequestId(null);
-                              localStorage.removeItem('apex_active_tracking_id');
-                              setActiveBookingStep(1);
-                            }}
-                            className="bg-white hover:bg-slate-50 text-[#6355F6] px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
-                          >
-                            <span>+ New Request</span>
-                          </button>
                         </div>
                       </div>
                     </div>
 
-                    {/* 2. SUMMARY KPI STAT CARDS (4 Cards Grid) */}
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                    {/* 2. SUMMARY KPI STAT CARDS (4 Cards Horizontal Layout matching Mockup) */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
                       {/* Card 1: Total Requests */}
-                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-500">Total Requests</span>
-                          <div className="w-10 h-10 rounded-full bg-[#F3F0FF] text-[#6355F6] flex items-center justify-center">
-                            <ClipboardList className="w-5 h-5" />
-                          </div>
+                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-[#F3F0FF] text-[#6355F6] flex items-center justify-center shrink-0">
+                          <ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
-                          {totalCount}
+                        <div className="min-w-0">
+                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Total Requests</div>
+                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{totalCount}</div>
                         </div>
                       </div>
 
                       {/* Card 2: In Progress */}
-                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-500">In Progress</span>
-                          <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-                            <Clock className="w-5 h-5" />
-                          </div>
+                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0">
+                          <Hourglass className="w-5 h-5 sm:w-6 sm:h-6" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
-                          {inProgressCount}
+                        <div className="min-w-0">
+                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">In Progress</div>
+                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{inProgressCount}</div>
                         </div>
                       </div>
 
                       {/* Card 3: Completed */}
-                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-500">Completed</span>
-                          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                            <CheckCircle2 className="w-5 h-5" />
-                          </div>
+                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+                          <Check className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3]" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
-                          {completedCount}
+                        <div className="min-w-0">
+                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Completed</div>
+                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{completedCount}</div>
                         </div>
                       </div>
 
                       {/* Card 4: Cancelled */}
-                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-500">Cancelled</span>
-                          <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-                            <XCircle className="w-5 h-5" />
-                          </div>
+                      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-100 shadow-xs hover:shadow-md transition-all flex items-center gap-3.5 sm:gap-4">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+                          <X className="w-5 h-5 sm:w-6 sm:h-6 stroke-[3]" />
                         </div>
-                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
-                          {cancelledCount}
+                        <div className="min-w-0">
+                          <div className="text-[11px] sm:text-xs font-semibold text-slate-500 truncate">Cancelled</div>
+                          <div className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{cancelledCount}</div>
                         </div>
                       </div>
                     </div>
@@ -2032,9 +2011,15 @@ export const RequestWorkPage = () => {
                           className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                             requestsFilterTab === 'ALL'
                               ? 'bg-[#6355F6] text-white shadow-xs'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                              : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           }`}
                         >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+                          </svg>
                           <span>All Requests ({totalCount})</span>
                         </button>
                         <button
@@ -2043,10 +2028,10 @@ export const RequestWorkPage = () => {
                           className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                             requestsFilterTab === 'IN_PROGRESS'
                               ? 'bg-[#6355F6] text-white shadow-xs'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                              : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           }`}
                         >
-                          <Clock className="w-3.5 h-3.5" />
+                          <Clock className="w-3.5 h-3.5 text-slate-400" />
                           <span>In Progress ({inProgressCount})</span>
                         </button>
                         <button
@@ -2055,10 +2040,10 @@ export const RequestWorkPage = () => {
                           className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                             requestsFilterTab === 'COMPLETED'
                               ? 'bg-[#6355F6] text-white shadow-xs'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                              : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           }`}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
                           <span>Completed ({completedCount})</span>
                         </button>
                         <button
@@ -2067,10 +2052,10 @@ export const RequestWorkPage = () => {
                           className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
                             requestsFilterTab === 'CANCELLED'
                               ? 'bg-[#6355F6] text-white shadow-xs'
-                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                              : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           }`}
                         >
-                          <XCircle className="w-3.5 h-3.5" />
+                          <XCircle className="w-3.5 h-3.5 text-slate-400" />
                           <span>Cancelled ({cancelledCount})</span>
                         </button>
                       </div>
@@ -2332,8 +2317,7 @@ export const RequestWorkPage = () => {
                                   {['Posted', 'Assigned', 'In Progress', 'Verification', 'Completed'].map((label, stepIdx) => {
                                     const stepNum = stepIdx + 1;
                                     const isReqCompleted = meta.statusType === 'completed';
-                                    const isCompleted = meta.activeStep > stepNum || isReqCompleted;
-                                    const isCurrent = meta.activeStep === stepNum && !isReqCompleted;
+                                    const isStepChecked = stepNum <= meta.activeStep || isReqCompleted;
                                     const isCancelled = meta.activeStep === -1;
 
                                     return (
@@ -2344,26 +2328,22 @@ export const RequestWorkPage = () => {
                                               ? 'bg-slate-100 text-slate-400 border border-slate-200'
                                               : isReqCompleted
                                               ? 'bg-emerald-500 text-white shadow-xs'
-                                              : isCompleted
+                                              : isStepChecked
                                               ? 'bg-[#6355F6] text-white shadow-xs'
-                                              : isCurrent
-                                              ? 'bg-white border-2 border-[#6355F6] text-[#6355F6] shadow-xs ring-4 ring-purple-100'
                                               : 'bg-white border-2 border-slate-200 text-slate-400'
                                           }`}
                                         >
-                                          {isReqCompleted || isCompleted ? (
+                                          {isStepChecked ? (
                                             <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[3]" />
-                                          ) : isCurrent ? (
-                                            <div className="w-2 h-2 rounded-full bg-[#6355F6]" />
                                           ) : (
-                                            <span className="text-[10px] sm:text-xs font-bold">{stepNum}</span>
+                                            <span className="text-[10px] sm:text-xs font-bold text-slate-400">{stepNum}</span>
                                           )}
                                         </div>
                                         <span
                                           className={`mt-1.5 text-[10px] sm:text-xs font-medium tracking-tight whitespace-nowrap ${
                                             isReqCompleted
                                               ? 'text-emerald-700 font-bold'
-                                              : isCompleted || isCurrent
+                                              : isStepChecked
                                               ? 'text-slate-900 font-bold'
                                               : 'text-slate-400'
                                           }`}

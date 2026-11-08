@@ -203,13 +203,12 @@ export const Navbar = () => {
 
           {/* Desktop Right Actions matching Reference Image */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* [📋 My Requests] Lavender Pill Button */}
+            {/* [ My Requests ] Solid Purple Pill Button matching mockup */}
             <button
               onClick={handleMyRequestsClick}
-              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#F3F0FF] hover:bg-[#EBE5FF] text-[#6355F6] border border-[#DDD6FE] text-xs font-bold transition-all cursor-pointer shadow-2xs hover:shadow-xs shrink-0"
+              className="inline-flex items-center px-4 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
               title="View all your service requests"
             >
-              <ClipboardList className="w-3.5 h-3.5 text-[#6355F6]" />
               <span className="whitespace-nowrap">My Requests</span>
             </button>
 
