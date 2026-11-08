@@ -23,6 +23,7 @@ import {
   X,
   Sparkles,
   User,
+  Plus,
   Star,
   Check,
   RefreshCw,

@@ -80,12 +80,61 @@ const MainContent = () => {
   );
 };
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('App ErrorBoundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center font-sans">
+          <div className="max-w-md bg-white p-8 rounded-3xl border border-slate-200 shadow-xl space-y-4">
+            <div className="w-14 h-14 bg-purple-50 text-[#6355F6] rounded-2xl flex items-center justify-center mx-auto text-xl font-black">
+              ⚡
+            </div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Something went wrong</h2>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              An unexpected issue occurred while rendering this page. Refreshing will restore the latest state.
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('apex_active_page');
+                  } catch {}
+                  window.location.reload();
+                }}
+                className="px-6 py-2.5 bg-[#6355F6] hover:bg-[#5244E8] text-white text-xs font-bold rounded-full transition-all shadow-md cursor-pointer"
+              >
+                Reload Application
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <DataProvider>
-      <ConfirmDialogProvider>
-        <MainContent />
-      </ConfirmDialogProvider>
-    </DataProvider>
+    <ErrorBoundary>
+      <DataProvider>
+        <ConfirmDialogProvider>
+          <MainContent />
+        </ConfirmDialogProvider>
+      </DataProvider>
+    </ErrorBoundary>
   );
 }
