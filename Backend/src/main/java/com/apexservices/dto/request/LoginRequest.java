@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;

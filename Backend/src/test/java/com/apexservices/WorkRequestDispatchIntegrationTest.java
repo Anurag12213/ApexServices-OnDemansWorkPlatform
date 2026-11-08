@@ -1,34 +1,33 @@
 package com.apexservices;
 
-import com.apexservices.dto.WorkRequestClaimResponseDto;
-import com.apexservices.dto.WorkRequestDto;
-import com.apexservices.dto.WorkRequestResponseDto;
+import com.apexservices.dto.request.WorkRequestDto;
+import com.apexservices.dto.response.WorkRequestClaimResponseDto;
+import com.apexservices.dto.response.WorkRequestResponseDto;
 import com.apexservices.exception.ConflictException;
 import com.apexservices.model.AuthProvider;
+import com.apexservices.model.Category;
 import com.apexservices.model.Role;
 import com.apexservices.model.User;
-import com.apexservices.model.WorkRequestStatus;
-import com.apexservices.model.Category;
 import com.apexservices.repository.CategoryRepository;
 import com.apexservices.repository.UserRepository;
+import com.apexservices.repository.WorkRequestRepository;
 import com.apexservices.service.WorkRequestService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@Transactional
-public class WorkRequestDispatchIntegrationTest {
+@DisplayName("Integration Tests - Post & Pick Marketplace, Atomic Claims & Lifecycle")
+class WorkRequestDispatchIntegrationTest {
 
     @Autowired
     private WorkRequestService workRequestService;
@@ -39,66 +38,67 @@ public class WorkRequestDispatchIntegrationTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @Autowired
+    private WorkRequestRepository workRequestRepository;
+
     private User partner1;
     private User partner2;
     private Category carpentryCategory;
 
     @BeforeEach
     void setUp() {
-        carpentryCategory = categoryRepository.findByNameIgnoreCase("Custom Carpentry").orElseGet(() ->
-                categoryRepository.save(Category.builder()
-                        .name("Custom Carpentry")
-                        .slug("custom-carpentry")
-                        .description("Professional carpentry services")
-                        .active(true)
-                        .build())
-        );
-        if (!carpentryCategory.isActive()) {
-            carpentryCategory.setActive(true);
+        carpentryCategory = categoryRepository.findByNameIgnoreCase("Custom Carpentry").orElse(null);
+        if (carpentryCategory == null) {
+            carpentryCategory = Category.builder()
+                    .name("Custom Carpentry")
+                    .slug("custom-carpentry")
+                    .active(true)
+                    .description("Carpentry works")
+                    .build();
             carpentryCategory = categoryRepository.save(carpentryCategory);
         }
 
-        Category finalCarpentryCategory = carpentryCategory;
+        final Category finalCarpentryCategory = carpentryCategory;
 
-        partner1 = userRepository.findByEmail("test.partner1@apexservices.com").orElseGet(() ->
-                userRepository.save(User.builder()
-                        .fullName("Rajesh Carpentry")
-                        .email("test.partner1@apexservices.com")
-                        .mobileNumber("+919876543210")
-                        .password("$2a$10$eD7q9rQvE7.yPskqK8qE6e2Uj1zZpCskJgUqYf45kR2lBvT5/m8q6")
-                        .role(Role.ROLE_PARTNER)
-                        .provider(AuthProvider.LOCAL)
-                        .active(true)
-                        .serviceCategories(new HashSet<>(Collections.singletonList(finalCarpentryCategory)))
-                        .build())
-        );
-
-        if (partner1.getServiceCategories() == null || partner1.getServiceCategories().isEmpty()) {
+        partner1 = userRepository.findByEmail("partner.dispatch1@apexservices.com").orElse(null);
+        if (partner1 == null) {
+            partner1 = User.builder()
+                    .fullName("Ramesh Carpenter")
+                    .email("partner.dispatch1@apexservices.com")
+                    .password("$2a$10$unusableHashForTesting0000000000000000000000000000000000")
+                    .provider(AuthProvider.LOCAL)
+                    .role(Role.ROLE_PARTNER)
+                    .active(true)
+                    .mobileNumber("+919800000001")
+                    .serviceCategories(new HashSet<>(Collections.singletonList(finalCarpentryCategory)))
+                    .build();
+            partner1 = userRepository.save(partner1);
+        } else {
             partner1.setServiceCategories(new HashSet<>(Collections.singletonList(finalCarpentryCategory)));
             partner1 = userRepository.save(partner1);
         }
 
-        partner2 = userRepository.findByEmail("test.partner2@apexservices.com").orElseGet(() ->
-                userRepository.save(User.builder()
-                        .fullName("Suresh Electricals")
-                        .email("test.partner2@apexservices.com")
-                        .mobileNumber("+919876543211")
-                        .password("$2a$10$eD7q9rQvE7.yPskqK8qE6e2Uj1zZpCskJgUqYf45kR2lBvT5/m8q6")
-                        .role(Role.ROLE_PARTNER)
-                        .provider(AuthProvider.LOCAL)
-                        .active(true)
-                        .serviceCategories(new HashSet<>(Collections.singletonList(finalCarpentryCategory)))
-                        .build())
-        );
-
-        if (partner2.getServiceCategories() == null || partner2.getServiceCategories().isEmpty()) {
+        partner2 = userRepository.findByEmail("partner.dispatch2@apexservices.com").orElse(null);
+        if (partner2 == null) {
+            partner2 = User.builder()
+                    .fullName("Suresh Carpenter")
+                    .email("partner.dispatch2@apexservices.com")
+                    .password("$2a$10$unusableHashForTesting0000000000000000000000000000000000")
+                    .provider(AuthProvider.LOCAL)
+                    .role(Role.ROLE_PARTNER)
+                    .active(true)
+                    .mobileNumber("+919800000002")
+                    .serviceCategories(new HashSet<>(Collections.singletonList(finalCarpentryCategory)))
+                    .build();
+            partner2 = userRepository.save(partner2);
+        } else {
             partner2.setServiceCategories(new HashSet<>(Collections.singletonList(finalCarpentryCategory)));
             partner2 = userRepository.save(partner2);
         }
     }
 
     @Test
-    @DisplayName("1. Customer submission creates broadcast with 45s countdown and appears in partner feed")
+    @DisplayName("1. Customer submission publishes request as POSTED in marketplace")
     void testCreateAndFeed() {
         WorkRequestDto dto = WorkRequestDto.builder()
                 .serviceCategory("Custom Carpentry")
@@ -106,25 +106,26 @@ public class WorkRequestDispatchIntegrationTest {
                 .customerEmail("anita.desai@gmail.com")
                 .contactPhone("+919811122233")
                 .serviceAddress("102 Green Heights, Mumbai")
+                .latitude(new BigDecimal("19.0760"))
+                .longitude(new BigDecimal("72.8777"))
                 .problemDescription("Door lock hinge is loose.")
                 .urgency("Standard")
                 .build();
 
         WorkRequestResponseDto created = workRequestService.createWorkRequest(dto, null);
         assertNotNull(created.getId());
-        assertEquals("BROADCASTED", created.getStatus());
+        assertEquals("POSTED", created.getStatus());
         assertEquals(1, created.getStage());
         assertNotNull(created.getExpiresAt());
-        assertTrue(created.getRemainingSeconds() > 0 && created.getRemainingSeconds() <= 120);
 
-        // Verify partner1 sees it in feed
-        List<WorkRequestResponseDto> feed = workRequestService.getPartnerFeed(partner1.getEmail(), "Custom Carpentry");
-        boolean found = feed.stream().anyMatch(r -> r.getId().equals(created.getId()));
-        assertTrue(found, "Newly created request should appear in partner's feed");
+        // Verify all eligible partners see the published request in All Jobs
+        List<WorkRequestResponseDto> allJobs = workRequestService.getPartnerAllJobs(partner1.getEmail(), "Custom Carpentry");
+        boolean found = allJobs.stream().anyMatch(r -> r.getId().equals(created.getId()));
+        assertTrue(found, "Newly published request should appear in partner's marketplace feed");
     }
 
     @Test
-    @DisplayName("2. First partner wins claim; second partner receives HTTP 409 Conflict (ALREADY_CLAIMED)")
+    @DisplayName("2. First partner wins acceptance; second partner receives HTTP 409 Conflict (ALREADY_CLAIMED)")
     void testAtomicClaimAndConflict() {
         WorkRequestDto dto = WorkRequestDto.builder()
                 .serviceCategory("Custom Carpentry")
@@ -137,46 +138,57 @@ public class WorkRequestDispatchIntegrationTest {
 
         WorkRequestResponseDto created = workRequestService.createWorkRequest(dto, null);
 
-        // Partner 1 claims the request
-        WorkRequestClaimResponseDto claimResult = workRequestService.claimWorkRequest(created.getId(), partner1.getEmail());
+        // Partner 1 accepts the request atomically
+        WorkRequestClaimResponseDto claimResult = workRequestService.acceptJobAtomically(created.getId(), partner1.getEmail());
         assertTrue(claimResult.isSuccess());
         assertNotNull(claimResult.getRequest());
         assertEquals("ASSIGNED", claimResult.getRequest().getStatus());
         assertEquals(partner1.getId(), claimResult.getRequest().getAssignedPartnerId());
 
-        // Partner 2 attempts to claim the same request -> ConflictException expected
+        // Partner 2 attempts to accept the same request -> ConflictException expected
         ConflictException ex = assertThrows(ConflictException.class, () ->
-                workRequestService.claimWorkRequest(created.getId(), partner2.getEmail())
+                workRequestService.acceptJobAtomically(created.getId(), partner2.getEmail())
         );
 
         assertEquals("ALREADY_CLAIMED", ex.getCode());
-        assertTrue(ex.getMessage().contains("already claimed"));
+        assertTrue(ex.getMessage().contains("already accepted") || ex.getMessage().contains("already claimed"));
     }
 
     @Test
-    @DisplayName("3. Partner rejection is isolated and does not affect other partners")
-    void testRejectionIsolation() {
+    @DisplayName("3. Nearby Jobs distance filtering and privacy masking for unassigned partners")
+    void testNearbyDistanceFilteringAndPrivacy() {
         WorkRequestDto dto = WorkRequestDto.builder()
                 .serviceCategory("Custom Carpentry")
-                .customerName("Pooja Nair")
-                .customerEmail("pooja@gmail.com")
+                .customerName("Private Customer")
+                .customerEmail("private@gmail.com")
                 .contactPhone("+919833344455")
-                .serviceAddress("701 Sunrise View, Mumbai")
+                .serviceAddress("Exact Flat 501, Secret Street, Mumbai")
+                .latitude(new BigDecimal("19.0760"))
+                .longitude(new BigDecimal("72.8777"))
+                .landmark("Near Metro Station")
+                .cityPostal("Mumbai 400001")
                 .problemDescription("Cabinet door fallen off.")
                 .build();
 
         WorkRequestResponseDto created = workRequestService.createWorkRequest(dto, null);
 
-        // Partner 1 rejects
-        Map<String, Object> rejectResult = workRequestService.rejectWorkRequest(created.getId(), partner1.getEmail());
-        assertTrue((Boolean) rejectResult.get("success"));
+        // Partner 1 queries nearby jobs within 10 km (same coordinate area)
+        List<WorkRequestResponseDto> nearby = workRequestService.getPartnerNearbyJobs(
+                partner1.getEmail(), 19.0760, 72.8777, 10.0, "Custom Carpentry");
+        
+        Optional<WorkRequestResponseDto> found = nearby.stream()
+                .filter(j -> j.getId().equals(created.getId()))
+                .findFirst();
 
-        // Partner 1 should NOT see it anymore
-        List<WorkRequestResponseDto> feed1 = workRequestService.getPartnerFeed(partner1.getEmail(), "Custom Carpentry");
-        assertFalse(feed1.stream().anyMatch(r -> r.getId().equals(created.getId())));
+        assertTrue(found.isPresent(), "Job should be discovered within 10km radius");
+        WorkRequestResponseDto job = found.get();
+        assertNotNull(job.getDistanceKm());
+        assertTrue(job.getDistanceKm() < 1.0, "Distance should be under 1 km for same coordinates");
 
-        // Partner 2 should STILL see it
-        List<WorkRequestResponseDto> feed2 = workRequestService.getPartnerFeed(partner2.getEmail(), "Custom Carpentry");
-        assertTrue(feed2.stream().anyMatch(r -> r.getId().equals(created.getId())));
+        // Verify privacy masking before acceptance: exact street address, phone, and email hidden
+        assertNull(job.getCustomerEmail());
+        assertNull(job.getContactPhone());
+        assertFalse(job.getServiceAddress().contains("Exact Flat 501"));
+        assertTrue(job.getServiceAddress().contains("Near Metro Station") || job.getServiceAddress().contains("Mumbai 400001"));
     }
 }

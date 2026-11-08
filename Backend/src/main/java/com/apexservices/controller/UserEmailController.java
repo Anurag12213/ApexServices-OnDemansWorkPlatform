@@ -1,8 +1,8 @@
 package com.apexservices.controller;
 
-import com.apexservices.dto.OtpApiResponse;
-import com.apexservices.dto.SendEmailOtpRequest;
-import com.apexservices.dto.VerifyEmailOtpRequest;
+import com.apexservices.dto.response.OtpApiResponse;
+import com.apexservices.dto.request.SendEmailOtpRequest;
+import com.apexservices.dto.request.VerifyEmailOtpRequest;
 import com.apexservices.model.OtpPurpose;
 import com.apexservices.service.EmailOtpService;
 import jakarta.servlet.http.HttpServletRequest;

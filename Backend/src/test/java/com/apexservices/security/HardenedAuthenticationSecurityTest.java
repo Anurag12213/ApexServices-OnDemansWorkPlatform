@@ -1,8 +1,8 @@
 package com.apexservices.security;
 
-import com.apexservices.dto.AuthResponse;
-import com.apexservices.dto.LoginRequest;
-import com.apexservices.dto.RegisterRequest;
+import com.apexservices.dto.response.AuthResponse;
+import com.apexservices.dto.request.LoginRequest;
+import com.apexservices.dto.request.RegisterRequest;
 import com.apexservices.exception.RateLimitExceededException;
 import com.apexservices.model.AuthProvider;
 import com.apexservices.model.Role;

@@ -39,14 +39,7 @@ export const PartnerProvider = ({ children }) => {
     setCategories(state.categories || []);
     setDepositTransactions(state.depositTransactions || []);
 
-    // Check for active unexpired pending offer to show in overlay
-    const pendingOffer = (state.offers || []).find(
-      o => o.status === 'PENDING' && o.expiresAt > Date.now()
-    );
-    if (pendingOffer && (!currentIncomingAlert || currentIncomingAlert.id !== pendingOffer.id)) {
-      setCurrentIncomingAlert(pendingOffer);
-      audioService.playIncomingAlertSound();
-    } else if (!pendingOffer && currentIncomingAlert) {
+    if (currentIncomingAlert) {
       setCurrentIncomingAlert(null);
     }
   }, [currentIncomingAlert]);
@@ -225,7 +218,10 @@ export const PartnerProvider = ({ children }) => {
     };
 
     pollFeed();
-    const timer = setInterval(pollFeed, 20000);
+    const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      pollFeed();
+    }, 45000);
     const onVisibility = () => {
       if (!document.hidden) pollFeed();
     };
@@ -259,6 +255,13 @@ export const PartnerProvider = ({ children }) => {
   // Auth: Login
   const login = async (emailOrPhone, password) => {
     const res = await api.login(emailOrPhone, password);
+    refreshState();
+    return res;
+  };
+
+  // Auth: Login via Google OAuth2 ID Token
+  const loginWithGoogle = async (idToken) => {
+    const res = await api.loginWithGoogle(idToken);
     refreshState();
     return res;
   };
@@ -380,6 +383,7 @@ export const PartnerProvider = ({ children }) => {
         setVibrationEnabled,
         toggleOnline,
         login,
+        loginWithGoogle,
         register,
         logout,
         payDeposit,

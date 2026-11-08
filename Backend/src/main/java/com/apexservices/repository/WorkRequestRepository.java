@@ -24,11 +24,17 @@ public interface WorkRequestRepository extends JpaRepository<WorkRequest, String
 
     List<WorkRequest> findByAssignedPartnerIdOrderByCreatedAtDesc(Long partnerId);
 
+    List<WorkRequest> findByAssignedPartnerIdAndStatusInOrderByCreatedAtDesc(Long partnerId, List<WorkRequestStatus> statuses);
+
     List<WorkRequest> findAllByOrderByCreatedAtDesc();
 
     Page<WorkRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     List<WorkRequest> findByStatusOrderByCreatedAtDesc(WorkRequestStatus status);
+
+    Page<WorkRequest> findByStatusOrderByCreatedAtDesc(WorkRequestStatus status, Pageable pageable);
+
+    Page<WorkRequest> findByStatusInOrderByCreatedAtDesc(List<WorkRequestStatus> statuses, Pageable pageable);
 
     long countByStatus(WorkRequestStatus status);
 
@@ -44,45 +50,38 @@ public interface WorkRequestRepository extends JpaRepository<WorkRequest, String
     java.math.BigDecimal sumTotalPartnerNetEarning();
 
     /**
-     * Find active broadcasted requests strictly matching the partner's assigned categories,
-     * excluding requests rejected by this partner.
+     * Post & Pick: Find all available published jobs matching partner's eligible categories.
+     * Accessible by all eligible partners without individual broadcast dispatch.
      */
-    @Query("SELECT w FROM WorkRequest w WHERE w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED " +
+    @Query("SELECT w FROM WorkRequest w WHERE (w.status = com.apexservices.model.WorkRequestStatus.POSTED OR w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED) " +
            "AND (w.expiresAt IS NULL OR w.expiresAt > :now) " +
-           "AND (w.serviceCategoryId IN :categoryIds OR w.serviceCategory IN :categoryNames) " +
-           "AND w.id NOT IN (SELECT r.workRequest.id FROM WorkRequestRejection r WHERE r.partner.id = :partnerId) " +
+           "AND (:hasCategories = false OR w.serviceCategoryId IN :categoryIds OR w.serviceCategory IN :categoryNames) " +
            "ORDER BY w.createdAt DESC")
-    List<WorkRequest> findEligibleBroadcastsForPartnerCategories(
-            @Param("partnerId") Long partnerId,
+    List<WorkRequest> findAvailablePublishedJobsForCategories(
             @Param("categoryIds") List<Long> categoryIds,
             @Param("categoryNames") List<String> categoryNames,
+            @Param("hasCategories") boolean hasCategories,
             @Param("now") LocalDateTime now
     );
 
     /**
-     * Find active broadcasted requests matching category that have not been rejected by this partner.
+     * Post & Pick: Find all available published jobs across all categories.
      */
-    @Query("SELECT w FROM WorkRequest w WHERE w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED " +
+    @Query("SELECT w FROM WorkRequest w WHERE (w.status = com.apexservices.model.WorkRequestStatus.POSTED OR w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED) " +
            "AND (w.expiresAt IS NULL OR w.expiresAt > :now) " +
-           "AND (:category IS NULL OR :category = '' OR w.serviceCategory = :category) " +
-           "AND w.id NOT IN (SELECT r.workRequest.id FROM WorkRequestRejection r WHERE r.partner.id = :partnerId) " +
            "ORDER BY w.createdAt DESC")
-    List<WorkRequest> findEligibleBroadcastsForPartner(
-            @Param("partnerId") Long partnerId,
-            @Param("category") String category,
-            @Param("now") LocalDateTime now
-    );
+    List<WorkRequest> findAllAvailablePublishedJobs(@Param("now") LocalDateTime now);
 
     /**
-     * Atomic claim operation executing conditional write lock query:
-     * Only succeeds if status is BROADCASTED and not yet expired.
+     * Post & Pick: Atomic claim/acceptance.
+     * Guaranteed single-winner semantics: Only succeeds if status is POSTED or BROADCASTED.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkRequest w SET w.status = com.apexservices.model.WorkRequestStatus.ASSIGNED, " +
            "w.assignedPartner = :partner, w.assignedPartnerName = :partnerName, " +
            "w.assignedPartnerPhone = :partnerPhone, w.assignedPartnerRating = :partnerRating, " +
            "w.assignedPartnerPhoto = :partnerPhoto, w.claimedAt = :claimedAt, w.stage = 2 " +
-           "WHERE w.id = :id AND w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED " +
+           "WHERE w.id = :id AND (w.status = com.apexservices.model.WorkRequestStatus.POSTED OR w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED) " +
            "AND (w.expiresAt IS NULL OR w.expiresAt > :claimedAt)")
     int claimRequestAtomically(
             @Param("id") String id,
@@ -95,16 +94,34 @@ public interface WorkRequestRepository extends JpaRepository<WorkRequest, String
     );
 
     /**
-     * Atomic expiration update: Transitions pending requests past their deadline to EXPIRED.
+     * Legacy broadcast support (backward compatibility).
      */
+    @Query("SELECT w FROM WorkRequest w WHERE (w.status = com.apexservices.model.WorkRequestStatus.POSTED OR w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED) " +
+           "AND (w.expiresAt IS NULL OR w.expiresAt > :now) " +
+           "AND (w.serviceCategoryId IN :categoryIds OR w.serviceCategory IN :categoryNames) " +
+           "ORDER BY w.createdAt DESC")
+    List<WorkRequest> findEligibleBroadcastsForPartnerCategories(
+            @Param("partnerId") Long partnerId,
+            @Param("categoryIds") List<Long> categoryIds,
+            @Param("categoryNames") List<String> categoryNames,
+            @Param("now") LocalDateTime now
+    );
+
+    @Query("SELECT w FROM WorkRequest w WHERE (w.status = com.apexservices.model.WorkRequestStatus.POSTED OR w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED) " +
+           "AND (w.expiresAt IS NULL OR w.expiresAt > :now) " +
+           "AND (:category IS NULL OR :category = '' OR w.serviceCategory = :category) " +
+           "ORDER BY w.createdAt DESC")
+    List<WorkRequest> findEligibleBroadcastsForPartner(
+            @Param("partnerId") Long partnerId,
+            @Param("category") String category,
+            @Param("now") LocalDateTime now
+    );
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkRequest w SET w.status = com.apexservices.model.WorkRequestStatus.EXPIRED " +
-           "WHERE w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED AND w.expiresAt <= :now")
+           "WHERE (w.status = com.apexservices.model.WorkRequestStatus.POSTED OR w.status = com.apexservices.model.WorkRequestStatus.BROADCASTED) AND w.expiresAt <= :now")
     int expireOverdueRequests(@Param("now") LocalDateTime now);
 
-    /**
-     * Dynamically propagates an updated partner profile avatar to all assigned work requests.
-     */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE WorkRequest w SET w.assignedPartnerPhoto = :avatarUrl WHERE w.assignedPartner.id = :partnerId")
     int updateAssignedPartnerPhotoForPartner(@Param("partnerId") Long partnerId, @Param("avatarUrl") String avatarUrl);

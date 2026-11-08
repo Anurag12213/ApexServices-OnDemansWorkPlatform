@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.response;
 
 import com.apexservices.model.AuthProvider;
 import com.apexservices.model.Role;

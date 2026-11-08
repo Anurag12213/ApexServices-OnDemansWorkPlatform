@@ -1,6 +1,6 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.BootstrapDataResponseDto;
+import com.apexservices.dto.response.BootstrapDataResponseDto;
 import com.apexservices.model.SiteSetting;
 import com.apexservices.repository.SiteSettingRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -177,7 +177,7 @@ public class SiteContentService {
         aiOwnerSection.put("headingText", "Your Peace of Mind is Our Top Priority!");
         aiOwnerSection.put("indicatedText", "We personally guarantee top-quality workmanship on every job. If you're not 100% satisfied with our carpentry, plumbing, or electrical repair, we'll fix it completely free of charge!");
         aiOwnerSection.put("buttonText", "REQUEST NOW");
-        aiOwnerSection.put("imageUrl", "/anurag_founder.jpg");
+        aiOwnerSection.put("imageUrl", "https://res.cloudinary.com/tadfkray/image/upload/v1793900817/apexservices/founder/anurag_founder.jpg");
 
         Map<String, Object> s1 = new LinkedHashMap<>();
         s1.put("id", "slide-1");
@@ -185,7 +185,7 @@ public class SiteContentService {
         s1.put("title", "Expert Home Services At Your Doorstep");
         s1.put("subtitle", "From precision carpentry to emergency plumbing and electrical solutions — reliable professionals ready 24/7.");
         s1.put("buttonText", "Request Service Now");
-        s1.put("imageUrl", "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1400&q=80");
+        s1.put("imageUrl", "https://res.cloudinary.com/tadfkray/image/upload/v1793900800/apexservices/hero/hero_slide_1.jpg");
         heroSlides.add(s1);
 
         Map<String, Object> s2 = new LinkedHashMap<>();
@@ -194,7 +194,7 @@ public class SiteContentService {
         s2.put("title", "Master Carpentry & Custom Woodwork");
         s2.put("subtitle", "Custom furniture fitting, door restoration, cabinetry, and structural repair by certified craftsmen.");
         s2.put("buttonText", "Book Woodwork Special");
-        s2.put("imageUrl", "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=1400&q=80");
+        s2.put("imageUrl", "https://res.cloudinary.com/tadfkray/image/upload/v1793900802/apexservices/hero/hero_slide_2.jpg");
         heroSlides.add(s2);
 
         Map<String, Object> s3 = new LinkedHashMap<>();
@@ -203,12 +203,12 @@ public class SiteContentService {
         s3.put("title", "Fast Plumbing & Electrical Repairs");
         s3.put("subtitle", "Zero hassle leakage repair, wiring upgrades, breaker fixes, and full maintenance packages.");
         s3.put("buttonText", "Explore Emergency Care");
-        s3.put("imageUrl", "https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=1400&q=80");
+        s3.put("imageUrl", "https://res.cloudinary.com/tadfkray/image/upload/v1793900805/apexservices/hero/hero_slide_3.jpg");
         heroSlides.add(s3);
 
-        addReviewDirect("rev-1", "Sarah Jenkins", "Homeowner", 5, "The carpentry team redesigned our custom kitchen cabinets flawlessly! Fast, polite, and very clean work.", "Custom Carpentry", "2 days ago", "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80");
-        addReviewDirect("rev-2", "David Miller", "Property Manager", 5, "Called their emergency plumbing team at 11 PM for a burst pipe. They arrived in 25 minutes and fixed it completely!", "Emergency Plumbing", "1 week ago", "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80");
-        addReviewDirect("rev-3", "Elena Rostova", "Interior Designer", 5, "Outstanding electrical and lighting installation. Their attention to safety and detail is unmatched in the area.", "Electrical Maintenance", "3 weeks ago", "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80");
+        addReviewDirect("rev-1", "Sarah Jenkins", "Homeowner", 5, "The carpentry team redesigned our custom kitchen cabinets flawlessly! Fast, polite, and very clean work.", "Custom Carpentry", "2 days ago", "https://res.cloudinary.com/tadfkray/image/upload/v1793900818/apexservices/reviews/avatar_sarah.jpg");
+        addReviewDirect("rev-2", "David Miller", "Property Manager", 5, "Called their emergency plumbing team at 11 PM for a burst pipe. They arrived in 25 minutes and fixed it completely!", "Emergency Plumbing", "1 week ago", "https://res.cloudinary.com/tadfkray/image/upload/v1793900819/apexservices/reviews/avatar_david.jpg");
+        addReviewDirect("rev-3", "Elena Rostova", "Interior Designer", 5, "Outstanding electrical and lighting installation. Their attention to safety and detail is unmatched in the area.", "Electrical Maintenance", "3 weeks ago", "https://res.cloudinary.com/tadfkray/image/upload/v1793900819/apexservices/reviews/avatar_elena.jpg");
     }
 
     private void addReviewDirect(String id, String name, String role, int rating, String comment, String serviceUsed, String date, String avatar) {

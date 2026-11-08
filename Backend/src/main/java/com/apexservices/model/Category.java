@@ -31,7 +31,7 @@ public class Category {
     @Column(name = "tag", length = 50)
     private String tag = "Popular";
 
-    @Column(name = "banner_image_url", length = 1000)
+    @Column(name = "banner_image_url", columnDefinition = "TEXT")
     private String bannerImageUrl;
 
     @Builder.Default

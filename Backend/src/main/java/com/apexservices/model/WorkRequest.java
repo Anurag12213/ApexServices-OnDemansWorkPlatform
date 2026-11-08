@@ -15,7 +15,9 @@ import java.time.LocalDateTime;
         @Index(name = "idx_wr_service_category_id", columnList = "service_category_id"),
         @Index(name = "idx_wr_customer_email", columnList = "customer_email"),
         @Index(name = "idx_wr_assigned_partner", columnList = "assigned_partner_id"),
-        @Index(name = "idx_wr_expires_at", columnList = "expires_at")
+        @Index(name = "idx_wr_expires_at", columnList = "expires_at"),
+        @Index(name = "idx_wr_post_and_pick", columnList = "status, service_category_id, created_at"),
+        @Index(name = "idx_wr_geo", columnList = "latitude, longitude")
     }
 )
 @Getter
@@ -51,6 +53,21 @@ public class WorkRequest {
     @Column(name = "service_address", nullable = false, columnDefinition = "TEXT")
     private String serviceAddress;
 
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private BigDecimal longitude;
+
+    @Column(name = "house_details", length = 200)
+    private String houseDetails;
+
+    @Column(name = "landmark", length = 200)
+    private String landmark;
+
+    @Column(name = "city_postal", length = 100)
+    private String cityPostal;
+
     @Column(name = "problem_title", length = 200)
     private String problemTitle;
 
@@ -75,10 +92,16 @@ public class WorkRequest {
     @Column(name = "estimated_cost", nullable = false, precision = 10, scale = 2)
     private BigDecimal estimatedCost = new BigDecimal("499.00");
 
+    @Column(name = "quote_amount", precision = 10, scale = 2)
+    private BigDecimal quoteAmount;
+
+    @Column(name = "quote_notes", columnDefinition = "TEXT")
+    private String quoteNotes;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     @Builder.Default
-    private WorkRequestStatus status = WorkRequestStatus.BROADCASTED;
+    private WorkRequestStatus status = WorkRequestStatus.POSTED;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_partner_id")
@@ -117,8 +140,32 @@ public class WorkRequest {
     @Column(name = "claimed_at")
     private LocalDateTime claimedAt;
 
+    @Column(name = "started_journey_at")
+    private LocalDateTime startedJourneyAt;
+
+    @Column(name = "arrived_at")
+    private LocalDateTime arrivedAt;
+
+    @Column(name = "started_work_at")
+    private LocalDateTime startedWorkAt;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
+
+    @Column(name = "cancellation_reason", columnDefinition = "TEXT")
+    private String cancellationReason;
+
+    @Column(name = "cancelled_by_role", length = 50)
+    private String cancelledByRole;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
+    @Column(name = "dispute_reason", columnDefinition = "TEXT")
+    private String disputeReason;
+
+    @Column(name = "disputed_at")
+    private LocalDateTime disputedAt;
 
     @Builder.Default
     @Column(name = "payment_status", length = 50)
@@ -143,7 +190,7 @@ public class WorkRequest {
     protected void onCreate() {
         if (this.createdAt == null) this.createdAt = LocalDateTime.now();
         if (this.updatedAt == null) this.updatedAt = LocalDateTime.now();
-        if (this.status == null) this.status = WorkRequestStatus.BROADCASTED;
+        if (this.status == null) this.status = WorkRequestStatus.POSTED;
         if (this.stage == 0) this.stage = 1;
         if (this.estimatedCost == null) this.estimatedCost = new BigDecimal("499.00");
         if (this.paymentStatus == null) this.paymentStatus = "UNPAID";

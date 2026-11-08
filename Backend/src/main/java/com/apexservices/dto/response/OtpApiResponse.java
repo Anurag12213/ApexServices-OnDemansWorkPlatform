@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;

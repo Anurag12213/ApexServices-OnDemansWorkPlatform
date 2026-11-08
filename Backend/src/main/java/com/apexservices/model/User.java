@@ -37,7 +37,8 @@ public class User {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "provider", nullable = false)
-    private AuthProvider provider;
+    @Builder.Default
+    private AuthProvider provider = AuthProvider.LOCAL;
 
     @Column(name = "provider_id", length = 255)
     private String providerId;

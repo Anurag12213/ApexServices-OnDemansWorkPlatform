@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.request;
 
 import com.apexservices.model.Role;
 import jakarta.validation.constraints.NotBlank;

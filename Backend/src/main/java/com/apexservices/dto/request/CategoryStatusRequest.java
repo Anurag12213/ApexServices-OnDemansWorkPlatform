@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

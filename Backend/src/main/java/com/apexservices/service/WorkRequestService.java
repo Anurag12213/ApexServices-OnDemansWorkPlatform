@@ -1,31 +1,33 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.WorkRequestClaimResponseDto;
-import com.apexservices.dto.WorkRequestDto;
-import com.apexservices.dto.WorkRequestResponseDto;
+import com.apexservices.dto.request.WorkRequestDto;
+import com.apexservices.dto.response.WorkRequestClaimResponseDto;
+import com.apexservices.dto.response.WorkRequestResponseDto;
 import com.apexservices.exception.ConflictException;
 import com.apexservices.model.*;
 import com.apexservices.repository.CategoryRepository;
 import com.apexservices.repository.UserRepository;
 import com.apexservices.repository.WorkRequestBroadcastRepository;
+import com.apexservices.repository.WorkRequestEventRepository;
 import com.apexservices.repository.WorkRequestRejectionRepository;
 import com.apexservices.repository.WorkRequestRepository;
 import com.apexservices.security.InputSanitizer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class WorkRequestService {
-
-    private static final Logger log = LoggerFactory.getLogger(WorkRequestService.class);
 
     private final WorkRequestRepository workRequestRepository;
     private final WorkRequestRejectionRepository rejectionRepository;
@@ -38,9 +40,10 @@ public class WorkRequestService {
     private final ReviewService reviewService;
     private final PartnerProfileService partnerProfileService;
     private final PaymentAndLedgerService paymentAndLedgerService;
-    private final com.apexservices.repository.WorkRequestEventRepository eventRepository;
+    private final WorkRequestEventRepository eventRepository;
     private final com.apexservices.security.JwtService jwtService;
 
+    @Autowired
     public WorkRequestService(
             WorkRequestRepository workRequestRepository,
             WorkRequestRejectionRepository rejectionRepository,
@@ -53,27 +56,8 @@ public class WorkRequestService {
             ReviewService reviewService,
             PartnerProfileService partnerProfileService,
             PaymentAndLedgerService paymentAndLedgerService,
-            com.apexservices.repository.WorkRequestEventRepository eventRepository) {
-        this(workRequestRepository, rejectionRepository, broadcastRepository, userRepository, categoryRepository,
-                notificationService, presenceService, otpSecurityService, reviewService, partnerProfileService,
-                paymentAndLedgerService, eventRepository, null);
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    public WorkRequestService(
-            WorkRequestRepository workRequestRepository,
-            WorkRequestRejectionRepository rejectionRepository,
-            WorkRequestBroadcastRepository broadcastRepository,
-            UserRepository userRepository,
-            CategoryRepository categoryRepository,
-            DispatchNotificationService notificationService,
-            PartnerPresenceService presenceService,
-            OtpSecurityService otpSecurityService,
-            ReviewService reviewService,
-            PartnerProfileService partnerProfileService,
-            PaymentAndLedgerService paymentAndLedgerService,
-            com.apexservices.repository.WorkRequestEventRepository eventRepository,
-            @org.springframework.beans.factory.annotation.Autowired(required = false) com.apexservices.security.JwtService jwtService) {
+            WorkRequestEventRepository eventRepository,
+            @Autowired(required = false) com.apexservices.security.JwtService jwtService) {
         this.workRequestRepository = workRequestRepository;
         this.rejectionRepository = rejectionRepository;
         this.broadcastRepository = broadcastRepository;
@@ -89,10 +73,10 @@ public class WorkRequestService {
         this.jwtService = jwtService;
     }
 
-    /**
-     * Converts a WorkRequest entity to DTO with dynamic partner profile avatar resolution.
-     * Ensures any partner avatar update is immediately and dynamically visible to customers.
-     */
+    // =========================================================================
+    // DTO MAPPING HELPER
+    // =========================================================================
+
     public WorkRequestResponseDto toResponseDto(WorkRequest wr) {
         if (wr == null) return null;
         WorkRequestResponseDto dto = WorkRequestResponseDto.fromEntity(wr);
@@ -105,9 +89,10 @@ public class WorkRequestService {
         return dto;
     }
 
-    /**
-     * Creates and broadcasts a new work request with a server-authoritative 45-second deadline.
-     */
+    // =========================================================================
+    // 1. CUSTOMER LIFECYCLE: SUBMIT WORK REQUEST (POST AND PICK)
+    // =========================================================================
+
     @Transactional
     public WorkRequestResponseDto createWorkRequest(WorkRequestDto dto, String authenticatedEmail) {
         String reqId = dto.getId() != null && !dto.getId().isBlank()
@@ -133,7 +118,7 @@ public class WorkRequestService {
                         .fullName(sanitizedName)
                         .email(email)
                         .mobileNumber(phone)
-                        .password("$2a$10$" + java.util.UUID.randomUUID().toString().replace("-", "") + "UnUsAbLeGuEsT")
+                        .password("$2a$10$" + UUID.randomUUID().toString().replace("-", "") + "UnUsAbLeGuEsT")
                         .role(Role.ROLE_CUSTOMER)
                         .provider(AuthProvider.LOCAL)
                         .active(true)
@@ -172,14 +157,15 @@ public class WorkRequestService {
             throw new IllegalArgumentException("Unknown or invalid service category: " + dto.getServiceCategory());
         }
         if (!category.isActive()) {
-            throw new IllegalArgumentException("The category '" + category.getName() + "' is currently deactivated and not accepting new requests.");
+            throw new IllegalArgumentException("The category '" + category.getName() + "' is currently deactivated.");
         }
 
         String canonicalCategoryName = category.getName();
         Long categoryId = category.getId();
 
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expiresAt = now.plusSeconds(120); // Server-authoritative 2-minute (120s) countdown
+        // Post and Pick: Published requests remain open for picking (24h availability window)
+        LocalDateTime expiresAt = now.plusHours(24);
 
         WorkRequest wr = WorkRequest.builder()
                 .id(reqId)
@@ -190,13 +176,18 @@ public class WorkRequestService {
                 .serviceCategory(canonicalCategoryName)
                 .serviceCategoryId(categoryId)
                 .serviceAddress(InputSanitizer.sanitize(dto.getServiceAddress()))
+                .latitude(dto.getLatitude())
+                .longitude(dto.getLongitude())
+                .houseDetails(dto.getHouseDetails() != null ? InputSanitizer.sanitize(dto.getHouseDetails()) : null)
+                .landmark(dto.getLandmark() != null ? InputSanitizer.sanitize(dto.getLandmark()) : null)
+                .cityPostal(dto.getCityPostal() != null ? InputSanitizer.sanitize(dto.getCityPostal()) : null)
                 .problemTitle(canonicalCategoryName + " Service")
                 .problemDescription(InputSanitizer.sanitize(dto.getProblemDescription()))
                 .urgency(dto.getUrgency() != null ? InputSanitizer.sanitize(dto.getUrgency()) : "Standard")
                 .preferredDate(dto.getPreferredDate() != null ? InputSanitizer.sanitize(dto.getPreferredDate()) : null)
                 .preferredTime(dto.getPreferredTime() != null ? InputSanitizer.sanitize(dto.getPreferredTime()) : null)
                 .estimatedCost(cost)
-                .status(WorkRequestStatus.BROADCASTED)
+                .status(WorkRequestStatus.POSTED)
                 .stage(1)
                 .createdAt(now)
                 .updatedAt(now)
@@ -208,32 +199,15 @@ public class WorkRequestService {
         // Generate authoritative customer completion verification OTP
         otpSecurityService.generateAndStoreOtp(wr);
 
-        // Record initial event
+        // Record audit event
         eventRepository.save(WorkRequestEvent.builder()
                 .workRequest(wr)
                 .fromStatus(null)
-                .toStatus(WorkRequestStatus.BROADCASTED.name())
+                .toStatus(WorkRequestStatus.POSTED.name())
                 .actor(customer)
                 .actorRole(customer != null ? "CUSTOMER" : "GUEST")
-                .notes("Service request submitted and broadcasted to eligible partners")
+                .notes("Work request published to open marketplace (POST AND PICK)")
                 .build());
-
-        // Record broadcasts ONLY for partners with verified eligibility for this category
-        List<User> eligiblePartners = userRepository.findEligiblePartnersByCategoryId(categoryId);
-        for (User p : eligiblePartners) {
-            if (p.isActive()) {
-                try {
-                    WorkRequestBroadcast broadcast = WorkRequestBroadcast.builder()
-                            .workRequest(wr)
-                            .partner(p)
-                            .notifiedAt(now)
-                            .build();
-                    broadcastRepository.save(broadcast);
-                } catch (Exception ex) {
-                    log.warn("Failed recording broadcast for partner {}: {}", p.getId(), ex.getMessage());
-                }
-            }
-        }
 
         WorkRequestResponseDto responseDto = toResponseDto(wr);
         if (jwtService != null && customer != null) {
@@ -248,17 +222,21 @@ public class WorkRequestService {
                 log.warn("Could not generate customer token on work request creation: {}", e.getMessage());
             }
         }
-        // Real-time broadcast to all eligible listening partners
-        notificationService.broadcastNewRequest(responseDto);
 
+        // Request successfully created and saved in database
         return responseDto;
     }
 
+    // =========================================================================
+    // 2. PARTNER MARKETPLACE: ALL JOBS & NEARBY JOBS (POST AND PICK)
+    // =========================================================================
+
     /**
-     * Retrieves active incoming broadcasts matching the partner's assigned categories, excluding rejected ones.
+     * All published jobs eligible for the authenticated partner.
+     * All eligible partners can browse all published jobs.
      */
     @Transactional(readOnly = true)
-    public List<WorkRequestResponseDto> getPartnerFeed(String partnerEmail, String category) {
+    public List<WorkRequestResponseDto> getPartnerAllJobs(String partnerEmail, String categoryFilter) {
         User partner = userRepository.findByEmail(partnerEmail.trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
 
@@ -269,46 +247,107 @@ public class WorkRequestService {
         List<Long> assignedCategoryIds = userRepository.findCategoryIdsByPartnerId(partner.getId());
         List<String> assignedCategoryNames = userRepository.findCategoryNamesByPartnerId(partner.getId());
 
-        if (assignedCategoryIds.isEmpty()) {
-            log.info("Partner {} has no assigned service categories in partner_service_categories", partnerEmail);
-            return Collections.emptyList();
-        }
-
         LocalDateTime now = LocalDateTime.now();
         List<WorkRequest> requests;
 
-        if (category != null && !category.isBlank()) {
-            String filter = category.trim();
-            boolean isEligibleForFilter = assignedCategoryNames.stream().anyMatch(n -> n.equalsIgnoreCase(filter))
-                    || assignedCategoryIds.stream().anyMatch(id -> String.valueOf(id).equals(filter));
-            if (!isEligibleForFilter) {
-                // Partner not eligible for requested filter
-                return Collections.emptyList();
-            }
-            requests = workRequestRepository.findEligibleBroadcastsForPartner(partner.getId(), filter, now);
+        if (assignedCategoryIds.isEmpty()) {
+            // If partner has no restrictions, retrieve all published jobs
+            requests = workRequestRepository.findAllAvailablePublishedJobs(now);
         } else {
-            // Strictly query requests matching partner's assigned categories
-            requests = workRequestRepository.findEligibleBroadcastsForPartnerCategories(partner.getId(), assignedCategoryIds, assignedCategoryNames, now);
+            requests = workRequestRepository.findAvailablePublishedJobsForCategories(
+                    assignedCategoryIds, assignedCategoryNames, true, now);
         }
 
-        List<WorkRequestResponseDto> result = new ArrayList<>();
-        for (WorkRequest wr : requests) {
-            result.add(toResponseDto(wr));
+        if (categoryFilter != null && !categoryFilter.isBlank()) {
+            String cf = categoryFilter.trim();
+            requests = requests.stream()
+                    .filter(r -> cf.equalsIgnoreCase(r.getServiceCategory()) ||
+                            (r.getServiceCategoryId() != null && String.valueOf(r.getServiceCategoryId()).equals(cf)))
+                    .collect(Collectors.toList());
         }
-        return result;
+
+        return requests.stream()
+                .map(r -> WorkRequestResponseDto.forUnassignedPartner(r, null))
+                .collect(Collectors.toList());
     }
 
     /**
-     * Atomically claims a work request.
+     * Nearby Jobs filter based on partner coordinates and radius.
+     * Nearby is a filtering feature, not a job visibility restriction.
+     */
+    @Transactional(readOnly = true)
+    public List<WorkRequestResponseDto> getPartnerNearbyJobs(
+            String partnerEmail,
+            Double partnerLat,
+            Double partnerLng,
+            Double radiusKm,
+            String categoryFilter) {
+
+        List<WorkRequestResponseDto> allJobs = getPartnerAllJobs(partnerEmail, categoryFilter);
+
+        if (partnerLat == null || partnerLng == null) {
+            return allJobs;
+        }
+
+        double maxDist = (radiusKm != null && radiusKm > 0) ? radiusKm : 50.0;
+
+        List<WorkRequestResponseDto> nearbyList = new ArrayList<>();
+        for (WorkRequestResponseDto job : allJobs) {
+            if (job.getLatitude() != null && job.getLongitude() != null) {
+                double dist = calculateDistanceKm(
+                        partnerLat, partnerLng,
+                        job.getLatitude().doubleValue(), job.getLongitude().doubleValue());
+                job.setDistanceKm(Math.round(dist * 10.0) / 10.0);
+                if (dist <= maxDist) {
+                    nearbyList.add(job);
+                }
+            } else {
+                // Jobs without coordinates remain visible in All Jobs, but excluded from strict distance radius
+                job.setDistanceKm(null);
+            }
+        }
+
+        nearbyList.sort(Comparator.comparing(
+                j -> j.getDistanceKm() != null ? j.getDistanceKm() : Double.MAX_VALUE));
+        return nearbyList;
+    }
+
+    /**
+     * Partner view of job details.
+     * Full customer address & contact details are protected/masked before assignment.
+     */
+    @Transactional(readOnly = true)
+    public WorkRequestResponseDto getPartnerJobDetail(String requestId, String partnerEmail) {
+        User partner = userRepository.findByEmail(partnerEmail.trim().toLowerCase())
+                .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
+
+        WorkRequest wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        boolean isAssigned = wr.getAssignedPartner() != null && wr.getAssignedPartner().getId().equals(partner.getId());
+
+        if (isAssigned) {
+            // Assigned partner sees full address, but OTP remains hidden
+            WorkRequestResponseDto dto = toResponseDto(wr);
+            dto.setCompletionOtp(null);
+            return dto;
+        }
+
+        // Unassigned partner browsing: privacy-masked view
+        return WorkRequestResponseDto.forUnassignedPartner(wr, null);
+    }
+
+    /**
+     * Atomic Post and Pick Acceptance.
      * Guaranteed only one winner: Competing partners receive HTTP 409 Conflict.
      */
     @Transactional
-    public WorkRequestClaimResponseDto claimWorkRequest(String requestId, String partnerEmail) {
+    public WorkRequestClaimResponseDto acceptJobAtomically(String requestId, String partnerEmail) {
         User partner = userRepository.findByEmail(partnerEmail.trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
 
         if (partner.getRole() != Role.ROLE_PARTNER) {
-            throw new IllegalArgumentException("Only verified partners can claim work requests");
+            throw new IllegalArgumentException("Only verified partners can accept work requests");
         }
         if (!partner.isActive()) {
             throw new ConflictException("Partner account is inactive", "ACCOUNT_INACTIVE");
@@ -332,7 +371,6 @@ public class WorkRequestService {
         );
 
         if (updatedRows == 0) {
-            // Check reason for failed atomic claim
             Optional<WorkRequest> existingOpt = workRequestRepository.findById(requestId);
             if (existingOpt.isEmpty()) {
                 throw new IllegalArgumentException("Work request not found: " + requestId);
@@ -340,14 +378,14 @@ public class WorkRequestService {
 
             WorkRequest existing = existingOpt.get();
             if (existing.getExpiresAt() != null && existing.getExpiresAt().isBefore(claimedAt)) {
-                throw new ConflictException("This work request has expired and can no longer be claimed.", "EXPIRED");
+                throw new ConflictException("This work request has expired and is no longer available.", "EXPIRED");
             }
-            if (existing.getStatus() != WorkRequestStatus.BROADCASTED) {
+            if (existing.getStatus() != WorkRequestStatus.POSTED && existing.getStatus() != WorkRequestStatus.BROADCASTED) {
                 String claimedBy = existing.getAssignedPartnerName() != null ? existing.getAssignedPartnerName() : "another partner";
-                throw new ConflictException("This work request was already claimed by " + claimedBy + ".", "ALREADY_CLAIMED");
+                throw new ConflictException("This work request was already accepted by " + claimedBy + ".", "ALREADY_CLAIMED");
             }
 
-            throw new ConflictException("Could not claim work request: offer is no longer available.", "OFFER_UNAVAILABLE");
+            throw new ConflictException("This job is no longer available.", "OFFER_UNAVAILABLE");
         }
 
         // Successfully claimed: reload updated record
@@ -355,81 +393,295 @@ public class WorkRequestService {
                 .orElseThrow(() -> new IllegalStateException("Claimed request could not be reloaded: " + requestId));
 
         WorkRequestResponseDto responseDto = toResponseDto(claimed);
+        responseDto.setCompletionOtp(null); // OTP is never shown to partner
 
         // Record audit event
         eventRepository.save(WorkRequestEvent.builder()
                 .workRequest(claimed)
-                .fromStatus(WorkRequestStatus.BROADCASTED.name())
+                .fromStatus(WorkRequestStatus.POSTED.name())
                 .toStatus(WorkRequestStatus.ASSIGNED.name())
                 .actor(partner)
                 .actorRole("PARTNER")
-                .notes("Work request claimed by partner: " + partnerName)
+                .notes("Work request accepted by partner: " + partnerName)
                 .build());
 
-        // Notify other partners to dismiss card and notify customer of partner assignment
+        // Real-time broadcast: notify other partners to remove job from feed, and notify customer
         notificationService.notifyRequestClaimed(requestId, partner.getId(), partnerName, responseDto);
 
         return WorkRequestClaimResponseDto.success(responseDto);
     }
 
     /**
-     * Records a partner rejection idempotently.
+     * Partner's assigned jobs: Active, Upcoming, and Completed.
      */
-    @Transactional
-    public Map<String, Object> rejectWorkRequest(String requestId, String partnerEmail) {
+    @Transactional(readOnly = true)
+    public List<WorkRequestResponseDto> getPartnerAssignedJobs(String partnerEmail, String statusFilter) {
         User partner = userRepository.findByEmail(partnerEmail.trim().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Partner account not found"));
+
+        List<WorkRequest> list;
+        if (statusFilter != null && !statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter)) {
+            try {
+                WorkRequestStatus st = WorkRequestStatus.valueOf(statusFilter.toUpperCase());
+                list = workRequestRepository.findByAssignedPartnerIdAndStatusInOrderByCreatedAtDesc(
+                        partner.getId(), List.of(st));
+            } catch (Exception e) {
+                list = workRequestRepository.findByAssignedPartnerIdOrderByCreatedAtDesc(partner.getId());
+            }
+        } else {
+            list = workRequestRepository.findByAssignedPartnerIdOrderByCreatedAtDesc(partner.getId());
+        }
+
+        return list.stream().map(wr -> {
+            WorkRequestResponseDto dto = toResponseDto(wr);
+            dto.setCompletionOtp(null);
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
+    // =========================================================================
+    // 3. WORK PROGRESS TRANSITIONS (PARTNER EXECUTION FLOW)
+    // =========================================================================
+
+    @Transactional
+    public WorkRequestResponseDto startJourney(String requestId, String partnerEmail) {
+        return transitionPartnerStage(requestId, partnerEmail,
+                WorkRequestStatus.ASSIGNED, WorkRequestStatus.PARTNER_ON_THE_WAY, 3, "Partner is on the way to customer address",
+                wr -> wr.setStartedJourneyAt(LocalDateTime.now()));
+    }
+
+    @Transactional
+    public WorkRequestResponseDto arriveAtLocation(String requestId, String partnerEmail) {
+        return transitionPartnerStage(requestId, partnerEmail,
+                WorkRequestStatus.PARTNER_ON_THE_WAY, WorkRequestStatus.PARTNER_ARRIVED, 4, "Partner arrived at service location",
+                wr -> wr.setArrivedAt(LocalDateTime.now()));
+    }
+
+    @Transactional
+    public WorkRequestResponseDto startWork(String requestId, String partnerEmail) {
+        return transitionPartnerStage(requestId, partnerEmail,
+                WorkRequestStatus.PARTNER_ARRIVED, WorkRequestStatus.IN_PROGRESS, 4, "Partner started work execution",
+                wr -> wr.setStartedWorkAt(LocalDateTime.now()));
+    }
+
+    @Transactional
+    public WorkRequestResponseDto requestCompletion(String requestId, String partnerEmail) {
+        return transitionPartnerStage(requestId, partnerEmail,
+                WorkRequestStatus.IN_PROGRESS, WorkRequestStatus.AWAITING_CUSTOMER_APPROVAL, 5, "Partner completed work, awaiting customer OTP verification",
+                null);
+    }
+
+    /**
+     * Backward-compatible advance-stage endpoint supporting sequential flow.
+     */
+    @Transactional
+    public WorkRequestResponseDto advanceStage(String requestId, String userEmail) {
+        WorkRequest wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        validatePartnerOwnership(wr, userEmail);
+
+        WorkRequestStatus current = wr.getStatus();
+        WorkRequestStatus next;
+        int nextStage;
+
+        if (current == WorkRequestStatus.ASSIGNED) {
+            next = WorkRequestStatus.PARTNER_ON_THE_WAY;
+            nextStage = 3;
+            wr.setStartedJourneyAt(LocalDateTime.now());
+        } else if (current == WorkRequestStatus.PARTNER_ON_THE_WAY || current == WorkRequestStatus.IN_TRANSIT) {
+            next = WorkRequestStatus.PARTNER_ARRIVED;
+            nextStage = 4;
+            wr.setArrivedAt(LocalDateTime.now());
+        } else if (current == WorkRequestStatus.PARTNER_ARRIVED || current == WorkRequestStatus.ARRIVED) {
+            next = WorkRequestStatus.IN_PROGRESS;
+            nextStage = 4;
+            wr.setStartedWorkAt(LocalDateTime.now());
+        } else if (current == WorkRequestStatus.IN_PROGRESS) {
+            next = WorkRequestStatus.AWAITING_CUSTOMER_APPROVAL;
+            nextStage = 5;
+        } else {
+            next = current;
+            nextStage = wr.getStage();
+        }
+
+        wr.setStatus(next);
+        wr.setStage(nextStage);
+        wr = workRequestRepository.save(wr);
+
+        eventRepository.save(WorkRequestEvent.builder()
+                .workRequest(wr)
+                .fromStatus(current.name())
+                .toStatus(next.name())
+                .actor(wr.getAssignedPartner())
+                .actorRole("PARTNER")
+                .notes("Partner advanced service status to " + next.name())
+                .build());
+
+        WorkRequestResponseDto dto = toResponseDto(wr);
+        dto.setCompletionOtp(null);
+        notificationService.notifyStageUpdated(requestId, dto);
+        return dto;
+    }
+
+    private WorkRequestResponseDto transitionPartnerStage(
+            String requestId,
+            String partnerEmail,
+            WorkRequestStatus expectedCurrent,
+            WorkRequestStatus nextStatus,
+            int nextStage,
+            String notes,
+            java.util.function.Consumer<WorkRequest> customUpdater) {
 
         WorkRequest wr = workRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
 
-        if (!rejectionRepository.existsByWorkRequestIdAndPartnerId(requestId, partner.getId())) {
-            WorkRequestRejection rejection = WorkRequestRejection.builder()
-                    .workRequest(wr)
-                    .partner(partner)
-                    .rejectedAt(LocalDateTime.now())
-                    .build();
-            rejectionRepository.save(rejection);
-        }
+        validatePartnerOwnership(wr, partnerEmail);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("success", true);
-        response.put("message", "Request rejected successfully for this partner");
-        response.put("requestId", requestId);
-        return response;
+        WorkRequestStatus current = wr.getStatus();
+        wr.setStatus(nextStatus);
+        wr.setStage(nextStage);
+        if (customUpdater != null) {
+            customUpdater.accept(wr);
+        }
+        wr = workRequestRepository.save(wr);
+
+        eventRepository.save(WorkRequestEvent.builder()
+                .workRequest(wr)
+                .fromStatus(current.name())
+                .toStatus(nextStatus.name())
+                .actor(wr.getAssignedPartner())
+                .actorRole("PARTNER")
+                .notes(notes)
+                .build());
+
+        WorkRequestResponseDto dto = toResponseDto(wr);
+        dto.setCompletionOtp(null);
+        notificationService.notifyStageUpdated(requestId, dto);
+        return dto;
     }
 
-    /**
-     * Gets a work request by ID with strict role-based ownership authorization.
-     * ONLY the customer who owns the request or an administrator can see the secret completion OTP.
-     * Partners assigned to the request receive the work request details with completionOtp set to NULL.
-     */
+    private void validatePartnerOwnership(WorkRequest wr, String callerEmail) {
+        if (callerEmail == null || callerEmail.isBlank()) return;
+        if (wr.getAssignedPartner() != null && wr.getAssignedPartner().getEmail() != null) {
+            if (!wr.getAssignedPartner().getEmail().equalsIgnoreCase(callerEmail.trim())) {
+                User caller = userRepository.findByEmail(callerEmail.trim().toLowerCase()).orElse(null);
+                if (caller == null || caller.getRole() != Role.ROLE_ADMIN) {
+                    throw new AccessDeniedException("You are not assigned to this work request");
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 4. COMPLETION VERIFICATION (SECURE OTP HMAC)
+    // =========================================================================
+
     @Transactional
+    public WorkRequestResponseDto verifyCompletion(String requestId, String partnerEmail, String completionOtp) {
+        WorkRequest wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        validatePartnerOwnership(wr, partnerEmail);
+
+        if (wr.getStatus() == WorkRequestStatus.COMPLETED) {
+            return toResponseDto(wr);
+        }
+        if (wr.getStatus() == WorkRequestStatus.CANCELLED || wr.getStatus() == WorkRequestStatus.EXPIRED) {
+            throw new ConflictException("Cannot verify completion for request in status: " + wr.getStatus(), "INVALID_STATUS");
+        }
+
+        // Verify and consume single-use OTP
+        otpSecurityService.verifyAndConsumeOtp(requestId, completionOtp);
+
+        WorkRequestStatus prev = wr.getStatus();
+        wr.setStatus(WorkRequestStatus.COMPLETED);
+        wr.setStage(5);
+        wr.setCompletedAt(LocalDateTime.now());
+        if (wr.getPaymentStatus() == null || "UNPAID".equals(wr.getPaymentStatus())) {
+            wr.setPaymentStatus("PAYMENT_PENDING");
+        }
+        wr = workRequestRepository.save(wr);
+
+        eventRepository.save(WorkRequestEvent.builder()
+                .workRequest(wr)
+                .fromStatus(prev != null ? prev.name() : null)
+                .toStatus(WorkRequestStatus.COMPLETED.name())
+                .actor(wr.getAssignedPartner())
+                .actorRole("PARTNER")
+                .notes("Work completion verified via customer completion OTP")
+                .build());
+
+        WorkRequestResponseDto dto = toResponseDto(wr);
+        dto.setCompletionOtp(null);
+        notificationService.notifyStageUpdated(requestId, dto);
+        return dto;
+    }
+
+    @Transactional
+    public Map<String, String> getCustomerCompletionOtp(String requestId, String customerEmail) {
+        if (customerEmail == null || customerEmail.isBlank()) {
+            throw new AccessDeniedException("Authentication required to access completion verification code.");
+        }
+
+        WorkRequest wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        User caller = userRepository.findByEmail(customerEmail.trim().toLowerCase())
+                .orElseThrow(() -> new AccessDeniedException("Unrecognized caller identity."));
+
+        boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
+        boolean isOwner = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
+
+        if (!isAdmin && !isOwner) {
+            throw new AccessDeniedException("Access denied: Only the customer who booked this service can view the completion OTP.");
+        }
+
+        if (wr.getStatus() == WorkRequestStatus.COMPLETED || wr.getStatus() == WorkRequestStatus.CANCELLED) {
+            throw new ConflictException("Completion OTP is not available for request in status: " + wr.getStatus(), "INVALID_STATUS");
+        }
+
+        String activeOtp = otpSecurityService.getActiveOtpForCustomer(requestId);
+        if (activeOtp == null) {
+            activeOtp = otpSecurityService.generateAndStoreOtp(wr);
+        }
+
+        Map<String, String> result = new LinkedHashMap<>();
+        result.put("requestId", requestId);
+        result.put("completionOtp", activeOtp);
+        result.put("otp", activeOtp);
+        return result;
+    }
+
+    // =========================================================================
+    // 5. CUSTOMER QUERIES, CANCELLATION & DISPUTE
+    // =========================================================================
+
+    @Transactional(readOnly = true)
     public WorkRequestResponseDto getWorkRequestById(String id, String callerEmail) {
         WorkRequest wr = workRequestRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + id));
 
         if (callerEmail == null || callerEmail.isBlank()) {
-            throw new org.springframework.security.access.AccessDeniedException("Authentication required to view work request details.");
+            throw new AccessDeniedException("Authentication required to view work request details.");
         }
 
         User caller = userRepository.findByEmail(callerEmail.trim().toLowerCase())
-                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+                .orElseThrow(() -> new AccessDeniedException("Unrecognized caller identity."));
 
         boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
         boolean isCustomer = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
         boolean isAssignedPartner = wr.getAssignedPartner() != null && wr.getAssignedPartner().getId().equals(caller.getId());
 
         if (!isAdmin && !isCustomer && !isAssignedPartner) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not authorized to view work request " + id);
+            throw new AccessDeniedException("Access denied: You are not authorized to view work request " + id);
         }
 
         WorkRequestResponseDto dto = toResponseDto(wr);
 
-        // Security requirement 2.2: NEVER reveal completion OTP to partner.
-        // Partner must ask customer at completion time; customer provides the OTP verbally/in-person.
+        // Security requirement: NEVER reveal completion OTP to partner.
         if (isCustomer || isAdmin) {
-            if (wr.getStatus() != WorkRequestStatus.COMPLETED && wr.getStatus() != WorkRequestStatus.CANCELLED && wr.getStatus() != WorkRequestStatus.EXPIRED) {
+            if (wr.getStatus() != WorkRequestStatus.COMPLETED && wr.getStatus() != WorkRequestStatus.CANCELLED) {
                 String activeOtp = otpSecurityService.getActiveOtpForCustomer(id);
                 if (activeOtp == null) {
                     activeOtp = otpSecurityService.generateAndStoreOtp(wr);
@@ -447,21 +699,14 @@ public class WorkRequestService {
         return getWorkRequestById(id, null);
     }
 
-    /**
-     * Scoped, role-based retrieval of work requests.
-     * Customers only see their own requests.
-     * Partners only see requests assigned to them.
-     * Administrators see scoped or all requests.
-     * Never executes findAll() for unauthenticated or non-admin callers.
-     */
     @Transactional(readOnly = true)
     public List<WorkRequestResponseDto> getWorkRequests(String callerEmail, String filterEmail) {
         if (callerEmail == null || callerEmail.isBlank()) {
-            throw new org.springframework.security.access.AccessDeniedException("Authentication required to access work requests.");
+            throw new AccessDeniedException("Authentication required to access work requests.");
         }
 
         User caller = userRepository.findByEmail(callerEmail.trim().toLowerCase())
-                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+                .orElseThrow(() -> new AccessDeniedException("Unrecognized caller identity."));
 
         List<WorkRequest> list;
         if (caller.getRole() == Role.ROLE_ADMIN) {
@@ -475,7 +720,7 @@ public class WorkRequestService {
         } else if (caller.getRole() == Role.ROLE_PARTNER) {
             list = workRequestRepository.findByAssignedPartnerIdOrderByCreatedAtDesc(caller.getId());
         } else {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied: Unauthorized role.");
+            throw new AccessDeniedException("Access denied: Unauthorized role.");
         }
 
         List<WorkRequestResponseDto> result = new ArrayList<>();
@@ -491,195 +736,23 @@ public class WorkRequestService {
         return getWorkRequests(email, null);
     }
 
-    /**
-     * Authoritatively advances work request service status.
-     * Enforces strict state machine: ASSIGNED -> IN_TRANSIT -> ARRIVED -> IN_PROGRESS.
-     * Service completion CANNOT be triggered here; it strictly requires verifyCompletion with customer OTP.
-     */
     @Transactional
-    public WorkRequestResponseDto advanceStage(String requestId, String userEmail) {
-        WorkRequest wr = workRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
-
-        if (userEmail != null && wr.getAssignedPartner() != null && wr.getAssignedPartner().getEmail() != null) {
-            if (!wr.getAssignedPartner().getEmail().equalsIgnoreCase(userEmail.trim())) {
-                User caller = userRepository.findByEmail(userEmail.trim().toLowerCase()).orElse(null);
-                if (caller == null || caller.getRole() != Role.ROLE_ADMIN) {
-                    throw new AccessDeniedException("You are not assigned to this work request");
-                }
-            }
-        }
-
-        WorkRequestStatus current = wr.getStatus();
-        WorkRequestStatus next;
-        int nextStage;
-
-        if (current == WorkRequestStatus.ASSIGNED) {
-            next = WorkRequestStatus.IN_TRANSIT;
-            nextStage = 3;
-        } else if (current == WorkRequestStatus.IN_TRANSIT) {
-            next = WorkRequestStatus.ARRIVED;
-            nextStage = 4;
-        } else if (current == WorkRequestStatus.ARRIVED) {
-            next = WorkRequestStatus.IN_PROGRESS;
-            nextStage = 4;
-        } else if (current == WorkRequestStatus.IN_PROGRESS) {
-            next = WorkRequestStatus.IN_PROGRESS;
-            nextStage = 4;
-        } else {
-            next = current;
-            nextStage = wr.getStage();
-        }
-
-        wr.setStatus(next);
-        wr.setStage(nextStage);
-        wr = workRequestRepository.save(wr);
-
-        eventRepository.save(WorkRequestEvent.builder()
-                .workRequest(wr)
-                .fromStatus(current.name())
-                .toStatus(next.name())
-                .actor(wr.getAssignedPartner())
-                .actorRole("PARTNER")
-                .notes("Partner advanced status to " + next.name())
-                .build());
-
-        WorkRequestResponseDto dto = toResponseDto(wr);
-        notificationService.notifyStageUpdated(requestId, dto);
-        return dto;
-    }
-
-    /**
-     * Verifies work completion using the customer's 4-digit verification code.
-     * Atomically consumes the single-use OTP and transitions the job to COMPLETED / PAYMENT_PENDING.
-     */
-    @Transactional
-    public WorkRequestResponseDto verifyCompletion(String requestId, String partnerEmail, String completionOtp) {
-        WorkRequest wr = workRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
-
-        if (partnerEmail != null && wr.getAssignedPartner() != null && wr.getAssignedPartner().getEmail() != null) {
-            if (!wr.getAssignedPartner().getEmail().equalsIgnoreCase(partnerEmail.trim())) {
-                User caller = userRepository.findByEmail(partnerEmail.trim().toLowerCase()).orElse(null);
-                if (caller == null || caller.getRole() != Role.ROLE_ADMIN) {
-                    throw new AccessDeniedException("You are not assigned to this work request");
-                }
-            }
-        }
-
-        if (wr.getStatus() == WorkRequestStatus.COMPLETED) {
-            return toResponseDto(wr);
-        }
-        if (wr.getStatus() == WorkRequestStatus.CANCELLED || wr.getStatus() == WorkRequestStatus.EXPIRED) {
-            throw new ConflictException("Cannot verify completion for request in status: " + wr.getStatus(), "INVALID_STATUS");
-        }
-
-        // Verify and consume OTP
-        otpSecurityService.verifyAndConsumeOtp(requestId, completionOtp);
-
-        WorkRequestStatus prev = wr.getStatus();
-        wr.setStatus(WorkRequestStatus.COMPLETED);
-        wr.setStage(5);
-        wr.setCompletedAt(LocalDateTime.now());
-        if (wr.getPaymentStatus() == null || "UNPAID".equals(wr.getPaymentStatus())) {
-            wr.setPaymentStatus("PAYMENT_PENDING");
-        }
-        wr = workRequestRepository.save(wr);
-
-        eventRepository.save(WorkRequestEvent.builder()
-                .workRequest(wr)
-                .fromStatus(prev.name())
-                .toStatus(WorkRequestStatus.COMPLETED.name())
-                .actor(wr.getAssignedPartner())
-                .actorRole("PARTNER")
-                .notes("Work completion verified via customer completion OTP")
-                .build());
-
-        WorkRequestResponseDto dto = toResponseDto(wr);
-        notificationService.notifyStageUpdated(requestId, dto);
-        return dto;
-    }
-
-    /**
-     * Retrieves the active completion OTP strictly for the verified customer owner or admin.
-     * Denies access to unauthenticated callers, partners, or cross-customer attackers.
-     */
-    @Transactional
-    public Map<String, String> getCustomerCompletionOtp(String requestId, String customerEmail) {
-        if (customerEmail == null || customerEmail.isBlank()) {
-            throw new org.springframework.security.access.AccessDeniedException("Authentication required to access completion verification code.");
-        }
-
-        WorkRequest wr = workRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
-
-        User caller = userRepository.findByEmail(customerEmail.trim().toLowerCase())
-                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
-
-        boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
-        boolean isOwner = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
-
-        if (!isAdmin && !isOwner) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied: Only the customer who booked this service can view the completion OTP.");
-        }
-
-        if (wr.getStatus() == WorkRequestStatus.COMPLETED || wr.getStatus() == WorkRequestStatus.CANCELLED || wr.getStatus() == WorkRequestStatus.EXPIRED) {
-            throw new ConflictException("Completion OTP is not available for request in status: " + wr.getStatus(), "INVALID_STATUS");
-        }
-
-        String activeOtp = otpSecurityService.getActiveOtpForCustomer(requestId);
-        if (activeOtp == null) {
-            activeOtp = otpSecurityService.generateAndStoreOtp(wr);
-        }
-
-        Map<String, String> result = new LinkedHashMap<>();
-        result.put("requestId", requestId);
-        result.put("completionOtp", activeOtp);
-        result.put("otp", activeOtp);
-        return result;
-    }
-
-    /**
-     * Settles customer payment using the authoritative PaymentAndLedgerService.
-     * Computes 20% platform fee and 80% partner earnings with idempotent accounting ledger entries.
-     */
-    @Transactional
-    public WorkRequestResponseDto processPayment(String requestId, String paymentMethod, String userEmail) {
-        WorkRequest wr = workRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
-
-        BigDecimal grossAmount = wr.getEstimatedCost() != null ? wr.getEstimatedCost() : new BigDecimal("499.00");
-        paymentAndLedgerService.settleWorkRequestPayment(requestId, paymentMethod, grossAmount, userEmail);
-
-        // Reload updated work request
-        wr = workRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalStateException("Reload failed for: " + requestId));
-
-        WorkRequestResponseDto dto = toResponseDto(wr);
-        notificationService.notifyStageUpdated(requestId, dto);
-        return dto;
-    }
-
-    /**
-     * Cancels a work request with strict caller ownership validation and status boundary enforcement.
-     */
-    @Transactional
-    public WorkRequestResponseDto cancelWorkRequest(String requestId, String userEmail) {
+    public WorkRequestResponseDto cancelWorkRequest(String requestId, String userEmail, String reason) {
         if (userEmail == null || userEmail.isBlank()) {
-            throw new org.springframework.security.access.AccessDeniedException("Authentication required to cancel a work request.");
+            throw new AccessDeniedException("Authentication required to cancel a work request.");
         }
 
         WorkRequest wr = workRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
 
         User caller = userRepository.findByEmail(userEmail.trim().toLowerCase())
-                .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Unrecognized caller identity."));
+                .orElseThrow(() -> new AccessDeniedException("Unrecognized caller identity."));
 
         boolean isAdmin = caller.getRole() == Role.ROLE_ADMIN;
         boolean isOwner = wr.getCustomerEmail() != null && wr.getCustomerEmail().equalsIgnoreCase(caller.getEmail());
 
         if (!isAdmin && !isOwner) {
-            throw new org.springframework.security.access.AccessDeniedException("Access denied: You are not authorized to cancel this work request.");
+            throw new AccessDeniedException("Access denied: You are not authorized to cancel this work request.");
         }
 
         if (wr.getStatus() == WorkRequestStatus.CANCELLED) {
@@ -697,6 +770,9 @@ public class WorkRequestService {
         WorkRequestStatus prev = wr.getStatus();
         wr.setStatus(WorkRequestStatus.CANCELLED);
         wr.setStage(6);
+        wr.setCancellationReason(reason != null ? InputSanitizer.sanitize(reason) : "Cancelled by user");
+        wr.setCancelledByRole(isAdmin ? "ADMIN" : "CUSTOMER");
+        wr.setCancelledAt(LocalDateTime.now());
         wr = workRequestRepository.save(wr);
 
         eventRepository.save(WorkRequestEvent.builder()
@@ -705,7 +781,7 @@ public class WorkRequestService {
                 .toStatus(WorkRequestStatus.CANCELLED.name())
                 .actor(caller)
                 .actorRole(isAdmin ? "ADMIN" : "CUSTOMER")
-                .notes("Work request cancelled by " + (isAdmin ? "administrator" : "customer"))
+                .notes("Work request cancelled: " + wr.getCancellationReason())
                 .build());
 
         WorkRequestResponseDto dto = toResponseDto(wr);
@@ -713,21 +789,199 @@ public class WorkRequestService {
         return dto;
     }
 
-    /**
-     * Background scheduler that automatically expires un-claimed broadcasted requests.
-     */
-    @Scheduled(fixedRate = 5000)
+    public WorkRequestResponseDto cancelWorkRequest(String requestId, String userEmail) {
+        return cancelWorkRequest(requestId, userEmail, null);
+    }
+
     @Transactional
-    public void expireOverdueRequests() {
-        LocalDateTime now = LocalDateTime.now();
-        List<WorkRequest> overdue = workRequestRepository.findByStatusOrderByCreatedAtDesc(WorkRequestStatus.BROADCASTED);
-        for (WorkRequest wr : overdue) {
-            if (wr.getExpiresAt() != null && wr.getExpiresAt().isBefore(now)) {
-                wr.setStatus(WorkRequestStatus.EXPIRED);
-                workRequestRepository.save(wr);
-                log.info("Work request {} expired without a partner claim.", wr.getId());
-                notificationService.notifyRequestExpired(wr.getId());
+    public WorkRequestResponseDto raiseDispute(String requestId, String userEmail, String disputeReason) {
+        WorkRequest wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        User caller = userRepository.findByEmail(userEmail.trim().toLowerCase())
+                .orElseThrow(() -> new AccessDeniedException("Unrecognized caller identity."));
+
+        WorkRequestStatus prev = wr.getStatus();
+        wr.setStatus(WorkRequestStatus.DISPUTED);
+        wr.setDisputeReason(disputeReason != null ? InputSanitizer.sanitize(disputeReason) : "Dispute raised");
+        wr.setDisputedAt(LocalDateTime.now());
+        wr = workRequestRepository.save(wr);
+
+        eventRepository.save(WorkRequestEvent.builder()
+                .workRequest(wr)
+                .fromStatus(prev != null ? prev.name() : null)
+                .toStatus(WorkRequestStatus.DISPUTED.name())
+                .actor(caller)
+                .actorRole(caller.getRole() != null ? caller.getRole().name().replace("ROLE_", "") : "USER")
+                .notes("Dispute raised: " + wr.getDisputeReason())
+                .build());
+
+        WorkRequestResponseDto dto = toResponseDto(wr);
+        notificationService.notifyStageUpdated(requestId, dto);
+        return dto;
+    }
+
+    @Transactional
+    public WorkRequestResponseDto processPayment(String requestId, String paymentMethod, String userEmail) {
+        WorkRequest wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Work request not found: " + requestId));
+
+        BigDecimal grossAmount = wr.getEstimatedCost() != null ? wr.getEstimatedCost() : new BigDecimal("499.00");
+        paymentAndLedgerService.settleWorkRequestPayment(requestId, paymentMethod, grossAmount, userEmail);
+
+        wr = workRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalStateException("Reload failed for: " + requestId));
+
+        WorkRequestResponseDto dto = toResponseDto(wr);
+        notificationService.notifyStageUpdated(requestId, dto);
+        return dto;
+    }
+
+    // =========================================================================
+    // 6. ADMIN PORTAL: OVERVIEW STATISTICS & ADVANCED MANAGEMENT
+    // =========================================================================
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAdminStatistics() {
+        Map<String, Object> stats = new LinkedHashMap<>();
+
+        long total = workRequestRepository.count();
+        long posted = workRequestRepository.countByStatusIn(List.of(
+                WorkRequestStatus.POSTED, WorkRequestStatus.BROADCASTED));
+        long assigned = workRequestRepository.countByStatus(WorkRequestStatus.ASSIGNED);
+        long onTheWay = workRequestRepository.countByStatusIn(List.of(
+                WorkRequestStatus.PARTNER_ON_THE_WAY, WorkRequestStatus.IN_TRANSIT,
+                WorkRequestStatus.PARTNER_ARRIVED, WorkRequestStatus.ARRIVED));
+        long inProgress = workRequestRepository.countByStatus(WorkRequestStatus.IN_PROGRESS);
+        long awaitingApproval = workRequestRepository.countByStatus(WorkRequestStatus.AWAITING_CUSTOMER_APPROVAL);
+        long completed = workRequestRepository.countByStatusIn(List.of(
+                WorkRequestStatus.COMPLETED, WorkRequestStatus.CLOSED));
+        long cancelled = workRequestRepository.countByStatus(WorkRequestStatus.CANCELLED);
+        long disputed = workRequestRepository.countByStatus(WorkRequestStatus.DISPUTED);
+
+        stats.put("totalRequests", total);
+        stats.put("postedRequests", posted);
+        stats.put("assignedRequests", assigned);
+        stats.put("onTheWayRequests", onTheWay);
+        stats.put("inProgressRequests", inProgress);
+        stats.put("awaitingApprovalRequests", awaitingApproval);
+        stats.put("completedRequests", completed);
+        stats.put("cancelledRequests", cancelled);
+        stats.put("disputedRequests", disputed);
+
+        BigDecimal totalRevenue = workRequestRepository.sumTotalPaidRevenue();
+        BigDecimal platformFees = workRequestRepository.sumTotalPlatformFee();
+        BigDecimal partnerEarnings = workRequestRepository.sumTotalPartnerNetEarning();
+
+        stats.put("totalRevenue", totalRevenue != null ? totalRevenue : BigDecimal.ZERO);
+        stats.put("platformFees", platformFees != null ? platformFees : BigDecimal.ZERO);
+        stats.put("partnerEarnings", partnerEarnings != null ? partnerEarnings : BigDecimal.ZERO);
+
+        return stats;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<WorkRequestResponseDto> getAdminWorkRequests(
+            String statusFilter,
+            String categoryFilter,
+            String search,
+            Pageable pageable) {
+
+        Page<WorkRequest> page;
+        if (statusFilter != null && !statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter)) {
+            try {
+                WorkRequestStatus st = WorkRequestStatus.valueOf(statusFilter.toUpperCase());
+                page = workRequestRepository.findByStatusOrderByCreatedAtDesc(st, pageable);
+            } catch (Exception e) {
+                page = workRequestRepository.findAllByOrderByCreatedAtDesc(pageable);
             }
+        } else {
+            page = workRequestRepository.findAllByOrderByCreatedAtDesc(pageable);
         }
+
+        return page.map(this::toResponseDto);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkRequestEvent> getWorkRequestEvents(String requestId) {
+        return eventRepository.findByWorkRequestIdOrderByCreatedAtAsc(requestId);
+    }
+
+    @Transactional
+    public Optional<WorkRequestResponseDto> adminOverrideStatus(
+            String id,
+            String newStatusStr,
+            String reason,
+            String adminActor) {
+
+        return workRequestRepository.findById(id).map(wr -> {
+            WorkRequestStatus prev = wr.getStatus();
+            try {
+                WorkRequestStatus newStatus = WorkRequestStatus.valueOf(newStatusStr.toUpperCase());
+                wr.setStatus(newStatus);
+            } catch (Exception e) {
+                log.warn("Invalid override status: {}", newStatusStr);
+            }
+
+            wr = workRequestRepository.save(wr);
+
+            eventRepository.save(WorkRequestEvent.builder()
+                    .workRequest(wr)
+                    .fromStatus(prev != null ? prev.name() : "UNKNOWN")
+                    .toStatus(wr.getStatus().name())
+                    .actorRole("ADMIN")
+                    .notes("Admin manual override: " + (reason != null ? reason : "Manual administrative intervention"))
+                    .build());
+
+            WorkRequestResponseDto dto = toResponseDto(wr);
+            notificationService.notifyStageUpdated(id, dto);
+            return dto;
+        });
+    }
+
+    // =========================================================================
+    // 7. UTILITIES & DISTANCE CALCULATION
+    // =========================================================================
+
+    /**
+     * Haversine formula to compute geodesic distance in kilometers between two GPS coordinates.
+     */
+    public static double calculateDistanceKm(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Earth's mean radius in km
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    /**
+     * Legacy reject method (idempotent no-op for backwards compatibility).
+     */
+    @Transactional
+    public Map<String, Object> rejectWorkRequest(String requestId, String partnerEmail) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("message", "Job dismissed");
+        response.put("requestId", requestId);
+        return response;
+    }
+
+    /**
+     * Legacy getPartnerFeed method (redirects to getPartnerAllJobs).
+     */
+    @Transactional(readOnly = true)
+    public List<WorkRequestResponseDto> getPartnerFeed(String partnerEmail, String category) {
+        return getPartnerAllJobs(partnerEmail, category);
+    }
+
+    /**
+     * Legacy claimWorkRequest (redirects to acceptJobAtomically).
+     */
+    @Transactional
+    public WorkRequestClaimResponseDto claimWorkRequest(String requestId, String partnerEmail) {
+        return acceptJobAtomically(requestId, partnerEmail);
     }
 }

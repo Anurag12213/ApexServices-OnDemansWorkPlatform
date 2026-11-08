@@ -145,7 +145,7 @@ export const SignupScreen = ({ accountType = 'INDIVIDUAL', onBack, onComplete })
       if (res.success) {
         onComplete(res.partner);
       } else {
-        setError('Registration could not be completed. Please try again.');
+        setError(res.error || 'Registration could not be completed. Please try again.');
       }
     } catch (err) {
       setError(err.message || 'Registration failed');
@@ -186,7 +186,7 @@ export const SignupScreen = ({ accountType = 'INDIVIDUAL', onBack, onComplete })
       if (regRes.success) {
         onComplete(regRes.partner);
       } else {
-        setError('Registration could not be completed.');
+        setError(regRes.error || 'Registration could not be completed.');
       }
     } catch (err) {
       setError(err.message || 'Registration failed');

@@ -152,14 +152,26 @@ export default function OrderBookingManagementSection() {
 
   const getStatusBadge = (status) => {
     switch (status) {
+      case 'POSTED':
+      case 'BROADCASTED':
+      case 'PENDING_DISPATCH':
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Open / Published</span>;
+      case 'ASSIGNED':
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">Partner Assigned</span>;
+      case 'PARTNER_ON_THE_WAY':
+      case 'IN_TRANSIT':
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-cyan-50 text-cyan-700 border border-cyan-200">On The Way</span>;
+      case 'PARTNER_ARRIVED':
+      case 'ARRIVED':
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-700 border border-sky-200">Arrived</span>;
       case 'IN_PROGRESS':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">In Progress</span>;
-      case 'PENDING_DISPATCH':
-      case 'BROADCASTED':
-        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 animate-pulse">Pending Dispatch</span>;
+      case 'AWAITING_CUSTOMER_APPROVAL':
+        return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Awaiting Verification</span>;
       case 'DISPUTED':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200 flex items-center gap-1"><ShieldAlert className="w-3 h-3" /> Disputed</span>;
       case 'COMPLETED':
+      case 'CLOSED':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Completed</span>;
       case 'CANCELLED':
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">Cancelled</span>;
@@ -168,6 +180,18 @@ export default function OrderBookingManagementSection() {
       default:
         return <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">{status}</span>;
     }
+  };
+
+  const statusTabLabels = {
+    ALL: 'All Requests',
+    POSTED: 'Published / Open',
+    ASSIGNED: 'Assigned',
+    PARTNER_ON_THE_WAY: 'On The Way',
+    IN_PROGRESS: 'In Progress',
+    AWAITING_CUSTOMER_APPROVAL: 'Awaiting Approval',
+    COMPLETED: 'Completed',
+    CANCELLED: 'Cancelled',
+    DISPUTED: 'Disputed'
   };
 
   return (
@@ -222,7 +246,7 @@ export default function OrderBookingManagementSection() {
         </div>
 
         <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          {['ALL', 'PENDING_DISPATCH', 'IN_PROGRESS', 'DISPUTED', 'COMPLETED', 'CANCELLED'].map((st) => (
+          {Object.keys(statusTabLabels).map((st) => (
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
@@ -232,7 +256,7 @@ export default function OrderBookingManagementSection() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {st === 'ALL' ? 'All Bookings' : st.replace('_', ' ')}
+              {statusTabLabels[st]}
             </button>
           ))}
         </div>

@@ -44,10 +44,152 @@ import {
   CreditCard,
   Activity,
   Tag,
+  RotateCcw,
+  ClipboardList,
+  SlidersHorizontal,
+  Filter,
+  XCircle,
+  Hourglass,
+  CheckCircle,
 } from 'lucide-react';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { useConfirm } from '../components/ConfirmDialog';
 import { API_BASE_URL, getAssetUrl } from '../utils/apiConfig';
+
+const MOCK_SAMPLE_REQUESTS = [
+  {
+    id: '238814',
+    displayId: 'REQ-238814',
+    serviceCategory: 'AC Repair & Service',
+    serviceAddress: 'Sector 62, Noida, Uttar Pradesh',
+    preferredDate: '09 Nov 2026',
+    preferredTime: '9:00 AM – 12:00 PM',
+    status: 'IN_PROGRESS',
+    estimatedCost: 599,
+    paidAmount: 599,
+    assignedPartnerName: 'Ramesh Verma',
+    problemTitle: 'AC cooling issue and indoor unit deep cleaning',
+  },
+  {
+    id: '238809',
+    displayId: 'REQ-238809',
+    serviceCategory: 'Deep Cleaning Service',
+    serviceAddress: 'Indirapuram, Ghaziabad, Uttar Pradesh',
+    preferredDate: '07 Nov 2026',
+    preferredTime: '2:00 PM – 4:00 PM',
+    status: 'COMPLETED',
+    estimatedCost: 399,
+    paidAmount: 399,
+    paymentStatus: 'PAID',
+    assignedPartnerName: 'Sunil Kumar',
+    rating: 5,
+    problemTitle: 'Full home deep sanitization and bathroom cleaning',
+  },
+  {
+    id: '238795',
+    displayId: 'REQ-238795',
+    serviceCategory: 'Electrical Wiring Check',
+    serviceAddress: 'Sector 18, Noida, Uttar Pradesh',
+    preferredDate: '10 Nov 2026',
+    preferredTime: '11:00 AM – 1:00 PM',
+    status: 'POSTED',
+    estimatedCost: 799,
+    problemTitle: 'Master circuit breaker tripping intermittently',
+  },
+  {
+    id: '238760',
+    displayId: 'REQ-238760',
+    serviceCategory: 'Plumbing & Pipe Repair',
+    serviceAddress: 'Sector 50, Noida, Uttar Pradesh',
+    preferredDate: '05 Nov 2026',
+    preferredTime: '10:00 AM – 12:00 PM',
+    status: 'CANCELLED',
+    estimatedCost: 499,
+    problemTitle: 'Bathroom tap leaking beneath sink fixture',
+  },
+];
+
+const getCategoryThumbnail = (req) => {
+  if (req?.bannerImageUrl) return req.bannerImageUrl;
+  if (req?.categoryImageUrl) return req.categoryImageUrl;
+  const cat = (req?.serviceCategory || req?.category || '').toLowerCase();
+  if (cat.includes('ac') || cat.includes('air conditioner') || cat.includes('cooling')) {
+    return 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=400&q=80';
+  }
+  if (cat.includes('clean') || cat.includes('deep clean') || cat.includes('sanitiz')) {
+    return 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80';
+  }
+  if (cat.includes('electric') || cat.includes('wiring') || cat.includes('breaker') || cat.includes('light')) {
+    return 'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=400&q=80';
+  }
+  if (cat.includes('plumb') || cat.includes('pipe') || cat.includes('leak') || cat.includes('tap') || cat.includes('drain')) {
+    return 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=400&q=80';
+  }
+  if (cat.includes('carpent') || cat.includes('wood') || cat.includes('furniture')) {
+    return 'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=400&q=80';
+  }
+  if (cat.includes('paint')) {
+    return 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=400&q=80';
+  }
+  if (cat.includes('appliance') || cat.includes('refrigerat') || cat.includes('washing')) {
+    return 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?auto=format&fit=crop&w=400&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80';
+};
+
+const getRequestCardMeta = (req) => {
+  const status = (req?.status || '').toUpperCase();
+  const idDisplay = req?.displayId || (req?.id ? (String(req.id).startsWith('REQ-') ? req.id : `REQ-${req.id}`) : 'REQ-238814');
+
+  if (status === 'CANCELLED' || status === 'EXPIRED') {
+    return {
+      statusType: 'cancelled',
+      statusLabel: 'Cancelled',
+      statusClass: 'bg-rose-50 text-rose-600 border border-rose-200',
+      activeStep: -1,
+      idDisplay,
+    };
+  }
+
+  if (status === 'COMPLETED') {
+    return {
+      statusType: 'completed',
+      statusLabel: 'Completed',
+      statusClass: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+      activeStep: 5,
+      idDisplay,
+    };
+  }
+
+  if (status === 'IN_PROGRESS' || status === 'EN_ROUTE' || status === 'STARTED') {
+    return {
+      statusType: 'in_progress',
+      statusLabel: 'In Progress',
+      statusClass: 'bg-[#6355F6] text-white shadow-xs',
+      activeStep: 3,
+      idDisplay,
+    };
+  }
+
+  if (status === 'ASSIGNED' || status === 'ACCEPTED') {
+    return {
+      statusType: 'assigned',
+      statusLabel: 'Assigned',
+      statusClass: 'bg-[#6355F6] text-white shadow-xs',
+      activeStep: 2,
+      idDisplay,
+    };
+  }
+
+  // Default: SUBMITTED / POSTED / AWAITING
+  return {
+    statusType: 'awaiting',
+    statusLabel: 'Awaiting Approval',
+    statusClass: 'bg-amber-50 text-amber-700 border border-amber-200',
+    activeStep: 1,
+    idDisplay,
+  };
+};
 
 export const RequestWorkPage = () => {
   const {
@@ -95,8 +237,8 @@ export const RequestWorkPage = () => {
     }
   };
 
-  // Pure memoized available dates (ARCH-03: prevents impure Date.now() during JSX render)
-  const availableDateOptions = useMemo(() => {
+  // Pure available dates generator (React 19 compliant state initializer)
+  const [availableDateOptions] = useState(() => {
     const base = new Date();
     base.setHours(0, 0, 0, 0);
     const baseTime = base.getTime();
@@ -113,7 +255,7 @@ export const RequestWorkPage = () => {
         label: daysAhead === 0 ? 'Today' : daysAhead === 1 ? 'Tomorrow' : dayName,
       };
     });
-  }, []);
+  });
 
   // Search filter for Screen 1
   const [categorySearch, setCategorySearch] = useState('');
@@ -132,6 +274,11 @@ export const RequestWorkPage = () => {
   const [cancelling, setCancelling] = useState(false);
   const [showAssignedBanner, setShowAssignedBanner] = useState(true);
   const [selectedHistoryRequest, setSelectedHistoryRequest] = useState(null);
+
+  // Modern Service Requests Dashboard Filters
+  const [requestsFilterTab, setRequestsFilterTab] = useState('ALL'); // 'ALL' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  const [requestsSearchQuery, setRequestsSearchQuery] = useState('');
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
 
   // Auto-dismiss assigned notification banner after 7 seconds
   useEffect(() => {
@@ -491,7 +638,10 @@ export const RequestWorkPage = () => {
       }
     };
 
-    const interval = setInterval(fetchStatus, 15000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchStatus();
+    }, 30000);
 
     return () => {
       isMounted = false;
@@ -649,6 +799,56 @@ export const RequestWorkPage = () => {
     }
   };
 
+  // Temporary: 1-Click Fast Test Dispatch for rapid verification
+  const [isFastTesting, setIsFastTesting] = useState(false);
+
+  const handleFastTestDispatch = async () => {
+    try {
+      setIsFastTesting(true);
+      const activeCat = data?.categories?.find(c => c.active !== false) || {
+        id: 1,
+        name: 'Custom Carpentry',
+        slug: 'custom-carpentry'
+      };
+
+      const testPayload = {
+        serviceCategoryId: activeCat.id,
+        serviceCategory: activeCat.name,
+        customerName: customerUser?.fullName || 'Fast Test Customer',
+        customerEmail: customerUser?.email || 'test.customer@apexservices.com',
+        contactPhone: customerUser?.mobileNumber || customerUser?.phone || '+919876543210',
+        problemType: 'General Maintenance & Diagnosis',
+        problemTitle: `Fast Test: ${activeCat.name} Quick Inspection`,
+        problemDescription: 'Automated test request generated via 1-Click Fast Test Dispatch for rapid lifecycle verification.',
+        urgency: 'Standard',
+        serviceAddress: 'Flat 402, Green Glen Layout, Outer Ring Road, Bangalore',
+        latitude: 12.9716,
+        longitude: 77.5946,
+        preferredDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        preferredTime: 'Morning (9 AM - 12 PM)',
+        timeSlot: 'Morning (9 AM - 12 PM)',
+        estimatedCost: 499,
+        notes: 'Fast test dispatch - instant 1-click test'
+      };
+
+      const res = await submitWorkRequest(testPayload);
+      if (res.success) {
+        setTrackedRequest(res.request);
+        setActiveTrackingRequestId(res.request.id);
+        setActiveBookingStep(9);
+        setViewMode('booking');
+        toast.success(`⚡ Fast Test Request dispatched! Ticket #${res.request.id}`, 'Fast Test Created');
+      } else {
+        toast.error(res.error || 'Failed to dispatch fast test request', 'Test Dispatch Error');
+      }
+    } catch (err) {
+      console.error('Fast test dispatch error:', err);
+      toast.error('Error generating fast test request.', 'Dispatch Error');
+    } finally {
+      setIsFastTesting(false);
+    }
+  };
+
   // Cancel Work Request action
   const handleCancelRequest = async (id) => {
     const ok = await confirm({
@@ -717,6 +917,7 @@ export const RequestWorkPage = () => {
     viewMode === 'booking' &&
     activeBookingStep >= 9 &&
     trackedRequest &&
+    trackedRequest.status !== 'POSTED' &&
     trackedRequest.status !== 'BROADCASTED' &&
     trackedRequest.status !== 'FINDING_PARTNER' &&
     trackedRequest.status !== 'WAITING_ACCEPTANCE' &&
@@ -854,6 +1055,18 @@ export const RequestWorkPage = () => {
                     {historyRequests.length}
                   </span>
                 </button>
+
+                {/* 4. Temporary: 1-Click Fast Test Dispatch */}
+                <button
+                  type="button"
+                  disabled={isFastTesting}
+                  onClick={handleFastTestDispatch}
+                  className="flex-1 sm:flex-initial text-center justify-center px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 bg-amber-500 hover:bg-amber-600 text-white shadow-xs"
+                  title="Instant 1-Click Request Dispatch for Fast Testing"
+                >
+                  <Zap className={`w-3.5 h-3.5 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
+                  <span>{isFastTesting ? 'Dispatching...' : '⚡ 1-Click Fast Test'}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -879,6 +1092,35 @@ export const RequestWorkPage = () => {
             </button>
           </div>
         )}
+
+        {/* PROMINENT DEDICATED FAST TESTING MODE CARD (ALWAYS VISIBLE) */}
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-2 border-amber-400 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-md border border-amber-300">
+                  ⚡ Fast Testing Mode
+                </span>
+                <span className="text-[11px] font-bold text-amber-800">1-Click Instant Dispatch</span>
+              </div>
+              <p className="text-xs text-amber-900 font-medium mt-1">
+                Skip the 6-step form and dispatch a test request in 1 click.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isFastTesting}
+            onClick={handleFastTestDispatch}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-black uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 shrink-0 whitespace-nowrap"
+          >
+            <Zap className={`w-4 h-4 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
+            <span>{isFastTesting ? 'Dispatching...' : '⚡ 1-Click Fast Test'}</span>
+          </button>
+        </div>
 
         {/* COMPACT & CONCISE LIVE REQUESTS BAR */}
         {hasLiveRequest && viewMode === 'booking' && activeBookingStep <= 6 && (
@@ -906,131 +1148,12 @@ export const RequestWorkPage = () => {
           </div>
         )}
 
-        {/* VIEW MODE 1: ALL REQUESTS (CLEAN SEPARATION: LIVE REQUESTS & HISTORY) */}
+        {/* VIEW MODE 1: INDUSTRY-STANDARD SERVICE REQUESTS DASHBOARD */}
         {viewMode === 'history' && (
-          <div className="bg-white rounded-2xl p-4 sm:p-6 md:p-8 border border-slate-200 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
-              <div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  {requestsSubTab === 'live' ? 'Active Live Requests' : 'Past Service History & Invoices'}
-                </h2>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  {requestsSubTab === 'live'
-                    ? `Showing ${liveRequests.length} in-flight active service order${liveRequests.length === 1 ? '' : 's'}`
-                    : `Showing ${historyRequests.length} completed or past service invoice${historyRequests.length === 1 ? '' : 's'}`}
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setViewMode('booking');
-                  setActiveTrackingRequestId(null);
-                  localStorage.removeItem('apex_active_tracking_id');
-                  setActiveBookingStep(1);
-                }}
-                className="bg-[#ff3b47] hover:bg-[#e62e3a] text-white px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2 self-start sm:self-auto"
-              >
-                <span>+ Request New Service</span>
-              </button>
-            </div>
-
-            {/* SUB-SECTION 1: ACTIVE LIVE REQUESTS */}
-            {requestsSubTab === 'live' && (
-              <div className="space-y-4">
-                {liveRequests.length === 0 ? (
-                  <div className="text-center py-16 space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto opacity-70" />
-                    <h3 className="text-sm font-black text-slate-900 tracking-tight">No active live requests in progress</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      All your previous requests have concluded. When you place a new service request, it will appear here in real-time.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setViewMode('booking');
-                        setActiveBookingStep(1);
-                      }}
-                      className="bg-[#ff3b47] hover:bg-[#e62e3a] text-white px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md cursor-pointer"
-                    >
-                      Book a Service Now
-                    </button>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {liveRequests.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-5 rounded-2xl border-2 border-emerald-300 hover:border-emerald-400 hover:shadow-lg transition-all bg-emerald-50/20 shadow-xs space-y-3 relative overflow-hidden"
-                      >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-400/10 rounded-full blur-xl pointer-events-none" />
-
-                        <div className="flex items-center justify-between relative z-10">
-                          <span className="font-mono text-xs font-bold text-emerald-900 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-lg">
-                            {req.id}
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 bg-emerald-600 text-white text-[11px] font-bold px-3 py-1 rounded-full shadow-2xs">
-                            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                            <span>{req.status?.replace('_', ' ')}</span>
-                          </span>
-                        </div>
-
-                        <div className="relative z-10">
-                          <h4 className="text-sm font-black text-slate-900">{req.serviceCategory || req.category}</h4>
-                          <p className="text-xs text-slate-600 line-clamp-1 mt-0.5">
-                            {req.problemTitle || req.problemDescription || req.notes || 'Technician service active'}
-                          </p>
-                        </div>
-
-                        <div className="text-[11px] text-slate-600 space-y-1.5 pt-2 border-t border-emerald-200/60 relative z-10">
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                            <span className="truncate">{req.serviceAddress || req.address}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                            <span>{req.preferredDate} • {req.preferredTime || req.timeSlot || 'Standard Service'}</span>
-                          </div>
-                          {req.assignedPartnerName && (
-                            <div className="flex items-center gap-2 text-slate-900 font-bold">
-                              {(req.assignedPartnerPhoto || req.partnerPhoto) ? (
-                                <img
-                                  src={getAssetUrl(req.assignedPartnerPhoto || req.partnerPhoto)}
-                                  alt={req.assignedPartnerName}
-                                  className="w-4 h-4 rounded-full object-cover border border-emerald-400 shrink-0"
-                                />
-                              ) : (
-                                <User className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              )}
-                              <span>Technician: {req.assignedPartnerName}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveTrackingRequestId(req.id);
-                            setTrackedRequest(req);
-                            setViewMode('booking');
-                            setActiveBookingStep(9);
-                          }}
-                          className="w-full mt-2 py-3 bg-[#6246FF] hover:bg-[#5034EA] text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer relative z-10"
-                        >
-                          <Activity className="w-4 h-4 animate-pulse" />
-                          <span>Track Live Status Now</span>
-                          <ChevronRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* SUB-SECTION 2: PAST ORDER HISTORY */}
-            {requestsSubTab === 'history' && (
-              <div className="space-y-4">
-                {selectedHistoryRequest ? (
-                  /* SOBER, CLEAN ORDER DETAILS & RECEIPT VIEW (NO TRACKING/STEPPER) */
-                  <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 md:p-8 space-y-6">
+          <div className="space-y-6">
+            {selectedHistoryRequest ? (
+              /* SOBER, CLEAN ORDER DETAILS & RECEIPT VIEW */
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-4 sm:p-6 md:p-8 space-y-6">
                     {/* Top Navigation & Status */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-4 border-b border-slate-100">
                       <button
@@ -1400,95 +1523,529 @@ export const RequestWorkPage = () => {
                       </div>
                     )}
                   </div>
-                ) : historyRequests.length === 0 ? (
-                  <div className="text-center py-16 space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                    <FileText className="w-12 h-12 text-slate-400 mx-auto opacity-50" />
-                    <h3 className="text-sm font-black text-slate-900 tracking-tight">No past history yet</h3>
-                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                      Completed orders and settled invoices will appear here once service has ended.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {historyRequests.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-5 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all bg-white shadow-xs space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
-                            {req.id}
-                          </span>
-                          <span
-                            className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                              req.paymentStatus === 'PAID'
-                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                : req.status === 'COMPLETED'
-                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                : req.status === 'CANCELLED'
-                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                : 'bg-slate-100 text-slate-600 border border-slate-200'
-                            }`}
-                          >
-                            {req.paymentStatus === 'PAID'
-                              ? 'Paid & Settled'
-                              : req.status?.replace('_', ' ')}
-                          </span>
-                        </div>
+            ) : (
+              /* MAIN INDUSTRY-STANDARD MY SERVICE REQUESTS DASHBOARD */
+              (() => {
+                const allRequestsSource = (customerRequests && customerRequests.length > 0) ? customerRequests : MOCK_SAMPLE_REQUESTS;
+                const isDemoData = (!customerRequests || customerRequests.length === 0);
+                const totalCount = allRequestsSource.length;
+                const inProgressCount = allRequestsSource.filter(r => {
+                  const s = (r.status || '').toUpperCase();
+                  return s !== 'COMPLETED' && s !== 'CANCELLED' && s !== 'EXPIRED';
+                }).length;
+                const completedCount = allRequestsSource.filter(r => (r.status || '').toUpperCase() === 'COMPLETED').length;
+                const cancelledCount = allRequestsSource.filter(r => {
+                  const s = (r.status || '').toUpperCase();
+                  return s === 'CANCELLED' || s === 'EXPIRED';
+                }).length;
 
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-black text-slate-900">{req.serviceCategory || req.category}</h4>
-                            <span className="text-xs font-black text-slate-900">
-                              {formatCurrency(req.paidAmount || req.estimatedCost || 499)}
-                            </span>
+                const filteredRequests = allRequestsSource.filter(req => {
+                  const s = (req.status || '').toUpperCase();
+                  if (requestsFilterTab === 'IN_PROGRESS') {
+                    if (s === 'COMPLETED' || s === 'CANCELLED' || s === 'EXPIRED') return false;
+                  } else if (requestsFilterTab === 'COMPLETED') {
+                    if (s !== 'COMPLETED') return false;
+                  } else if (requestsFilterTab === 'CANCELLED') {
+                    if (s !== 'CANCELLED' && s !== 'EXPIRED') return false;
+                  }
+                  if (requestsSearchQuery.trim()) {
+                    const q = requestsSearchQuery.toLowerCase().trim();
+                    const matchId = String(req.id || '').toLowerCase().includes(q) || String(req.displayId || '').toLowerCase().includes(q);
+                    const matchCat = String(req.serviceCategory || req.category || '').toLowerCase().includes(q);
+                    const matchProb = String(req.problemTitle || req.problemDescription || req.notes || '').toLowerCase().includes(q);
+                    const matchAddr = String(req.serviceAddress || req.address || '').toLowerCase().includes(q);
+                    if (!matchId && !matchCat && !matchProb && !matchAddr) return false;
+                  }
+                  return true;
+                });
+
+                return (
+                  <div className="space-y-6">
+                    {/* 1. HERO HEADER BANNER */}
+                    <div className="bg-gradient-to-r from-[#4A3AFF] via-[#5C48F5] to-[#7B57FF] rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-lg border border-indigo-400/20">
+                      {/* Subtle Background Glows */}
+                      <div className="absolute -top-12 -right-12 w-56 h-56 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                      <div className="absolute -bottom-12 -left-12 w-56 h-56 bg-purple-900/20 rounded-full blur-2xl pointer-events-none" />
+
+                      <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <span className="w-1.5 h-8 sm:h-10 bg-amber-400 rounded-full mr-3.5 shrink-0" />
+                            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                              My Service Requests
+                            </h1>
                           </div>
-                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                            {req.problemTitle || req.problemDescription || req.notes || 'Service order completed'}
+                          <p className="text-xs sm:text-sm text-purple-100/90 pl-5 font-normal max-w-xl">
+                            Track, manage and view the status of all your service requests in one unified place.
                           </p>
                         </div>
 
-                        <div className="text-[11px] text-slate-600 space-y-1.5 pt-2 border-t border-slate-100">
-                          <div className="flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate">{req.serviceAddress || req.address}</span>
+                        {/* Right Graphic: Stylized 3D House Illustration */}
+                        <div className="flex items-center gap-4 self-end md:self-auto">
+                          <div className="hidden md:flex items-center justify-center shrink-0 relative">
+                            <svg viewBox="0 0 160 120" className="w-40 h-28 drop-shadow-xl" fill="none">
+                              <ellipse cx="80" cy="100" rx="65" ry="16" fill="rgba(0,0,0,0.18)" />
+                              <path d="M40 70 L80 48 L120 70 L120 100 L40 100 Z" fill="#FFFFFF" />
+                              <path d="M35 70 L80 40 L125 70 L115 75 L80 50 L45 75 Z" fill="#FFB74D" />
+                              <path d="M40 70 L80 44 L120 70 Z" fill="#F59E0B" />
+                              <path d="M80 48 L120 70 L120 100 L80 100 Z" fill="#E2E8F0" />
+                              <rect x="55" y="80" width="14" height="20" rx="2" fill="#6355F6" />
+                              <circle cx="66" cy="90" r="1.5" fill="#FFFFFF" />
+                              <rect x="88" y="72" width="18" height="14" rx="2" fill="#93C5FD" />
+                              <line x1="97" y1="72" x2="97" y2="86" stroke="#FFFFFF" strokeWidth="1.5" />
+                              <line x1="88" y1="79" x2="106" y2="79" stroke="#FFFFFF" strokeWidth="1.5" />
+                              <circle cx="28" cy="85" r="10" fill="#10B981" />
+                              <rect x="26" y="92" width="4" height="8" fill="#78350F" />
+                              <circle cx="132" cy="88" r="8" fill="#34D399" />
+                              <rect x="130" y="93" width="4" height="7" fill="#78350F" />
+                              <g transform="translate(70, 8)">
+                                <path d="M10 0 C4.48 0 0 4.48 0 10 C0 17 10 26 10 26 C10 26 20 17 20 10 C20 4.48 15.52 0 10 0 Z" fill="#38BDF8" />
+                                <circle cx="10" cy="9.5" r="5" fill="#FFFFFF" />
+                                <path d="M8 9.5 L9.5 11 L12.5 8" stroke="#0284C7" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              </g>
+                            </svg>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span>{req.preferredDate} • {req.timeSlot || 'Morning'}</span>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewMode('booking');
+                              setActiveTrackingRequestId(null);
+                              localStorage.removeItem('apex_active_tracking_id');
+                              setActiveBookingStep(1);
+                            }}
+                            className="bg-white hover:bg-slate-50 text-[#6355F6] px-5 py-2.5 rounded-full text-xs font-black uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2 shrink-0 whitespace-nowrap"
+                          >
+                            <span>+ New Request</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 2. SUMMARY KPI STAT CARDS (4 Cards Grid) */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                      {/* Card 1: Total Requests */}
+                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Total Requests</span>
+                          <div className="w-10 h-10 rounded-full bg-[#F3F0FF] text-[#6355F6] flex items-center justify-center">
+                            <ClipboardList className="w-5 h-5" />
                           </div>
-                          {req.assignedPartnerName && (
-                            <div className="flex items-center gap-2 text-slate-700 font-medium">
-                              {(req.assignedPartnerPhoto || req.partnerPhoto) ? (
-                                <img
-                                  src={getAssetUrl(req.assignedPartnerPhoto || req.partnerPhoto)}
-                                  alt={req.assignedPartnerName}
-                                  className="w-4 h-4 rounded-full object-cover border border-emerald-400 shrink-0"
-                                />
-                              ) : (
-                                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              )}
-                              <span>Specialist: {req.assignedPartnerName}</span>
-                            </div>
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
+                          {totalCount}
+                        </div>
+                      </div>
+
+                      {/* Card 2: In Progress */}
+                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">In Progress</span>
+                          <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
+                          {inProgressCount}
+                        </div>
+                      </div>
+
+                      {/* Card 3: Completed */}
+                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Completed</span>
+                          <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5" />
+                          </div>
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
+                          {completedCount}
+                        </div>
+                      </div>
+
+                      {/* Card 4: Cancelled */}
+                      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Cancelled</span>
+                          <div className="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+                            <XCircle className="w-5 h-5" />
+                          </div>
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-3">
+                          {cancelledCount}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. FILTER TABS & SEARCH TOOLBAR */}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
+                      {/* Left Segmented Filter Tabs */}
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                        <button
+                          type="button"
+                          onClick={() => setRequestsFilterTab('ALL')}
+                          className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                            requestsFilterTab === 'ALL'
+                              ? 'bg-[#6355F6] text-white shadow-xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>All Requests ({totalCount})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRequestsFilterTab('IN_PROGRESS')}
+                          className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                            requestsFilterTab === 'IN_PROGRESS'
+                              ? 'bg-[#6355F6] text-white shadow-xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>In Progress ({inProgressCount})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRequestsFilterTab('COMPLETED')}
+                          className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                            requestsFilterTab === 'COMPLETED'
+                              ? 'bg-[#6355F6] text-white shadow-xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Completed ({completedCount})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRequestsFilterTab('CANCELLED')}
+                          className={`px-4 py-2 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                            requestsFilterTab === 'CANCELLED'
+                              ? 'bg-[#6355F6] text-white shadow-xs'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          <span>Cancelled ({cancelledCount})</span>
+                        </button>
+                      </div>
+
+                      {/* Right Toolbar: Search & Filters Button */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <div className="relative flex-1 sm:w-72">
+                          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={requestsSearchQuery}
+                            onChange={(e) => setRequestsSearchQuery(e.target.value)}
+                            placeholder="Search by Request ID or Service..."
+                            className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#6355F6] focus:ring-2 focus:ring-purple-100 shadow-2xs"
+                          />
+                          {requestsSearchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setRequestsSearchQuery('')}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
 
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                            className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs shrink-0"
+                          >
+                            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Filters</span>
+                          </button>
+
+                          {showFilterDropdown && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-30 animate-in fade-in duration-100">
+                              <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                Filter by Category
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequestsSearchQuery('');
+                                  setShowFilterDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
+                              >
+                                All Categories
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequestsSearchQuery('AC');
+                                  setShowFilterDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
+                              >
+                                AC Repair & Service
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequestsSearchQuery('Plumbing');
+                                  setShowFilterDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
+                              >
+                                Plumbing
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequestsSearchQuery('Electrical');
+                                  setShowFilterDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
+                              >
+                                Electrical
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRequestsSearchQuery('Cleaning');
+                                  setShowFilterDropdown(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] cursor-pointer"
+                              >
+                                Cleaning
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Notice if displaying sample requests */}
+                    {isDemoData && (
+                      <div className="bg-purple-50/70 border border-purple-200/80 rounded-2xl p-3 sm:px-4 text-xs text-purple-900 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[#6355F6] shrink-0" />
+                          <span>
+                            <strong>Demo Preview:</strong> Showing preview requests matching your exact industry design. Click <strong>1-Click Test</strong> or <strong>+ New Request</strong> to dispatch your live orders!
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. 2-COLUMN REQUEST CARDS GRID */}
+                    {filteredRequests.length === 0 ? (
+                      <div className="text-center py-16 space-y-3 bg-white rounded-3xl border border-dashed border-slate-200">
+                        <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+                        <h3 className="text-sm font-black text-slate-900 tracking-tight">No service requests found</h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          No requests matched your current search or status filter. Try clearing filters to see all requests.
+                        </p>
                         <button
                           type="button"
                           onClick={() => {
-                            setSelectedHistoryRequest(req);
+                            setRequestsFilterTab('ALL');
+                            setRequestsSearchQuery('');
                           }}
-                          className="w-full mt-2 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-full transition-colors cursor-pointer"
                         >
-                          <FileText className="w-3.5 h-3.5 text-slate-500" />
-                          <span>View Request Details & Receipt</span>
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          Reset Filters
                         </button>
                       </div>
-                    ))}
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {filteredRequests.map((req) => {
+                          const meta = getRequestCardMeta(req);
+                          const thumbnail = getCategoryThumbnail(req);
+
+                          return (
+                            <div
+                              key={req.id || meta.idDisplay}
+                              className="bg-white rounded-2xl border border-slate-200/90 hover:border-slate-300 p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                            >
+                              {/* Top Info Section */}
+                              <div className="flex gap-4">
+                                {/* Left Category Thumbnail */}
+                                <img
+                                  src={thumbnail}
+                                  alt={req.serviceCategory || req.category || 'Service'}
+                                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 border border-slate-100 shadow-2xs"
+                                  onError={(e) => {
+                                    e.target.src = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=400&q=80';
+                                  }}
+                                />
+
+                                {/* Right Details */}
+                                <div className="flex-1 min-w-0">
+                                  {/* Badge Row & Price */}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#F3F0FF] text-[#6355F6] border border-[#E9E4FF]">
+                                        {meta.idDisplay}
+                                      </span>
+                                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full ${meta.statusClass}`}>
+                                        {meta.statusType === 'in_progress' || meta.statusType === 'assigned' ? (
+                                          <RotateCcw className="w-3 h-3 animate-spin" />
+                                        ) : meta.statusType === 'completed' ? (
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                        ) : meta.statusType === 'cancelled' ? (
+                                          <XCircle className="w-3 h-3 text-rose-600" />
+                                        ) : (
+                                          <Clock className="w-3 h-3 text-amber-600" />
+                                        )}
+                                        <span>{meta.statusLabel}</span>
+                                      </span>
+                                    </div>
+                                    <span className="text-base sm:text-lg font-black text-slate-900 shrink-0">
+                                      {formatCurrency(req.paidAmount || req.estimatedCost || 599)}
+                                    </span>
+                                  </div>
+
+                                  {/* Service Title */}
+                                  <h3 className="text-sm sm:text-base font-bold text-slate-900 mt-1 truncate">
+                                    {req.serviceCategory || req.category || 'AC Repair & Service'}
+                                  </h3>
+
+                                  {/* Address & Schedule */}
+                                  <div className="text-xs text-slate-500 space-y-0.5 mt-1">
+                                    <div className="flex items-center gap-1.5 truncate">
+                                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span className="truncate">{req.serviceAddress || req.address || 'Sector 62, Noida'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                      <span>
+                                        {req.preferredDate || '09 Nov 2026'} • {req.preferredTime || req.timeSlot || '9:00 AM – 12:00 PM'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 5-Step Horizontal Progress Stepper */}
+                              <div className="py-2.5 px-2 border-t border-b border-slate-100">
+                                <div className="relative flex items-center justify-between">
+                                  {/* Base Gray Track */}
+                                  <div className="absolute left-4 right-4 top-3.5 -translate-y-1/2 h-[2px] bg-slate-200 z-0" />
+
+                                  {/* Active Colored Track */}
+                                  {meta.activeStep > 1 && (
+                                    <div
+                                      className="absolute left-4 top-3.5 -translate-y-1/2 h-[2px] bg-[#6355F6] z-0 transition-all duration-500"
+                                      style={{
+                                        width: meta.activeStep === 5 ? 'calc(100% - 2rem)' : `${((meta.activeStep - 1) / 4) * 100}%`
+                                      }}
+                                    />
+                                  )}
+
+                                  {['Submitted', 'Assigned', 'In Progress', 'Verification', 'Completed'].map((label, stepIdx) => {
+                                    const stepNum = stepIdx + 1;
+                                    const isCompleted = meta.activeStep > stepNum || (meta.activeStep === 5 && stepNum === 5);
+                                    const isCurrent = meta.activeStep === stepNum && meta.activeStep !== 5;
+                                    const isCancelled = meta.activeStep === -1;
+
+                                    return (
+                                      <div key={label} className="relative z-10 flex flex-col items-center">
+                                        <div
+                                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                                            isCancelled
+                                              ? 'bg-slate-100 text-slate-400 border border-slate-200'
+                                              : isCompleted
+                                              ? 'bg-[#6355F6] text-white shadow-xs'
+                                              : isCurrent
+                                              ? 'bg-white border-2 border-[#6355F6] text-[#6355F6] shadow-xs ring-4 ring-purple-100'
+                                              : 'bg-white border-2 border-slate-200 text-slate-400'
+                                          }`}
+                                        >
+                                          {isCompleted ? (
+                                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                          ) : isCurrent ? (
+                                            <div className="w-2 h-2 rounded-full bg-[#6355F6]" />
+                                          ) : (
+                                            <span className="text-[10px] font-bold">{stepNum}</span>
+                                          )}
+                                        </div>
+                                        <span
+                                          className={`mt-1 text-[10px] sm:text-[11px] font-medium tracking-tight whitespace-nowrap ${
+                                            isCompleted || isCurrent ? 'text-slate-900 font-bold' : 'text-slate-400'
+                                          }`}
+                                        >
+                                          {label}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Card Bottom Actions */}
+                              <div className="flex items-center justify-between gap-3 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedHistoryRequest(req)}
+                                  className="px-4 py-2 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>View Details</span>
+                                </button>
+
+                                {meta.statusType === 'in_progress' || meta.statusType === 'assigned' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveTrackingRequestId(req.id);
+                                      setTrackedRequest(req);
+                                      setViewMode('booking');
+                                      setActiveBookingStep(9);
+                                    }}
+                                    className="px-4 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+                                  >
+                                    <MapPin className="w-3.5 h-3.5" />
+                                    <span>Track Live Status</span>
+                                  </button>
+                                ) : meta.statusType === 'completed' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedHistoryRequest(req)}
+                                    className="px-4 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+                                  >
+                                    <Star className="w-3.5 h-3.5 fill-current" />
+                                    <span>Rate & Review</span>
+                                  </button>
+                                ) : meta.statusType === 'cancelled' ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedHistoryRequest(req)}
+                                    className="px-4 py-2 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                                  >
+                                    <span>View Reason</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveTrackingRequestId(req.id);
+                                      setTrackedRequest(req);
+                                      setViewMode('booking');
+                                      setActiveBookingStep(9);
+                                    }}
+                                    className="px-4 py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs hover:shadow-md"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Verify Details</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                );
+              })()
             )}
           </div>
         )}
@@ -1573,6 +2130,28 @@ export const RequestWorkPage = () => {
                       <p className="text-xs text-slate-500">
                         Choose from our certified home service categories or search by specialty.
                       </p>
+                    </div>
+
+                    {/* Quick 1-Click Fast Test Dispatch Banner */}
+                    <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                          <Zap className="w-4 h-4 fill-current" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-amber-950">Fast Testing Mode</p>
+                          <p className="text-[11px] text-amber-700">Skip the 6-step form and dispatch a test request in 1 click.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isFastTesting}
+                        onClick={handleFastTestDispatch}
+                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <Zap className={`w-3.5 h-3.5 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
+                        <span>{isFastTesting ? 'Dispatching...' : '⚡ 1-Click Fast Test'}</span>
+                      </button>
                     </div>
 
                     {/* Search Field */}
@@ -2561,94 +3140,94 @@ export const RequestWorkPage = () => {
                 {/* SCREEN 8, 9, 10, 11: POST-SUBMISSION LIVE PARTNER DISPATCH & TRACKING */}
                 {activeBookingStep >= 9 && trackedRequest && (
                   <>
-                    {/* SCREEN 9: FINDING A SERVICE PARTNER */}
-                    {(trackedRequest.status === 'BROADCASTED' || trackedRequest.status === 'FINDING_PARTNER' || trackedRequest.status === 'WAITING_ACCEPTANCE') && (
-                      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-                        <div className="space-y-6 text-center py-4">
-                          {/* Animated Radar Pulse */}
-                          <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                            <span className="absolute w-full h-full rounded-full bg-blue-500/15 animate-ping" />
-                            <span className="absolute w-14 h-14 rounded-full bg-red-500/15 animate-pulse" />
-                            <div className="w-12 h-12 rounded-2xl bg-[#0A2540] text-white flex items-center justify-center shadow-md relative z-10">
-                              <Search className="w-5 h-5 text-white animate-pulse" />
-                            </div>
+                    {/* SCREEN 9: WORK REQUEST SUBMITTED CONFIRMATION (NO BROADCAST / NO RADAR) */}
+                    {(trackedRequest.status === 'POSTED' || trackedRequest.status === 'SUBMITTED' || trackedRequest.status === 'BROADCASTED' || trackedRequest.status === 'FINDING_PARTNER' || trackedRequest.status === 'WAITING_ACCEPTANCE') && (
+                      <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6 max-w-xl mx-auto">
+                        <div className="space-y-4 text-center py-2">
+                          {/* Success Icon */}
+                          <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+                            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
                           </div>
 
-                          <div className="space-y-2 max-w-md mx-auto">
+                          <div className="space-y-1.5">
                             <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                              We're finding the right service partner for you.
+                              Work Request Submitted!
                             </h2>
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                              Your request has been received. We're contacting eligible certified partners in your area and will update you as soon as someone accepts.
+                            <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                              Your service request has been successfully recorded. Our operations team will assign a certified technician to your request.
                             </p>
                           </div>
 
-                          {/* Request Reference Pill */}
-                          <div className="inline-flex items-center gap-2 bg-slate-100 border border-slate-200 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold text-slate-800">
+                          {/* Reference Ticket Badge */}
+                          <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 px-4 py-1.5 rounded-full text-xs font-mono font-bold text-slate-800">
                             <span className="text-[#ff3b47]">Ticket #{trackedRequest.id}</span>
-                            <span className="text-slate-400">•</span>
-                            <span>{trackedRequest.serviceCategory || trackedRequest.category}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-sans font-bold">
+                              Received
+                            </span>
                           </div>
 
-                          {/* 4-Stage Progress Timeline */}
-                          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-left max-w-md mx-auto space-y-3">
-                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-                              Live Dispatch Status
+                          {/* Request Summary Card */}
+                          <div className="p-4 sm:p-5 rounded-xl bg-slate-50/70 border border-slate-200 text-left space-y-3">
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                              Request Summary
                             </h4>
 
-                            <div className="space-y-2.5 text-xs">
-                              <div className="flex items-center gap-2.5 text-emerald-600 font-bold">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>1. Request Received & Verified</span>
+                            <div className="space-y-2 text-xs">
+                              <div className="flex items-start justify-between py-1 border-b border-slate-200/60">
+                                <span className="text-slate-500 font-medium">Service Category:</span>
+                                <span className="font-bold text-slate-900 text-right">
+                                  {trackedRequest.serviceCategory || trackedRequest.category}
+                                </span>
                               </div>
 
-                              <div className="flex items-center gap-2.5 text-[#ff3b47] font-bold">
-                                <span className="w-4 h-4 rounded-full bg-red-100 text-[#ff3b47] flex items-center justify-center text-[10px] animate-pulse">
-                                  2
+                              <div className="flex items-start justify-between py-1 border-b border-slate-200/60">
+                                <span className="text-slate-500 font-medium">Schedule:</span>
+                                <span className="font-bold text-slate-900 text-right">
+                                  {trackedRequest.preferredDate ? `${trackedRequest.preferredDate} (${trackedRequest.timeSlot || trackedRequest.preferredTime || 'Morning'})` : 'Flexible'}
                                 </span>
-                                <span>2. Broadcasting to Available Certified Partners</span>
                               </div>
 
-                              <div className={`flex items-center gap-2.5 font-medium ${
-                                trackedRequest.status === 'WAITING_ACCEPTANCE'
-                                  ? 'text-[#ff3b47] font-bold'
-                                  : 'text-slate-400'
-                              }`}>
-                                <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px]">
-                                  3
+                              <div className="flex items-start justify-between py-1 border-b border-slate-200/60">
+                                <span className="text-slate-500 font-medium">Location:</span>
+                                <span className="font-medium text-slate-800 text-right max-w-[60%] truncate">
+                                  {trackedRequest.serviceAddress || 'Address on file'}
                                 </span>
-                                <span>3. Waiting for Partner Acceptance</span>
                               </div>
 
-                              <div className="flex items-center gap-2.5 text-slate-400 font-medium">
-                                <span className="w-4 h-4 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[10px]">
-                                  4
+                              <div className="flex items-start justify-between py-1">
+                                <span className="text-slate-500 font-medium">Estimated Amount:</span>
+                                <span className="font-black text-slate-900 text-right">
+                                  {formatCurrency(trackedRequest.estimatedCost || 499)}
                                 </span>
-                                <span>4. Partner Assigned</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* Actions: Back to All Requests & Cancel */}
-                          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                          {/* Action Buttons: View All Requests & Submit Another */}
+                          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
                             <button
                               type="button"
                               onClick={() => {
                                 setViewMode('history');
                                 setRequestsSubTab('live');
                               }}
-                              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 border border-slate-300 shadow-2xs"
+                              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
                             >
-                              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
-                              <span>Back to All Requests</span>
+                              <span>View My Requests</span>
+                              <ChevronRight className="w-3.5 h-3.5" />
                             </button>
+
                             <button
                               type="button"
-                              disabled={cancelling}
-                              onClick={() => handleCancelRequest(trackedRequest.id)}
-                              className="px-4 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+                              onClick={() => {
+                                clearBookingDraft();
+                                setActiveBookingStep(1);
+                                setActiveTrackingRequestId(null);
+                              }}
+                              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all cursor-pointer border border-slate-200"
                             >
-                              {cancelling ? 'Cancelling...' : 'Cancel Request'}
+                              Submit Another Request
                             </button>
                           </div>
                         </div>

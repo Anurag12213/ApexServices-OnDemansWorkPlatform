@@ -21,6 +21,7 @@ import {
   Image,
   Upload,
   FileImage,
+  Loader2,
 } from 'lucide-react';
 import { RenderIcon, SYSTEM_ICONS } from './CategoryIconSelector';
 import { adminFetch, API_BASE_URL } from '../utils/api';
@@ -79,6 +80,9 @@ export default function ServiceCategoriesSection() {
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadSuccessMsg, setUploadSuccessMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // New Category Form state
   const [newCategory, setNewCategory] = useState({
@@ -90,6 +94,34 @@ export default function ServiceCategoriesSection() {
     iconId: 1,
     bannerImageUrl: '',
   });
+
+  // Client-side image compression helper
+  const compressImageFile = (file, maxWidth = 800, quality = 0.82) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new window.Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => resolve(event.target.result);
+        img.src = event.target.result;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
 
   // Load custom category images map from localStorage
   const getCategoryImagesMap = () => {
@@ -111,7 +143,7 @@ export default function ServiceCategoriesSection() {
     });
     if (!uploadRes.ok) {
       const err = await uploadRes.json().catch(() => ({}));
-      throw new Error(err.message || 'Permanent media upload failed. Please ensure cloud storage is configured.');
+      throw new Error(err.error || err.message || 'Permanent media upload failed. Please ensure cloud storage is configured.');
     }
     const json = await uploadRes.json();
     if (!json.url) {
@@ -154,13 +186,36 @@ export default function ServiceCategoriesSection() {
   const handleNewCategoryFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsUploadingImage(true);
+    setCategoryError('');
+    setUploadSuccessMsg('');
+
     try {
-      showToast('Uploading banner to permanent cloud storage...');
-      const url = await uploadCategoryImage(file);
-      setNewCategory((prev) => ({ ...prev, bannerImageUrl: url }));
-      showToast(`Banner uploaded successfully: ${file.name}`);
+      // 1. Instantly create client-side preview
+      const localCompressed = await compressImageFile(file);
+      if (localCompressed) {
+        setNewCategory((prev) => ({ ...prev, bannerImageUrl: localCompressed }));
+        setUploadSuccessMsg(`Image attached: ${file.name}`);
+      }
+
+      // 2. Concurrently attempt permanent cloud storage upload
+      try {
+        const url = await uploadCategoryImage(file);
+        if (url) {
+          setNewCategory((prev) => ({ ...prev, bannerImageUrl: url }));
+          setUploadSuccessMsg(`Uploaded to cloud CDN: ${file.name}`);
+          showToast(`Banner uploaded successfully: ${file.name}`);
+        }
+      } catch (cloudErr) {
+        console.warn('Cloud upload fallback notice:', cloudErr.message);
+        setUploadSuccessMsg(`Image optimized & ready for card: ${file.name}`);
+        showToast(`Image attached & ready for category card.`);
+      }
     } catch (err) {
-      showToast(err.message || 'Failed to upload image file.');
+      setCategoryError(err.message || 'Failed to upload image file.');
+    } finally {
+      setIsUploadingImage(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -168,13 +223,34 @@ export default function ServiceCategoriesSection() {
   const handleEditCategoryFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setIsUploadingImage(true);
+    setCategoryError('');
+    setUploadSuccessMsg('');
+
     try {
-      showToast('Uploading banner to permanent cloud storage...');
-      const url = await uploadCategoryImage(file);
-      setEditingCategory((prev) => ({ ...prev, bannerImageUrl: url }));
-      showToast(`Banner uploaded successfully: ${file.name}`);
+      const localCompressed = await compressImageFile(file);
+      if (localCompressed) {
+        setEditingCategory((prev) => ({ ...prev, bannerImageUrl: localCompressed }));
+        setUploadSuccessMsg(`Image attached: ${file.name}`);
+      }
+
+      try {
+        const url = await uploadCategoryImage(file);
+        if (url) {
+          setEditingCategory((prev) => ({ ...prev, bannerImageUrl: url }));
+          setUploadSuccessMsg(`Uploaded to cloud CDN: ${file.name}`);
+          showToast(`Banner uploaded successfully: ${file.name}`);
+        }
+      } catch (cloudErr) {
+        console.warn('Cloud upload fallback notice:', cloudErr.message);
+        setUploadSuccessMsg(`Image optimized & ready for card: ${file.name}`);
+        showToast(`Image attached & ready for category card.`);
+      }
     } catch (err) {
-      showToast(err.message || 'Failed to upload image file.');
+      setCategoryError(err.message || 'Failed to upload image file.');
+    } finally {
+      setIsUploadingImage(false);
+      if (e.target) e.target.value = '';
     }
   };
 
@@ -276,6 +352,7 @@ export default function ServiceCategoriesSection() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const payload = {
         name: newCategory.name.trim(),
@@ -310,6 +387,7 @@ export default function ServiceCategoriesSection() {
 
         setCategories((prev) => [...prev, savedWithImg]);
         setShowAddModal(false);
+        setUploadSuccessMsg('');
         setNewCategory({
           name: '',
           slug: '',
@@ -331,10 +409,12 @@ export default function ServiceCategoriesSection() {
         fetchCategories(); // Refresh to guarantee sync
       } else {
         const err = await res.json().catch(() => ({}));
-        setCategoryError(err.message || 'Failed to create category. Please verify unique name/slug.');
+        setCategoryError(err.error || err.message || 'Failed to create category. Please verify unique name/slug.');
       }
     } catch (e) {
       setCategoryError('Network error connecting to backend service.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -344,6 +424,7 @@ export default function ServiceCategoriesSection() {
     setCategoryError('');
     if (!editingCategory || !editingCategory.id) return;
 
+    setIsSubmitting(true);
     try {
       const payload = {
         name: editingCategory.name.trim(),
@@ -376,6 +457,7 @@ export default function ServiceCategoriesSection() {
 
         setCategories((prev) => prev.map((c) => (c.id === updated.id ? updatedWithImg : c)));
         setEditingCategory(null);
+        setUploadSuccessMsg('');
 
         try {
           const syncChannel = new BroadcastChannel('apex_services_sync');
@@ -387,10 +469,53 @@ export default function ServiceCategoriesSection() {
         fetchCategories();
       } else {
         const err = await res.json().catch(() => ({}));
-        setCategoryError(err.message || 'Failed to update category.');
+        setCategoryError(err.error || err.message || 'Failed to update category.');
       }
     } catch (e) {
       setCategoryError('Network error updating category.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Smart delete handler: Permanent delete for zero-allocation/demo/archived categories, soft-delete for active ones with data
+  const handleCategoryDeleteAction = async (cat) => {
+    const hasAllocations = (cat.partnerCount > 0) || (cat.requestCount > 0);
+    const isArchived = cat.active === false || cat.isSoftDeleted === true;
+
+    if (isArchived || !hasAllocations) {
+      let ok = false;
+      try {
+        if (confirm) {
+          ok = await confirm({
+            title: `Permanently Delete "${cat.name}"?`,
+            message: `Are you sure you want to permanently delete "${cat.name}"? This category has no linked bookings and will be completely removed from the database.`,
+            confirmText: 'Permanently Delete',
+            variant: 'danger',
+          });
+        } else {
+          ok = window.confirm(`Permanently delete "${cat.name}" from database?`);
+        }
+      } catch {
+        ok = window.confirm(`Permanently delete "${cat.name}" from database?`);
+      }
+      if (!ok) return;
+
+      try {
+        const res = await adminFetch(`/admin/service-categories/${cat.id}?permanent=true`, { method: 'DELETE' });
+        if (res.ok) {
+          setCategories((prev) => prev.filter((c) => Number(c.id) !== Number(cat.id)));
+          showToast(`Category "${cat.name}" permanently deleted.`);
+          fetchCategories();
+        } else {
+          await handleSoftDelete(cat.id, cat.name);
+        }
+      } catch (e) {
+        console.error(e);
+        showToast('Network error while deleting category.');
+      }
+    } else {
+      await handleSoftDelete(cat.id, cat.name);
     }
   };
 
@@ -871,9 +996,9 @@ export default function ServiceCategoriesSection() {
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handleSoftDelete(cat.id, cat.name)}
+                              onClick={() => handleCategoryDeleteAction(cat)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer border border-transparent hover:border-rose-200"
-                              title="Soft Delete Category"
+                              title={!cat.partnerCount && !cat.requestCount ? "Permanently Delete Category" : "Archive Category"}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -1004,14 +1129,27 @@ export default function ServiceCategoriesSection() {
 
               {/* Clean, Concise Image Upload Section */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Image className="w-3.5 h-3.5 text-blue-600" />
-                  Category Card Image
+                <label className="block font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Image className="w-3.5 h-3.5 text-blue-600" />
+                    Category Card Image
+                  </span>
+                  {uploadSuccessMsg && !isUploadingImage && (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 animate-fade-in">
+                      <CheckCircle2 className="w-3 h-3" /> Ready
+                    </span>
+                  )}
                 </label>
                 
-                {newCategory.bannerImageUrl ? (
+                {isUploadingImage ? (
+                  /* Uploading Spinner Card */
+                  <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-700 text-xs font-semibold flex items-center justify-center gap-2.5 animate-pulse">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                    <span>Processing and uploading category image...</span>
+                  </div>
+                ) : newCategory.bannerImageUrl ? (
                   /* Active Image Preview Card */
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
                     <div className="flex items-center gap-3 min-w-0">
                       <img
                         src={newCategory.bannerImageUrl}
@@ -1020,16 +1158,20 @@ export default function ServiceCategoriesSection() {
                       />
                       <div className="min-w-0">
                         <span className="text-xs font-bold text-slate-800 block truncate">
-                          {newCategory.bannerImageUrl.startsWith('data:') ? 'Custom Uploaded File' : 'External Image Link'}
+                          {newCategory.bannerImageUrl.startsWith('data:') ? 'Custom Attached File' : 'Cloud / Web Image'}
                         </span>
                         <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Ready for live card
+                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                          {uploadSuccessMsg || 'Ready for live category card'}
                         </span>
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setNewCategory({ ...newCategory, bannerImageUrl: '' })}
+                      onClick={() => {
+                        setNewCategory({ ...newCategory, bannerImageUrl: '' });
+                        setUploadSuccessMsg('');
+                      }}
                       className="px-2.5 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0"
                     >
                       Change / Remove
@@ -1056,7 +1198,12 @@ export default function ServiceCategoriesSection() {
                         type="text"
                         placeholder="Paste image URL (https://...)"
                         value={newCategory.bannerImageUrl || ''}
-                        onChange={(e) => setNewCategory({ ...newCategory, bannerImageUrl: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNewCategory({ ...newCategory, bannerImageUrl: val });
+                          if (val) setUploadSuccessMsg('Direct image URL specified');
+                          else setUploadSuccessMsg('');
+                        }}
                         className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none text-xs focus:border-blue-500 transition"
                       />
                     </div>
@@ -1087,7 +1234,9 @@ export default function ServiceCategoriesSection() {
                 onClick={() => {
                   setShowAddModal(false);
                   setCategoryError('');
+                  setUploadSuccessMsg('');
                 }}
+                disabled={isSubmitting}
                 className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition cursor-pointer text-xs"
               >
                 Cancel
@@ -1095,10 +1244,20 @@ export default function ServiceCategoriesSection() {
               <button
                 type="submit"
                 form="add-category-form"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5 text-xs"
+                disabled={isSubmitting || isUploadingImage}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5 text-xs"
               >
-                <Plus className="w-4 h-4" />
-                <span>Create Category</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating Category...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>Create Category</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1219,14 +1378,27 @@ export default function ServiceCategoriesSection() {
 
               {/* Clean, Concise Image Upload Section */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
-                  <Image className="w-3.5 h-3.5 text-blue-600" />
-                  Category Card Image
+                <label className="block font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Image className="w-3.5 h-3.5 text-blue-600" />
+                    Category Card Image
+                  </span>
+                  {uploadSuccessMsg && !isUploadingImage && (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 animate-fade-in">
+                      <CheckCircle2 className="w-3 h-3" /> Ready
+                    </span>
+                  )}
                 </label>
                 
-                {editingCategory.bannerImageUrl ? (
+                {isUploadingImage ? (
+                  /* Uploading Spinner Card */
+                  <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-700 text-xs font-semibold flex items-center justify-center gap-2.5 animate-pulse">
+                    <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                    <span>Processing and uploading category image...</span>
+                  </div>
+                ) : editingCategory.bannerImageUrl ? (
                   /* Active Image Preview Card */
-                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 animate-fade-in">
                     <div className="flex items-center gap-3 min-w-0">
                       <img
                         src={editingCategory.bannerImageUrl}
@@ -1235,16 +1407,20 @@ export default function ServiceCategoriesSection() {
                       />
                       <div className="min-w-0">
                         <span className="text-xs font-bold text-slate-800 block truncate">
-                          {editingCategory.bannerImageUrl.startsWith('data:') ? 'Custom Uploaded File' : 'External Image Link'}
+                          {editingCategory.bannerImageUrl.startsWith('data:') ? 'Custom Attached File' : 'Cloud / Web Image'}
                         </span>
                         <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Ready for live card
+                          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                          {uploadSuccessMsg || 'Ready for live category card'}
                         </span>
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setEditingCategory({ ...editingCategory, bannerImageUrl: '' })}
+                      onClick={() => {
+                        setEditingCategory({ ...editingCategory, bannerImageUrl: '' });
+                        setUploadSuccessMsg('');
+                      }}
                       className="px-2.5 py-1 text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer shrink-0"
                     >
                       Change / Remove
@@ -1271,7 +1447,12 @@ export default function ServiceCategoriesSection() {
                         type="text"
                         placeholder="Paste image URL (https://...)"
                         value={editingCategory.bannerImageUrl || ''}
-                        onChange={(e) => setEditingCategory({ ...editingCategory, bannerImageUrl: e.target.value })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setEditingCategory({ ...editingCategory, bannerImageUrl: val });
+                          if (val) setUploadSuccessMsg('Direct image URL specified');
+                          else setUploadSuccessMsg('');
+                        }}
                         className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-lg outline-none text-xs focus:border-blue-500 transition"
                       />
                     </div>
@@ -1302,7 +1483,9 @@ export default function ServiceCategoriesSection() {
                 onClick={() => {
                   setEditingCategory(null);
                   setCategoryError('');
+                  setUploadSuccessMsg('');
                 }}
+                disabled={isSubmitting}
                 className="px-4 py-2 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold transition cursor-pointer text-xs"
               >
                 Cancel
@@ -1310,10 +1493,20 @@ export default function ServiceCategoriesSection() {
               <button
                 type="submit"
                 form="edit-category-form"
-                className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5 text-xs"
+                disabled={isSubmitting || isUploadingImage}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold px-5 py-2 rounded-lg transition shadow-xs cursor-pointer flex items-center gap-1.5 text-xs"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Save Changes</span>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving Changes...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Save Changes</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

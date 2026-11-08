@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePartner } from '../../context/PartnerContext';
 import { Mail, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight, ClipboardList, Clock, TrendingUp } from 'lucide-react';
 import ApexLogo from '../../components/common/ApexLogo';
 import GoogleButton from '../../components/common/GoogleButton';
 import { isSqlSafe, isXssSafe, formatEmail, formatPhone, validateEmail, validatePhone } from '../../utils/inputValidator';
+import { parseOAuthRedirectParams } from '../../utils/googleAuth';
 
 export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
-  const { login, setActiveTab, brandName } = usePartner();
+  const { login, loginWithGoogle, setActiveTab, brandName } = usePartner();
 
   const [loginTab, setLoginTab] = useState('email');
   const [email, setEmail] = useState('');
@@ -61,6 +62,60 @@ export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
       return;
     }
     setActiveTab('home');
+  };
+
+  // Handle OAuth2 redirect callback token or error
+  useEffect(() => {
+    const { token, error: oauthError } = parseOAuthRedirectParams();
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError));
+    } else if (token) {
+      localStorage.setItem('apex_partner_token', token);
+      const serverUrl = (
+        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+        'http://localhost:8080/api'
+      ).replace(/\/+$/, '');
+
+      fetch(`${serverUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then((r) => r.json())
+        .then((user) => {
+          if (user && user.id) {
+            const partnerProfile = {
+              id: `PRT-${user.id}`,
+              userId: user.id,
+              fullName: user.fullName || 'Service Partner',
+              email: user.email,
+              phone: user.mobileNumber,
+              category: (user.serviceCategories || []).join(', ') || 'Custom Carpentry',
+              onboardingState: user.active ? 'APPROVED' : 'UNDER_REVIEW',
+              depositStatus: user.active ? 'VERIFIED' : 'PAYMENT_PENDING'
+            };
+            routeByPartnerState(partnerProfile);
+          }
+        })
+        .catch(() => {
+          setError('Failed to load partner profile after Google sign-in.');
+        });
+    }
+  }, []);
+
+  const handleGoogleSuccess = async (credential) => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await loginWithGoogle(credential);
+      if (res.success && res.partner) {
+        routeByPartnerState(res.partner);
+      } else {
+        setError(res.error || 'Google authentication failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.message || 'Could not connect to authentication service.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogin = async (e) => {
@@ -309,6 +364,31 @@ export const LoginScreen = ({ onRegisterClick, onForgotPasswordClick }) => {
                 )}
               </button>
             </form>
+
+            {/* Divider */}
+            <div className="relative my-3 text-center">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <span className="relative px-3 bg-white text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                OR
+              </span>
+            </div>
+
+            {/* Google Sign-In Button */}
+            <GoogleButton
+              onSuccess={handleGoogleSuccess}
+              onError={(err) => {
+                setError('Google sign-in was not completed.');
+              }}
+              portal="partner"
+              apiBaseUrl={
+                (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL) ||
+                'http://localhost:8080/api'
+              }
+              disabled={isLoading}
+              label="Continue with Google"
+            />
 
             {/* Quick Certified Partner Switcher (Dev Mode Only) */}
             {!import.meta.env?.PROD && (

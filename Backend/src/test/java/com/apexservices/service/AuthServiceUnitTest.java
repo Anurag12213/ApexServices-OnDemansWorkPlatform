@@ -1,8 +1,9 @@
 package com.apexservices.service;
+import com.apexservices.dto.request.GoogleAuthRequest;
 
-import com.apexservices.dto.AuthResponse;
-import com.apexservices.dto.LoginRequest;
-import com.apexservices.dto.RegisterRequest;
+import com.apexservices.dto.response.AuthResponse;
+import com.apexservices.dto.request.LoginRequest;
+import com.apexservices.dto.request.RegisterRequest;
 import com.apexservices.exception.ConflictException;
 import com.apexservices.model.AuthProvider;
 import com.apexservices.model.Role;
@@ -365,7 +366,7 @@ public class AuthServiceUnitTest {
     @Test
     @DisplayName("Compatibility: Google OAuth registration remains functional and verifies Google token independently")
     void testGoogleOAuth_PreservesIndependentTokenValidation() {
-        com.apexservices.dto.GoogleAuthRequest googleReq = new com.apexservices.dto.GoogleAuthRequest();
+        com.apexservices.dto.request.GoogleAuthRequest googleReq = new com.apexservices.dto.request.GoogleAuthRequest();
         googleReq.setIdToken("malformed-or-expired-google-id-token");
         googleReq.setRole(Role.ROLE_CUSTOMER);
 

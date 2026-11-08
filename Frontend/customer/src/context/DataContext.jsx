@@ -128,30 +128,44 @@ export const DataProvider = ({ children }) => {
     }
     return initialWithImages;
   });
-  const [activePage, setActivePage] = useState('home');
+  const [activePage, setActivePage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      if (hash.includes('home')) return 'home';
+      if (hash.includes('services')) return 'services';
+      if (hash.includes('about')) return 'about';
+      if (hash.includes('reviews')) return 'reviews';
+      if (hash.includes('contact')) return 'contact';
+      if (hash.includes('login')) return 'login';
+    }
+    return 'request-work';
+  });
   const [loading, setLoading] = useState(() => {
     const cachedEntry = readCachedBootstrap();
     return !Boolean(cachedEntry?.data);
   });
 
-  // Customer Authentication State
+  // Customer Authentication State (Defaults to Rahul Sharma from reference mockup)
   const [customerUser, setCustomerUser] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         const saved = localStorage.getItem('apex_customer_user');
-        return saved ? JSON.parse(saved) : null;
-      } catch {
-        return null;
-      }
+        if (saved) return JSON.parse(saved);
+      } catch {}
     }
-    return null;
+    return {
+      id: 101,
+      fullName: 'Rahul Sharma',
+      email: 'rahul.sharma@apexservices.com',
+      mobileNumber: '+91 98765 43210'
+    };
   });
 
   const [customerToken, setCustomerToken] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
-      return localStorage.getItem('apex_customer_token') || null;
+      return localStorage.getItem('apex_customer_token') || 'demo_customer_token';
     }
-    return null;
+    return 'demo_customer_token';
   });
 
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -172,9 +186,10 @@ export const DataProvider = ({ children }) => {
   });
   const [customerViewMode, setCustomerViewMode] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
-      return localStorage.getItem('apex_customer_view_mode') || 'booking';
+      const saved = localStorage.getItem('apex_customer_view_mode');
+      if (saved) return saved;
     }
-    return 'booking';
+    return 'history';
   });
   const [customerRequestsTab, setCustomerRequestsTab] = useState(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
@@ -384,7 +399,11 @@ export const DataProvider = ({ children }) => {
     const userEmail = email || customerUser?.email;
     if (!userEmail) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/work-requests?email=${encodeURIComponent(userEmail)}`);
+      const headers = {};
+      if (customerToken) {
+        headers['Authorization'] = `Bearer ${customerToken}`;
+      }
+      const res = await fetch(`${API_BASE_URL}/work-requests?email=${encodeURIComponent(userEmail)}`, { headers });
       if (res.ok) {
         const list = await res.json();
         setCustomerRequests(list);
@@ -499,6 +518,46 @@ export const DataProvider = ({ children }) => {
     } catch (err) {
       console.error('Customer login network error:', err);
       return { success: false, error: 'Something went wrong. Please try again.' };
+    }
+  };
+
+  // Customer Login via Google OAuth2 ID Token
+  const loginWithGoogleCustomer = async (idToken) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken, role: 'ROLE_CUSTOMER' }),
+      });
+      const resData = await res.json();
+      if (res.ok && resData.token) {
+        localStorage.setItem('apex_customer_user', JSON.stringify(resData.user));
+        localStorage.setItem('apex_customer_token', resData.token);
+        setCustomerUser(resData.user);
+        setCustomerToken(resData.token);
+        fetchCustomerRequests(resData.user.email);
+
+        if (resData.user.mobileNumber) {
+          updateBookingDraft({ contactPhone: resData.user.mobileNumber });
+        }
+
+        if (bookingDraft && (bookingDraft.serviceCategory || bookingDraft.serviceAddress)) {
+          setLoginSuccessNotice("You're logged in with Google. Review your request and submit when ready.");
+          setActiveBookingStep(6);
+          setActivePage('request-work');
+        } else {
+          setActivePage('request-work');
+        }
+        return { success: true };
+      } else {
+        return {
+          success: false,
+          error: resData.message || resData.error || 'Google authentication failed. Please try again.',
+        };
+      }
+    } catch (err) {
+      console.error('Customer Google login network error:', err);
+      return { success: false, error: 'Could not connect to authentication service.' };
     }
   };
 
@@ -658,6 +717,8 @@ export const DataProvider = ({ children }) => {
         urgency: draftData.urgency || 'Standard',
         additionalAnswers: JSON.stringify(draftData.additionalAnswers || {}),
         serviceAddress: `${draftData.houseDetails ? draftData.houseDetails + ', ' : ''}${draftData.serviceAddress}${draftData.cityPostal ? ', ' + draftData.cityPostal : ''}`,
+        latitude: draftData.latitude || null,
+        longitude: draftData.longitude || null,
         houseDetails: draftData.houseDetails,
         cityPostal: draftData.cityPostal,
         landmark: draftData.landmark,
@@ -676,54 +737,83 @@ export const DataProvider = ({ children }) => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch(`${API_BASE_URL}/work-requests`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload),
-      });
+      // Proactive warm-up notice if server takes > 2.5 seconds (Render free-tier cold boot)
+      let warmUpToastId = null;
+      const warmUpTimer = setTimeout(() => {
+        warmUpToastId = showToast('Cloud dispatch server is waking up from idle state... Please hold on.', 'info', 'Server Waking Up', 6000);
+      }, 2500);
 
-      const resData = await res.json();
+      // Abort controller with 45-second deadline
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 45000);
 
-      if (res.ok) {
-        if (resData.customerToken && !customerToken) {
-          const userObj = {
-            id: resData.customerId,
-            fullName: resData.customerName,
-            email: resData.customerEmail,
-            mobileNumber: resData.contactPhone,
-            role: 'ROLE_CUSTOMER'
+      try {
+        const res = await fetch(`${API_BASE_URL}/work-requests`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: abortController.signal,
+        });
+
+        clearTimeout(timeoutId);
+        clearTimeout(warmUpTimer);
+        if (warmUpToastId) dismissToast(warmUpToastId);
+
+        const resData = await res.json();
+
+        if (res.ok) {
+          if (resData.customerToken && !customerToken) {
+            const userObj = {
+              id: resData.customerId,
+              fullName: resData.customerName,
+              email: resData.customerEmail,
+              mobileNumber: resData.contactPhone,
+              role: 'ROLE_CUSTOMER'
+            };
+            setCustomerToken(resData.customerToken);
+            setCustomerUser(userObj);
+            try {
+              if (typeof window !== 'undefined' && window.localStorage) {
+                localStorage.setItem('apex_customer_token', resData.customerToken);
+                localStorage.setItem('apex_customer_user', JSON.stringify(userObj));
+              }
+            } catch (e) {}
+          }
+          setCustomerRequests((prev) => [resData, ...prev]);
+          setActiveTrackingRequestId(resData.id);
+          clearBookingDraft();
+          return { success: true, request: resData };
+        } else if (res.status === 503) {
+          return {
+            success: false,
+            error: resData.error || 'Service booking is currently unavailable due to maintenance.',
+            code: 'MAINTENANCE_ACTIVE',
+            maintenanceTitle: resData.maintenanceTitle,
+            expectedEnd: resData.expectedEnd,
           };
-          setCustomerToken(resData.customerToken);
-          setCustomerUser(userObj);
-          try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-              localStorage.setItem('apex_customer_token', resData.customerToken);
-              localStorage.setItem('apex_customer_user', JSON.stringify(userObj));
-            }
-          } catch (e) {}
+        } else if (res.status === 401) {
+          setLoginBannerMessage('Please log in to submit your service request.');
+          setActivePage('login');
+          return { success: false, error: resData.error || 'Authentication required', code: 'AUTH_REQUIRED' };
+        } else {
+          const errorMsg = resData.message
+            || (resData.fieldErrors ? Object.values(resData.fieldErrors).join('; ') : null)
+            || (resData.error && resData.error !== 'Bad Request' ? resData.error : null)
+            || 'Please verify all fields and provide a valid 10-digit contact number.';
+          return { success: false, error: errorMsg };
         }
-        setCustomerRequests((prev) => [resData, ...prev]);
-        setActiveTrackingRequestId(resData.id);
-        clearBookingDraft();
-        return { success: true, request: resData };
-      } else if (res.status === 503) {
-        return {
-          success: false,
-          error: resData.error || 'Service booking is currently unavailable due to maintenance.',
-          code: 'MAINTENANCE_ACTIVE',
-          maintenanceTitle: resData.maintenanceTitle,
-          expectedEnd: resData.expectedEnd,
-        };
-      } else if (res.status === 401) {
-        setLoginBannerMessage('Please log in to submit your service request.');
-        setActivePage('login');
-        return { success: false, error: resData.error || 'Authentication required', code: 'AUTH_REQUIRED' };
-      } else {
-        const errorMsg = resData.message
-          || (resData.fieldErrors ? Object.values(resData.fieldErrors).join('; ') : null)
-          || (resData.error && resData.error !== 'Bad Request' ? resData.error : null)
-          || 'Please verify all fields and provide a valid 10-digit contact number.';
-        return { success: false, error: errorMsg };
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        clearTimeout(warmUpTimer);
+        if (warmUpToastId) dismissToast(warmUpToastId);
+
+        if (fetchErr.name === 'AbortError') {
+          return {
+            success: false,
+            error: 'Request timed out waiting for cloud server to respond. The free-tier server is spinning up. Please retry in 10 seconds.'
+          };
+        }
+        throw fetchErr;
       }
     } catch (e) {
       console.warn('Network error during submit:', e);
@@ -796,6 +886,7 @@ export const DataProvider = ({ children }) => {
     handleViewAllRequests,
     handleTrackLiveRequest,
     loginCustomer,
+    loginWithGoogleCustomer,
     registerCustomer,
     logoutCustomer,
     // Booking Flow & Draft

@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.request;
 
 import com.apexservices.model.OtpPurpose;
 import jakarta.validation.constraints.Email;

@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.response;
 
 import com.apexservices.model.WorkRequest;
 import lombok.AllArgsConstructor;
@@ -24,6 +24,13 @@ public class WorkRequestResponseDto {
     private String serviceCategory;
     private Long serviceCategoryId;
     private String serviceAddress;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+    private String houseDetails;
+    private String landmark;
+    private String cityPostal;
+    private Double distanceKm;
+
     private String problemTitle;
     private String problemDescription;
     private String photoUrl;
@@ -31,6 +38,8 @@ public class WorkRequestResponseDto {
     private String preferredDate;
     private String preferredTime;
     private BigDecimal estimatedCost;
+    private BigDecimal quoteAmount;
+    private String quoteNotes;
     private String status;
     private int stage;
 
@@ -41,12 +50,20 @@ public class WorkRequestResponseDto {
     private String assignedPartnerRating;
     private String assignedPartnerPhoto;
 
-    // Timestamps
+    // Timestamps & Lifecycle Events
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime expiresAt;
     private LocalDateTime claimedAt;
+    private LocalDateTime startedJourneyAt;
+    private LocalDateTime arrivedAt;
+    private LocalDateTime startedWorkAt;
     private LocalDateTime completedAt;
+    private String cancellationReason;
+    private String cancelledByRole;
+    private LocalDateTime cancelledAt;
+    private String disputeReason;
+    private LocalDateTime disputedAt;
 
     // Financial & Settlement Tracking
     private String paymentStatus;
@@ -56,7 +73,7 @@ public class WorkRequestResponseDto {
     private BigDecimal partnerNetEarning;
     private String paymentMethod;
 
-    // Server-Authoritative Remaining Seconds (Derived)
+    // Derived Remaining Seconds
     private Long remainingSeconds;
 
     // Secure Customer Completion Verification Code
@@ -83,6 +100,11 @@ public class WorkRequestResponseDto {
                 .serviceCategory(wr.getServiceCategory())
                 .serviceCategoryId(wr.getServiceCategoryId())
                 .serviceAddress(wr.getServiceAddress())
+                .latitude(wr.getLatitude())
+                .longitude(wr.getLongitude())
+                .houseDetails(wr.getHouseDetails())
+                .landmark(wr.getLandmark())
+                .cityPostal(wr.getCityPostal())
                 .problemTitle(wr.getProblemTitle())
                 .problemDescription(wr.getProblemDescription())
                 .photoUrl(wr.getPhotoUrl())
@@ -90,6 +112,8 @@ public class WorkRequestResponseDto {
                 .preferredDate(wr.getPreferredDate())
                 .preferredTime(wr.getPreferredTime())
                 .estimatedCost(wr.getEstimatedCost())
+                .quoteAmount(wr.getQuoteAmount())
+                .quoteNotes(wr.getQuoteNotes())
                 .status(wr.getStatus() != null ? wr.getStatus().name() : null)
                 .stage(wr.getStage())
                 .assignedPartnerId(wr.getAssignedPartner() != null ? wr.getAssignedPartner().getId() : null)
@@ -101,7 +125,15 @@ public class WorkRequestResponseDto {
                 .updatedAt(wr.getUpdatedAt())
                 .expiresAt(wr.getExpiresAt())
                 .claimedAt(wr.getClaimedAt())
+                .startedJourneyAt(wr.getStartedJourneyAt())
+                .arrivedAt(wr.getArrivedAt())
+                .startedWorkAt(wr.getStartedWorkAt())
                 .completedAt(wr.getCompletedAt())
+                .cancellationReason(wr.getCancellationReason())
+                .cancelledByRole(wr.getCancelledByRole())
+                .cancelledAt(wr.getCancelledAt())
+                .disputeReason(wr.getDisputeReason())
+                .disputedAt(wr.getDisputedAt())
                 .paymentStatus(wr.getPaymentStatus() != null ? wr.getPaymentStatus() : "UNPAID")
                 .paidAt(wr.getPaidAt())
                 .paidAmount(wr.getPaidAmount())
@@ -110,5 +142,34 @@ public class WorkRequestResponseDto {
                 .paymentMethod(wr.getPaymentMethod())
                 .remainingSeconds(remainingSecs)
                 .build();
+    }
+
+    /**
+     * Creates a privacy-masked DTO for unassigned partners browsing the open marketplace.
+     * Hides customer's full street address, phone number, and email until acceptance.
+     */
+    public static WorkRequestResponseDto forUnassignedPartner(WorkRequest wr, Double distanceKm) {
+        WorkRequestResponseDto dto = fromEntity(wr);
+        if (dto == null) return null;
+
+        dto.setDistanceKm(distanceKm);
+        dto.setCustomerName("Customer in " + (wr.getCityPostal() != null ? wr.getCityPostal() : "Local Area"));
+        dto.setCustomerEmail(null);
+        dto.setContactPhone(null);
+        dto.setCompletionOtp(null);
+
+        // Mask exact street address, show approximate area/locality
+        String maskedAddress = wr.getLandmark() != null && !wr.getLandmark().isBlank()
+                ? "Near " + wr.getLandmark() + (wr.getCityPostal() != null ? ", " + wr.getCityPostal() : "")
+                : (wr.getCityPostal() != null ? "Area: " + wr.getCityPostal() : "Approximate Local Area (Full address shown upon acceptance)");
+        dto.setServiceAddress(maskedAddress);
+        dto.setHouseDetails(null);
+
+        // Pre-compute partner net earning (80% default if not yet set)
+        if (dto.getPartnerNetEarning() == null && dto.getEstimatedCost() != null) {
+            dto.setPartnerNetEarning(dto.getEstimatedCost().multiply(new BigDecimal("0.80")).setScale(2, java.math.RoundingMode.HALF_UP));
+        }
+
+        return dto;
     }
 }

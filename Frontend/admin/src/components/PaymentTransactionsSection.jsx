@@ -16,8 +16,6 @@ import {
   X,
   FileText,
   Clock,
-  Sparkles,
-  ChevronRight,
   Check,
 } from 'lucide-react';
 
@@ -43,25 +41,10 @@ export default function PaymentTransactionsSection() {
   // ==========================================
   // 1. PARTNER PAYMENT MANAGEMENT (Dynamic)
   // ==========================================
-  const [partnerPayouts, setPartnerPayouts] = useState(() => {
-    try {
-      const stored = localStorage.getItem('apex_partner_payouts');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Remove legacy hardcoded dummy mock IDs
-          const realOnly = parsed.filter(
-            (p) => !['PAY-PRT-801', 'PAY-PRT-802', 'PAY-PRT-803', 'PAY-PRT-804'].includes(p.id)
-          );
-          return realOnly;
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
-
+  const [partnerPayouts, setPartnerPayouts] = useState([]);
   const [partnerFilter, setPartnerFilter] = useState('All');
   const [partnerSearch, setPartnerSearch] = useState('');
+  const [processingPayoutId, setProcessingPayoutId] = useState(null);
 
   // Multi-step Process Partner Payout Modal
   const [showPayoutModal, setShowPayoutModal] = useState(false);
@@ -76,67 +59,82 @@ export default function PaymentTransactionsSection() {
     notes: 'Bi-weekly settlement for completed service requests',
   });
 
-  // Step 1: Admin Approves Partner Withdrawal Request (Confirms request is valid with no issues)
-  const handleApprovePartnerPayout = (id) => {
-    let updatedPayout;
-    setPartnerPayouts((prev) => {
-      const next = prev.map((p) => {
-        if (p.id === id) {
-          updatedPayout = { ...p, status: 'Approved' };
-          return updatedPayout;
-        }
-        return p;
+  // Step 1: Admin Approves Partner Withdrawal Request (Confirms request is valid with backend)
+  const handleApprovePartnerPayout = async (id) => {
+    setProcessingPayoutId(id);
+    try {
+      const res = await adminFetch(`/admin/payments/payouts/${id}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'APPROVE' })
       });
-      try {
-        localStorage.setItem('apex_partner_payouts', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+      if (res.ok) {
+        let updatedPayout;
+        setPartnerPayouts((prev) =>
+          prev.map((p) => {
+            if (p.id === id) {
+              updatedPayout = { ...p, status: 'Approved' };
+              return updatedPayout;
+            }
+            return p;
+          })
+        );
 
-    adminFetch(`/admin/payments/payouts/${id}/action`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'APPROVE' })
-    }).catch(e => console.warn('Backend payout approve sync note:', e));
+        broadcastSync('PARTNER_PAYOUT_APPROVED', {
+          payoutId: id,
+          partnerName: updatedPayout?.partnerName,
+          status: 'Approved',
+        });
 
-    broadcastSync('PARTNER_PAYOUT_APPROVED', {
-      payoutId: id,
-      partnerName: updatedPayout?.partnerName,
-      status: 'Approved',
-    });
-
-    showToast(`Step 1 Complete: Payout ${id} APPROVED. Notification dispatched to Partner. Ready for payment disbursement.`);
+        showToast(`Step 1 Complete: Payout ${id} APPROVED. Notification dispatched to Partner.`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(`Payout approval failed: ${errData.message || 'Server rejected request'}`);
+      }
+    } catch (e) {
+      showToast('Network error during payout approval. Please try again.');
+    } finally {
+      setProcessingPayoutId(null);
+    }
   };
 
   // Step 2: Admin Makes Payment and Marks it Settled / Done
-  const handleSettlePartnerPayout = (id) => {
-    let settledPayout;
-    setPartnerPayouts((prev) => {
-      const next = prev.map((p) => {
-        if (p.id === id) {
-          settledPayout = { ...p, status: 'Settled' };
-          return settledPayout;
-        }
-        return p;
+  const handleSettlePartnerPayout = async (id) => {
+    setProcessingPayoutId(id);
+    try {
+      const txnRef = `TXN-PRT-${id}-${Date.now()}`;
+      const res = await adminFetch(`/admin/payments/payouts/${id}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'SETTLE', transactionReference: txnRef })
       });
-      try {
-        localStorage.setItem('apex_partner_payouts', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+      if (res.ok) {
+        let settledPayout;
+        setPartnerPayouts((prev) =>
+          prev.map((p) => {
+            if (p.id === id) {
+              settledPayout = { ...p, status: 'Settled', transactionReference: txnRef };
+              return settledPayout;
+            }
+            return p;
+          })
+        );
 
-    adminFetch(`/admin/payments/payouts/${id}/action`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'SETTLE', transactionReference: `TXN-PRT-${Date.now()}` })
-    }).catch(e => console.warn('Backend payout settle sync note:', e));
+        broadcastSync('PARTNER_PAYOUT_SETTLED', {
+          payoutId: id,
+          partnerName: settledPayout?.partnerName,
+          netPayout: settledPayout?.netPayout,
+          status: 'Settled',
+        });
 
-    broadcastSync('PARTNER_PAYOUT_SETTLED', {
-      payoutId: id,
-      partnerName: settledPayout?.partnerName,
-      netPayout: settledPayout?.netPayout,
-      status: 'Settled',
-    });
-
-    showToast(`Step 2 Complete: Payment for ${id} transferred & SETTLED! Partner notified of fund arrival.`);
+        showToast(`Step 2 Complete: Payment for ${id} transferred & SETTLED!`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(`Payout settlement failed: ${errData.message || 'Server rejected settlement'}`);
+      }
+    } catch (e) {
+      showToast('Network error during payout settlement. Please try again.');
+    } finally {
+      setProcessingPayoutId(null);
+    }
   };
 
   const handleExecutePartnerPayout = (e) => {
@@ -156,11 +154,7 @@ export default function PaymentTransactionsSection() {
       date: 'Today',
     };
 
-    const next = [newPayout, ...partnerPayouts];
-    setPartnerPayouts(next);
-    try {
-      localStorage.setItem('apex_partner_payouts', JSON.stringify(next));
-    } catch (e) {}
+    setPartnerPayouts((prev) => [newPayout, ...prev]);
 
     showToast(`Payout request ${newPayout.id} logged. Awaiting Step 1 Admin Approval.`);
     setShowPayoutModal(false);
@@ -170,22 +164,7 @@ export default function PaymentTransactionsSection() {
   // ==========================================
   // 2. USER PAYMENT & REFUND MANAGEMENT (Dynamic)
   // ==========================================
-  const [userTransactions, setUserTransactions] = useState(() => {
-    try {
-      const stored = localStorage.getItem('apex_user_refunds');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // Remove legacy hardcoded dummy mock IDs
-          const realOnly = parsed.filter(
-            (t) => !['TXN-90812', 'TXN-90813', 'TXN-90814', 'TXN-90815'].includes(t.id)
-          );
-          return realOnly;
-        }
-      }
-    } catch (e) {}
-    return [];
-  });
+  const [userTransactions, setUserTransactions] = useState([]);
 
   const [userFilter, setUserFilter] = useState('All');
   const [userSearch, setUserSearch] = useState('');
@@ -262,66 +241,50 @@ export default function PaymentTransactionsSection() {
     const fetchLiveFinancials = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       try {
-        const res = await adminFetch('/work-requests');
-        if (res.ok) {
-          const list = await res.json();
-          if (Array.isArray(list) && list.length > 0 && isMounted) {
-            // 1. Map paid or completed work requests to user transactions
-            const liveUserTxns = list
-              .filter((r) => r.paymentStatus === 'PAID' || r.status === 'COMPLETED' || (r.paidAmount && Number(r.paidAmount) > 0))
-              .map((r) => {
-                const amountNum = Number(r.paidAmount || r.estimatedCost || 499);
-                return {
-                  id: `TXN-${r.id.replace(/[^0-9]/g, '').slice(-5) || Math.floor(10000 + Math.random() * 90000)}`,
-                  customer: r.customerName || 'Customer',
-                  email: r.customerEmail || 'customer@apexservices.com',
-                  serviceTicket: r.id,
-                  service: r.serviceCategory || 'Home Service',
-                  gateway: r.paymentMethod || 'UPI Instant',
-                  amount: `₹${amountNum.toFixed(2)}`,
-                  status: 'Completed',
-                  date: r.paidAt ? new Date(r.paidAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recent',
-                  disputeReason: '',
-                };
-              });
+        // 1. Fetch real partner payouts from backend
+        const payoutsRes = await adminFetch('/admin/payments/payouts');
+        if (payoutsRes.ok && isMounted) {
+          const list = await payoutsRes.json();
+          if (Array.isArray(list) && list.length > 0) {
+            const mappedPayouts = list.map((p) => {
+              const amt = Number(p.amount || 0);
+              return {
+                id: p.id,
+                partnerName: p.partnerName || 'Certified Partner',
+                category: p.notes || 'Service Payout',
+                grossBilled: `₹${amt.toFixed(2)}`,
+                platformCut: '₹0.00 (Settled)',
+                netPayout: `₹${amt.toFixed(2)}`,
+                paymentMethod: p.payoutMethod || 'Bank Transfer (HDFC Bank)',
+                status: p.status === 'SETTLED' ? 'Settled' : (p.status === 'APPROVED' ? 'Approved' : 'Pending Approval'),
+                date: p.createdAt ? new Date(p.createdAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recent',
+              };
+            });
+            setPartnerPayouts(mappedPayouts);
+          }
+        }
 
-            if (liveUserTxns.length > 0) {
-              setUserTransactions((prev) => {
-                const map = new Map();
-                prev.forEach((t) => map.set(t.id, t));
-                liveUserTxns.forEach((t) => map.set(t.id, t));
-                return Array.from(map.values());
-              });
-            }
-
-            // 2. Map completed or assigned requests to partner payouts
-            const livePartnerPayouts = list
-              .filter((r) => r.assignedPartnerName && (r.status === 'COMPLETED' || r.paymentStatus === 'PAID'))
-              .map((r) => {
-                const gross = Number(r.paidAmount || r.estimatedCost || 499);
-                const cut = Number(r.platformFee || (gross * 0.20));
-                const net = Number(r.partnerNetEarning || (gross - cut));
-                return {
-                  id: `PAY-PRT-${r.id.replace(/[^0-9]/g, '').slice(-3) || Math.floor(800 + Math.random() * 199)}`,
-                  partnerName: r.assignedPartnerName,
-                  category: r.serviceCategory || 'Specialist Work',
-                  grossBilled: `₹${gross.toFixed(2)}`,
-                  platformCut: `₹${cut.toFixed(2)} (20%)`,
-                  netPayout: `₹${net.toFixed(2)}`,
-                  paymentMethod: 'Bank Transfer (HDFC Bank)',
-                  status: r.status === 'COMPLETED' ? 'Settled' : 'Pending Approval',
-                  date: r.completedAt ? new Date(r.completedAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recent',
-                };
-              });
-
-            if (livePartnerPayouts.length > 0) {
-              setPartnerPayouts((prev) => {
-                const map = new Map();
-                prev.forEach((p) => map.set(p.id, p));
-                livePartnerPayouts.forEach((p) => map.set(p.id, p));
-                return Array.from(map.values());
-              });
-            }
+        // 2. Fetch real customer refunds from backend
+        const refundsRes = await adminFetch('/admin/payments/refunds');
+        if (refundsRes.ok && isMounted) {
+          const list = await refundsRes.json();
+          if (Array.isArray(list) && list.length > 0) {
+            const mappedRefunds = list.map((r) => {
+              const amt = Number(r.amount || 0);
+              return {
+                id: r.id,
+                customer: r.customerName || 'Customer',
+                email: 'customer@apexservices.com',
+                serviceTicket: r.workRequestId,
+                service: 'Customer Escrow Refund',
+                gateway: 'Escrow Reverse',
+                amount: `₹${amt.toFixed(2)}`,
+                status: r.status === 'SETTLED' ? 'Refunded' : (r.status === 'APPROVED' ? 'Refund Approved' : 'Dispute / Refund Requested'),
+                date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recent',
+                disputeReason: r.reason || 'Customer Support Dispute',
+              };
+            });
+            setUserTransactions(mappedRefunds);
           }
         }
       } catch (err) {
@@ -330,7 +293,10 @@ export default function PaymentTransactionsSection() {
     };
 
     fetchLiveFinancials();
-    const interval = setInterval(fetchLiveFinancials, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchLiveFinancials();
+    }, 60000);
     const onVisibility = () => {
       if (!document.hidden) fetchLiveFinancials();
     };
@@ -343,69 +309,78 @@ export default function PaymentTransactionsSection() {
   }, []);
 
   // Step 1: Admin Approves Customer Refund Request
-  const handleApproveUserRefund = (id) => {
-    let approvedTxn;
-    setUserTransactions((prev) => {
-      const next = prev.map((t) => {
-        if (t.id === id) {
-          approvedTxn = { ...t, status: 'Refund Approved' };
-          return approvedTxn;
-        }
-        return t;
+  const handleApproveUserRefund = async (id) => {
+    try {
+      const res = await adminFetch(`/admin/payments/refunds/${id}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'APPROVE' })
       });
-      try {
-        localStorage.setItem('apex_user_refunds', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+      if (res.ok) {
+        let approvedTxn;
+        setUserTransactions((prev) =>
+          prev.map((t) => {
+            if (t.id === id) {
+              approvedTxn = { ...t, status: 'Refund Approved' };
+              return approvedTxn;
+            }
+            return t;
+          })
+        );
 
-    adminFetch(`/admin/payments/refunds/${id}/action`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'APPROVE' })
-    }).catch(e => console.warn('Backend refund approve sync note:', e));
+        broadcastSync('USER_REFUND_APPROVED', {
+          txnId: id,
+          ticket: approvedTxn?.serviceTicket,
+          customer: approvedTxn?.customer,
+          amount: approvedTxn?.amount,
+          status: 'Refund Approved',
+        });
 
-    broadcastSync('USER_REFUND_APPROVED', {
-      txnId: id,
-      ticket: approvedTxn?.serviceTicket,
-      customer: approvedTxn?.customer,
-      amount: approvedTxn?.amount,
-      status: 'Refund Approved',
-    });
-
-    showToast(`Step 1 Complete: Refund claim for ${id} APPROVED. Notification sent to customer.`);
+        showToast(`Step 1 Complete: Refund claim for ${id} APPROVED.`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(`Refund approval failed: ${errData.message || 'Server rejected action'}`);
+      }
+    } catch (e) {
+      showToast('Network error during refund approval.');
+    }
   };
 
   // Step 2: Admin Settles Payment & Marks Refund Done
-  const handleSettleUserRefund = (id) => {
-    let settledTxn;
-    setUserTransactions((prev) => {
-      const next = prev.map((t) => {
-        if (t.id === id) {
-          settledTxn = { ...t, status: 'Refunded' };
-          return settledTxn;
-        }
-        return t;
+  const handleSettleUserRefund = async (id) => {
+    try {
+      const txnRef = `REF-SETTLE-${id}-${Date.now()}`;
+      const res = await adminFetch(`/admin/payments/refunds/${id}/action`, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'SETTLE', transactionReference: txnRef })
       });
-      try {
-        localStorage.setItem('apex_user_refunds', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+      if (res.ok) {
+        let settledTxn;
+        setUserTransactions((prev) =>
+          prev.map((t) => {
+            if (t.id === id) {
+              settledTxn = { ...t, status: 'Refunded', transactionReference: txnRef };
+              return settledTxn;
+            }
+            return t;
+          })
+        );
 
-    adminFetch(`/admin/payments/refunds/${id}/action`, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'SETTLE', transactionReference: `REF-SETTLE-${Date.now()}` })
-    }).catch(e => console.warn('Backend refund settle sync note:', e));
+        broadcastSync('USER_REFUND_SETTLED', {
+          txnId: id,
+          ticket: settledTxn?.serviceTicket,
+          customer: settledTxn?.customer,
+          amount: settledTxn?.amount,
+          status: 'Refunded',
+        });
 
-    broadcastSync('USER_REFUND_SETTLED', {
-      txnId: id,
-      ticket: settledTxn?.serviceTicket,
-      customer: settledTxn?.customer,
-      amount: settledTxn?.amount,
-      status: 'Refunded',
-    });
-
-    showToast(`Step 2 Complete: Refund for ${id} SETTLED & MARKED DONE! Money returned to customer source.`);
+        showToast(`Step 2 Complete: Refund for ${id} SETTLED & MARKED DONE! Money returned to customer.`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        showToast(`Refund settlement failed: ${errData.message || 'Server rejected action'}`);
+      }
+    } catch (e) {
+      showToast('Network error during refund settlement.');
+    }
   };
 
   // Cross-portal Broadcast Listener
@@ -450,11 +425,7 @@ export default function PaymentTransactionsSection() {
         if (data.type === 'PARTNER_PAYOUT_REQUESTED' && data.payout) {
           setPartnerPayouts((prev) => {
             if (prev.some((p) => p.id === data.payout.id)) return prev;
-            const updated = [data.payout, ...prev];
-            try {
-              localStorage.setItem('apex_partner_payouts', JSON.stringify(updated));
-            } catch (e) {}
-            return updated;
+            return [data.payout, ...prev];
           });
           showToast(`New Partner Withdrawal Request received: ${data.payout.id} (${data.payout.partnerName})`);
         }
@@ -463,15 +434,14 @@ export default function PaymentTransactionsSection() {
         if (data.type === 'USER_REFUND_REQUESTED' && data.ticket) {
           setUserTransactions((prev) => {
             const matchIndex = prev.findIndex((t) => t.serviceTicket === data.ticket.serviceTicket || t.id === data.ticket.id);
-            let updated;
             if (matchIndex >= 0) {
-              updated = prev.map((t, idx) =>
+              return prev.map((t, idx) =>
                 idx === matchIndex
                   ? { ...t, status: 'Dispute / Refund Requested', disputeReason: data.ticket.reason || 'Customer Support Dispute' }
                   : t
               );
             } else {
-              updated = [
+              return [
                 {
                   id: 'TXN-' + Math.floor(10000 + Math.random() * 90000),
                   customer: data.ticket.customerName || 'Customer',
@@ -487,10 +457,6 @@ export default function PaymentTransactionsSection() {
                 ...prev,
               ];
             }
-            try {
-              localStorage.setItem('apex_user_refunds', JSON.stringify(updated));
-            } catch (e) {}
-            return updated;
           });
           showToast(`Customer Dispute Ticket logged for ${data.ticket.serviceTicket || data.ticket.id}. Awaiting Admin Review.`);
         }

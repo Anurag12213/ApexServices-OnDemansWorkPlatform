@@ -1,6 +1,6 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.CategoryRequestDto;
+import com.apexservices.dto.request.CategoryRequestDto;
 import com.apexservices.model.Icon;
 import com.apexservices.repository.IconRepository;
 import com.apexservices.security.InputSanitizer;

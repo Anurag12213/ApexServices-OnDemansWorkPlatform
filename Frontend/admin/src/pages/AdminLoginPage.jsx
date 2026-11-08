@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart2, Users, Settings, Mail, Phone, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
 import ApexLogo from '../components/ApexLogo';
 import GoogleButton from '../components/GoogleButton';
 import { isSqlSafe, isXssSafe, formatEmail, formatPhone, validateEmail, validatePhone } from '../utils/inputValidator';
 import { useToast } from '../components/Toast';
 import { API_BASE_URL } from '../utils/api';
+import { parseOAuthRedirectParams } from '../utils/googleAuth';
 
 export default function AdminLoginPage({ onLogin, brandName = 'ApexServices' }) {
   const displayBrand = brandName || 'ApexServices';
@@ -17,6 +18,89 @@ export default function AdminLoginPage({ onLogin, brandName = 'ApexServices' }) 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Check URL query parameters for OAuth2 redirect token or error
+  useEffect(() => {
+    const { token, error: oauthError } = parseOAuthRedirectParams();
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError));
+      toast.error(decodeURIComponent(oauthError), 'Admin Authentication Failed');
+    } else if (token) {
+      fetch(`${API_BASE_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then((r) => r.json())
+        .then((user) => {
+          if (user && user.role === 'ROLE_ADMIN') {
+            const sessionData = {
+              success: true,
+              token,
+              admin: {
+                name: user.fullName || 'Administrator',
+                email: user.email,
+                role: 'ROLE_ADMIN'
+              },
+              user
+            };
+            localStorage.setItem('apex_admin_auth', JSON.stringify(sessionData));
+            toast.success(`Welcome back, ${user.fullName || 'Super Administrator'}!`, 'Admin Authenticated');
+            onLogin(sessionData);
+          } else {
+            setError('Access Denied: Your account does not possess administrative privileges.');
+            toast.error('Access Denied: Insufficient administrative privileges.', 'Forbidden');
+          }
+        })
+        .catch(() => {
+          setError('Could not verify administrator profile.');
+        });
+    }
+  }, []);
+
+  const handleGoogleSuccess = async (credential) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/admin/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken: credential })
+      });
+      const data = await res.json();
+      if (res.ok && data.token) {
+        if (data.user?.role !== 'ROLE_ADMIN') {
+          setError('Access Denied: Your Google account does not possess administrative privileges.');
+          toast.error('Access Denied: Administrator role required.', 'Security Alert');
+          return;
+        }
+        const sessionData = {
+          success: true,
+          token: data.token,
+          admin: {
+            name: data.user?.fullName || 'Super Administrator',
+            email: data.user?.email || 'admin@apexservices.com',
+            role: 'ROLE_ADMIN'
+          },
+          user: data.user
+        };
+        if (rememberMe) {
+          localStorage.setItem('apex_admin_auth', JSON.stringify(sessionData));
+        }
+        toast.success('Admin authenticated successfully via Google SSO', 'Welcome');
+        onLogin(sessionData);
+      } else if (res.status === 403) {
+        setError('Access Denied: Your Google account does not have administrative privileges.');
+        toast.error('Access Denied: Your Google account does not have administrative privileges.', 'Unauthorized Account');
+      } else {
+        setError(data.message || data.error || 'Google authentication failed.');
+        toast.error(data.message || data.error || 'Google authentication failed.', 'Error');
+      }
+    } catch (err) {
+      setError('Could not connect to authentication service.');
+      toast.error('Network error during Google authentication.', 'Error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -297,9 +381,14 @@ export default function AdminLoginPage({ onLogin, brandName = 'ApexServices' }) 
 
               {/* Google Button */}
               <GoogleButton
-                onClick={() => {
-                  handleSubmit({ preventDefault: () => {} });
+                onSuccess={handleGoogleSuccess}
+                onError={(err) => {
+                  setError('Google sign-in was not completed.');
+                  toast.error('Google sign-in was canceled or encountered an issue.', 'Google SSO');
                 }}
+                portal="admin"
+                apiBaseUrl={API_BASE_URL}
+                disabled={loading}
                 label="Continue with Google"
               />
             </div>

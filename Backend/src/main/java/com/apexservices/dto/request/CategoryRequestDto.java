@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.request;
 
 import com.apexservices.security.SafeText;
 import jakarta.validation.constraints.NotBlank;

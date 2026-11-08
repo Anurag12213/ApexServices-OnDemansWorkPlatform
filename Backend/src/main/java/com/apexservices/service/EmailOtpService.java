@@ -1,6 +1,7 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.*;
+import com.apexservices.dto.request.*;
+import com.apexservices.dto.response.*;
 import com.apexservices.email.EmailService;
 import com.apexservices.exception.ConflictException;
 import com.apexservices.exception.RateLimitExceededException;

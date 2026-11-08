@@ -8,7 +8,7 @@ export default function StatCards() {
     const fetchStats = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
       try {
-        const res = await adminFetch('/work-requests');
+        const res = await adminFetch('/admin/work-requests');
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
@@ -21,7 +21,10 @@ export default function StatCards() {
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchStats();
+    }, 60000);
     const onVisibilityChange = () => {
       if (!document.hidden) fetchStats();
     };

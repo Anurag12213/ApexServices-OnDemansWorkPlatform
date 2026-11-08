@@ -1,6 +1,6 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.WorkRequestResponseDto;
+import com.apexservices.dto.response.WorkRequestResponseDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,21 +23,8 @@ public class DispatchNotificationService {
      * Broadcasts a new work request offer to all eligible partners.
      */
     public void broadcastNewRequest(WorkRequestResponseDto requestDto) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("type", "NEW_WORK_REQUEST");
-        payload.put("data", requestDto);
-
-        log.info("Broadcasting new work request: {} to /topic/broadcasts", requestDto.getId());
-        try {
-            messagingTemplate.convertAndSend("/topic/broadcasts", (Object) payload);
-            
-            if (requestDto.getServiceCategory() != null) {
-                String catSlug = requestDto.getServiceCategory().trim().toLowerCase().replaceAll("[^a-z0-9]", "-");
-                messagingTemplate.convertAndSend("/topic/category." + catSlug, (Object) payload);
-            }
-        } catch (Exception ex) {
-            log.warn("Failed to send WebSocket broadcast for request {}: {}", requestDto.getId(), ex.getMessage());
-        }
+        // Broadcasts disabled - work requests are submitted only without push broadcasts
+        log.debug("Work request {} recorded without broadcast", requestDto != null ? requestDto.getId() : "null");
     }
 
     /**

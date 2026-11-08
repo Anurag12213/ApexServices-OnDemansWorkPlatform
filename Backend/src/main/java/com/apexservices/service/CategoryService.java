@@ -1,8 +1,8 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.CategoryRequestDto;
-import com.apexservices.dto.CategoryStatusRequest;
-import com.apexservices.dto.ServiceCategoryDto;
+import com.apexservices.dto.request.CategoryRequestDto;
+import com.apexservices.dto.request.CategoryStatusRequest;
+import com.apexservices.dto.response.ServiceCategoryDto;
 import com.apexservices.exception.ConflictException;
 import com.apexservices.model.Category;
 import com.apexservices.model.Icon;

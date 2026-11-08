@@ -1,7 +1,7 @@
 package com.apexservices;
 
-import com.apexservices.dto.CategoryRequestDto;
-import com.apexservices.dto.ServiceCategoryDto;
+import com.apexservices.dto.request.CategoryRequestDto;
+import com.apexservices.dto.response.ServiceCategoryDto;
 import com.apexservices.model.Category;
 import com.apexservices.repository.CategoryRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -109,4 +109,5 @@ public class CategoryOperationIntegrationTest {
         boolean exists = categoryRepository.existsBySlug("painting-services");
         assertTrue(exists, "Slug existence check should return true for existing slug");
     }
+
 }

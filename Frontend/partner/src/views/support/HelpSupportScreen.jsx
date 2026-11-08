@@ -126,8 +126,11 @@ export const HelpSupportScreen = () => {
       };
     } catch (e) {}
 
-    // Auto-poll every 25s for bi-directional live sync (instant on focus and BroadcastChannel)
-    const interval = setInterval(() => fetchTickets(true), 25000);
+    // Auto-poll every 60s for bi-directional live sync (instant on focus and BroadcastChannel)
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchTickets(true);
+    }, 60000);
 
     const handleFocus = () => fetchTickets(true);
     window.addEventListener('focus', handleFocus);

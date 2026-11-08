@@ -275,7 +275,7 @@ class ApiClient {
     };
 
     // Register in backend database
-    let token = 'prt-tok-' + Date.now();
+    let token = null;
     try {
       const regRes = await fetch(`${API_BASE}/auth/register`, {
         method: 'POST',
@@ -289,15 +289,28 @@ class ApiClient {
           verificationGrant: partnerData.verificationGrant || undefined
         })
       });
-      if (regRes.ok) {
-        const authData = await regRes.json();
-        if (authData.token) {
-          token = authData.token;
-          this.setToken(token);
-        }
+
+      const authData = await regRes.json().catch(() => ({}));
+      if (!regRes.ok) {
+        return {
+          success: false,
+          error: authData.message || authData.error || 'Registration rejected by backend. Please check your information.'
+        };
+      }
+
+      if (authData.token) {
+        token = authData.token;
+        this.setToken(token);
+      }
+      if (authData.user?.id) {
+        newPartner.id = `PRT-${authData.user.id}`;
       }
     } catch (e) {
-      console.warn('Backend partner register sync notice:', e);
+      console.warn('Backend partner register sync error:', e);
+      return {
+        success: false,
+        error: 'Network error connecting to backend server. Please verify your connection.'
+      };
     }
 
     state.partner = newPartner;
@@ -476,6 +489,74 @@ class ApiClient {
     }
   }
 
+  // 3b. Auth: Login / Auto-Registration via Google OAuth2 ID Token
+  async loginWithGoogle(idToken) {
+    const state = this.getState();
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken, role: 'ROLE_PARTNER' })
+      });
+      if (res.ok) {
+        const authData = await res.json();
+        const token = authData.token;
+        const user = authData.user || {};
+        this.setToken(token);
+
+        const isOrg = user.partnerType === 'ORG_MEMBER';
+        const userCategories = (user.serviceCategories && user.serviceCategories.length > 0)
+          ? user.serviceCategories
+          : [isOrg ? 'Custom Carpentry, Emergency Plumbing' : 'Custom Carpentry'];
+
+        const partner = {
+          id: `PRT-${user.id || Date.now()}`,
+          userId: user.id,
+          fullName: user.fullName || 'Service Partner',
+          email: user.email || 'partner@apexservices.com',
+          phone: user.mobileNumber || '+91 98234 11200',
+          accountType: isOrg ? 'ORGANIZATION' : 'INDIVIDUAL',
+          partnerType: user.partnerType || 'INDIVIDUAL',
+          orgName: user.organizationName || (isOrg ? 'Apex Craft Solutions LLP' : null),
+          gstin: isOrg ? '27AABCA1234F1Z5' : null,
+          category: userCategories.join(', '),
+          serviceCategories: userCategories,
+          territory: user.operatingTerritory || 'Mumbai West (Andheri - Bandra)',
+          serviceRadiusKm: 15,
+          onboardingState: user.onboardingState || (user.active ? 'APPROVED' : 'UNDER_REVIEW'),
+          depositStatus: user.depositStatus || (user.active ? 'VERIFIED' : 'PAYMENT_PENDING'),
+          isAvailable: user.active !== false,
+          rating: user.rating != null ? user.rating : 5.0,
+          completedJobsCount: user.completedJobsCount || 0,
+          walletBalance: 0,
+          pendingEscrowBalance: 0,
+          joinedDate: new Date().toISOString(),
+          earnings: {
+            today: 0,
+            thisWeek: 0,
+            thisMonth: 0,
+            lifetime: 0,
+            pendingPayout: 0,
+            availableBalance: 0
+          }
+        };
+
+        state.partner = partner;
+        state.offers = [];
+        state.activeJob = null;
+        this.saveState(state);
+        return { success: true, partner, token };
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        return { success: false, error: errJson.error || errJson.message || 'Google sign-in failed. Please verify partner credentials.' };
+      }
+    } catch (e) {
+      console.warn('Backend Google login error:', e);
+      return { success: false, error: 'Network error connecting to login server' };
+    }
+  }
+
   // 4. Deposit Payment Execution
   async processDepositPayment(paymentDetails) {
     const state = this.getState();
@@ -629,28 +710,37 @@ class ApiClient {
         ? `${API_BASE}/work-requests/partner-feed?category=${encodeURIComponent(category)}`
         : `${API_BASE}/work-requests/partner-feed`;
 
-      let res = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const headers = {
+        'Authorization': `Bearer ${token}`
+      };
+      if (this._partnerFeedEtag) {
+        headers['If-None-Match'] = this._partnerFeedEtag;
+      }
+
+      let res = await fetch(url, { headers });
+
+      if (res.status === 304) {
+        return this._lastLiveFeed || [];
+      }
 
       // Automatic token renewal on expired token (401/403)
       if (res.status === 401 || res.status === 403) {
         this.setToken(null);
         token = await this.getPartnerAuthToken(true);
         if (token) {
-          res = await fetch(url, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          headers['Authorization'] = `Bearer ${token}`;
+          res = await fetch(url, { headers });
+          if (res.status === 304) return this._lastLiveFeed || [];
         }
       }
 
-      if (!res.ok) return [];
+      if (!res.ok) return this._lastLiveFeed || [];
+
+      const etag = res.headers.get('etag');
+      if (etag) this._partnerFeedEtag = etag;
 
       const liveRequests = await res.json();
+      this._lastLiveFeed = liveRequests;
       const state = this.getState();
       if (!state.offers) state.offers = [];
 

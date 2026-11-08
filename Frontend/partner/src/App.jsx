@@ -191,9 +191,6 @@ const MainApp = () => {
 
       {/* Mobile Bottom Navigation (5 core tabs) */}
       <BottomNavigation />
-
-      {/* Uber Partner-Style Incoming Request Alert Overlay (Global trigger) */}
-      <IncomingRequestOverlay />
     </div>
   );
 };

@@ -75,7 +75,7 @@ public class MediaMigrationController {
             res.put("url", url);
             res.put("isCloudinary", mediaStorageService.isCloudStorageConfigured());
             return ResponseEntity.ok(res);
-        } catch (IOException e) {
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Upload failed: " + e.getMessage()));
         }

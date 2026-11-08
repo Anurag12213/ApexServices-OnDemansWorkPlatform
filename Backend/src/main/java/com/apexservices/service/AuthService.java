@@ -1,6 +1,7 @@
 package com.apexservices.service;
 
-import com.apexservices.dto.*;
+import com.apexservices.dto.request.*;
+import com.apexservices.dto.response.*;
 import com.apexservices.model.AuthProvider;
 import com.apexservices.model.Role;
 import com.apexservices.model.User;
@@ -14,11 +15,21 @@ import com.google.api.client.json.gson.GsonFactory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Optional;
 
@@ -39,6 +50,25 @@ public class AuthService {
 
     @Value("${security.google.client-id:}")
     private String googleClientId;
+
+    @Value("${security.google.client-secret:}")
+    private String googleClientSecret;
+
+    @Value("${frontend.customer-url:http://localhost:5173}")
+    private String customerFrontendUrl;
+
+    @Value("${frontend.partner-url:http://localhost:5174}")
+    private String partnerFrontendUrl;
+
+    @Value("${frontend.admin-url:http://localhost:5175}")
+    private String adminFrontendUrl;
+
+    @Value("${backend.base-url:http://localhost:8080}")
+    private String backendBaseUrl;
+
+    public String getGoogleClientId() {
+        return this.googleClientId != null ? this.googleClientId.trim() : "";
+    }
 
     /**
      * Authenticate via Email OR Mobile Number + Password.
@@ -179,10 +209,16 @@ public class AuthService {
     }
 
     /**
-     * Authenticate or Auto-Register via Google OAuth2 ID Token
+     * Authenticate or Auto-Register via Google OAuth2 ID Token (Customer & Partner)
+     * Strictly blocks claiming ROLE_ADMIN.
      */
     @Transactional
     public AuthResponse loginWithGoogle(GoogleAuthRequest request) {
+        if (request.getRole() == Role.ROLE_ADMIN) {
+            log.warn("[SECURITY AUDIT] Unauthorized attempt to register or login as ROLE_ADMIN via public Google endpoint");
+            throw new BadCredentialsException("Administrator access must be authenticated via the Admin portal.");
+        }
+
         GoogleIdToken.Payload payload = verifyGoogleIdToken(request.getIdToken());
         if (payload == null) {
             log.warn("[SECURITY AUDIT] Google OAuth verification failed: invalid or expired ID token");
@@ -209,6 +245,7 @@ public class AuthService {
                 user.setProviderId(googleSubId);
                 user = userRepository.save(user);
             }
+            log.info("[SECURITY AUDIT] Existing user authenticated via Google SSO [id={}, role={}]", user.getId(), user.getRole());
         } else {
             // Auto-register new Google user (Never assign ROLE_ADMIN via Google public login)
             Role role = (request.getRole() == Role.ROLE_PARTNER) ? Role.ROLE_PARTNER : Role.ROLE_CUSTOMER;
@@ -229,6 +266,155 @@ public class AuthService {
     }
 
     /**
+     * Dedicated Administrator Authentication via Google OAuth2 ID Token.
+     * Enforces that the user already exists AND possesses ROLE_ADMIN.
+     * Returns HTTP 403 Forbidden (AccessDeniedException) if unvetted account attempts login.
+     */
+    @Transactional
+    public AuthResponse loginAdminWithGoogle(GoogleAuthRequest request) {
+        GoogleIdToken.Payload payload = verifyGoogleIdToken(request.getIdToken());
+        if (payload == null) {
+            log.warn("[SECURITY AUDIT] Admin Google OAuth verification failed: invalid or expired ID token");
+            throw new BadCredentialsException("Invalid or expired Google ID Token");
+        }
+
+        String email = payload.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new BadCredentialsException("Google account has no associated email address");
+        }
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> {
+                    log.warn("[SECURITY AUDIT] Admin Google login rejected: account not found for [{}]", maskIdentifier(email));
+                    return new AccessDeniedException("Access Denied: Your Google account does not have administrative privileges.");
+                });
+
+        if (user.getRole() != Role.ROLE_ADMIN) {
+            log.warn("[SECURITY AUDIT] Admin Google login rejected: user [{}] possesses role [{}] instead of ROLE_ADMIN", maskIdentifier(email), user.getRole());
+            throw new AccessDeniedException("Access Denied: Your Google account does not have administrative privileges.");
+        }
+
+        if (!user.isActive()) {
+            log.warn("[SECURITY AUDIT] Admin Google login rejected: deactivated account [{}]", maskIdentifier(email));
+            throw new BadCredentialsException("Your account is currently deactivated. Please contact support.");
+        }
+
+        if (user.getProviderId() == null) {
+            user.setProviderId(payload.getSubject());
+            user = userRepository.save(user);
+        }
+
+        log.info("[SECURITY AUDIT] Administrator logged in successfully via Google SSO [id={}]", user.getId());
+        return buildAuthResponse(user);
+    }
+
+    /**
+     * Constructs Google OAuth2 Authorization URL with state and PKCE/nonce parameters.
+     */
+    public String buildGoogleAuthorizationUrl(String portal, String returnUrl) {
+        String clientId = this.googleClientId != null ? this.googleClientId.trim() : "";
+        if (clientId.isEmpty()) {
+            throw new IllegalStateException("Google OAuth Client ID is not configured on the server.");
+        }
+        String redirectUri = backendBaseUrl + "/api/auth/oauth2/callback/google";
+        String normalizedPortal = (portal != null && !portal.isBlank()) ? portal.toLowerCase().trim() : "customer";
+        String state = Base64.getUrlEncoder().encodeToString(
+                (normalizedPortal + ":" + System.currentTimeMillis() + ":" + (returnUrl != null ? returnUrl : "")).getBytes(StandardCharsets.UTF_8)
+        );
+
+        return "https://accounts.google.com/o/oauth2/v2/auth?"
+                + "client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
+                + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                + "&response_type=code"
+                + "&scope=" + URLEncoder.encode("openid profile email", StandardCharsets.UTF_8)
+                + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8)
+                + "&access_type=online"
+                + "&prompt=select_account";
+    }
+
+    /**
+     * Handles Google OAuth2 Authorization Code Callback, exchanges code with Google,
+     * resolves identity and user role, and returns portal-specific redirect URL with token.
+     */
+    @Transactional
+    public String handleOAuth2Callback(String code, String state, String error) {
+        String portal = "customer";
+        if (state != null && !state.isBlank()) {
+            try {
+                String decodedState = new String(Base64.getUrlDecoder().decode(state), StandardCharsets.UTF_8);
+                String[] parts = decodedState.split(":", 3);
+                if (parts.length > 0 && !parts[0].isBlank()) {
+                    portal = parts[0].toLowerCase().trim();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        String targetPortalUrl = switch (portal) {
+            case "admin" -> adminFrontendUrl;
+            case "partner" -> partnerFrontendUrl;
+            default -> customerFrontendUrl;
+        };
+
+        if (error != null && !error.isBlank()) {
+            log.warn("[SECURITY AUDIT] Google OAuth authorization callback returned error: {}", error);
+            return targetPortalUrl + "/login?error=" + URLEncoder.encode("Google sign-in was canceled or denied: " + error, StandardCharsets.UTF_8);
+        }
+
+        if (code == null || code.isBlank()) {
+            return targetPortalUrl + "/login?error=" + URLEncoder.encode("Missing authorization code from Google.", StandardCharsets.UTF_8);
+        }
+
+        try {
+            // Exchange code for tokens at https://oauth2.googleapis.com/token
+            String redirectUri = backendBaseUrl + "/api/auth/oauth2/callback/google";
+            String requestBody = "code=" + URLEncoder.encode(code, StandardCharsets.UTF_8)
+                    + "&client_id=" + URLEncoder.encode(googleClientId != null ? googleClientId.trim() : "", StandardCharsets.UTF_8)
+                    + "&client_secret=" + URLEncoder.encode(googleClientSecret != null ? googleClientSecret.trim() : "", StandardCharsets.UTF_8)
+                    + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+                    + "&grant_type=authorization_code";
+
+            HttpClient httpClient = HttpClient.newHttpClient();
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create("https://oauth2.googleapis.com/token"))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> httpResponse = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
+
+            if (httpResponse.statusCode() != 200) {
+                log.error("[SECURITY AUDIT] Failed to exchange Google auth code for token. HTTP {}: {}", httpResponse.statusCode(), httpResponse.body());
+                return targetPortalUrl + "/login?error=" + URLEncoder.encode("Failed to exchange authorization token with Google.", StandardCharsets.UTF_8);
+            }
+
+            JsonNode jsonNode = new ObjectMapper().readTree(httpResponse.body());
+            String idToken = jsonNode.has("id_token") ? jsonNode.get("id_token").asText() : null;
+
+            if (idToken == null || idToken.isBlank()) {
+                return targetPortalUrl + "/login?error=" + URLEncoder.encode("No ID token returned by Google.", StandardCharsets.UTF_8);
+            }
+
+            AuthResponse authResponse;
+            if ("admin".equalsIgnoreCase(portal)) {
+                authResponse = loginAdminWithGoogle(GoogleAuthRequest.builder().idToken(idToken).build());
+            } else {
+                Role requestedRole = "partner".equalsIgnoreCase(portal) ? Role.ROLE_PARTNER : Role.ROLE_CUSTOMER;
+                authResponse = loginWithGoogle(GoogleAuthRequest.builder().idToken(idToken).role(requestedRole).build());
+            }
+
+            return targetPortalUrl + "/login?oauth_token=" + URLEncoder.encode(authResponse.getToken(), StandardCharsets.UTF_8)
+                    + "&role=" + authResponse.getUser().getRole().name();
+
+        } catch (AccessDeniedException ade) {
+            log.warn("[SECURITY AUDIT] OAuth2 callback access denied: {}", ade.getMessage());
+            return targetPortalUrl + "/login?error=" + URLEncoder.encode(ade.getMessage(), StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            log.error("[SECURITY AUDIT] OAuth2 callback processing failed", ex);
+            return targetPortalUrl + "/login?error=" + URLEncoder.encode("Authentication processing failed: " + ex.getMessage(), StandardCharsets.UTF_8);
+        }
+    }
+
+    /**
      * Get Current Authenticated User Summary
      */
     public UserSummaryDto getCurrentUser(String identifier) {
@@ -237,7 +423,7 @@ public class AuthService {
         return mapToSummary(user);
     }
 
-    private GoogleIdToken.Payload verifyGoogleIdToken(String idTokenString) {
+    public GoogleIdToken.Payload verifyGoogleIdToken(String idTokenString) {
         try {
             GoogleIdTokenVerifier.Builder verifierBuilder = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(),
@@ -245,13 +431,14 @@ public class AuthService {
             );
 
             if (googleClientId != null && !googleClientId.isBlank()) {
-                verifierBuilder.setAudience(Collections.singletonList(googleClientId));
+                verifierBuilder.setAudience(Collections.singletonList(googleClientId.trim()));
             }
 
             GoogleIdTokenVerifier verifier = verifierBuilder.build();
             GoogleIdToken idToken = verifier.verify(idTokenString);
             return idToken != null ? idToken.getPayload() : null;
         } catch (Exception e) {
+            log.warn("[SECURITY AUDIT] Google ID token verification error: {}", e.getMessage());
             return null;
         }
     }

@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, CheckCircle, AlertTriangle, Clock, ChevronDown, ChevronUp, Activity } from 'lucide-react';
-import { API_BASE_URL } from '../utils/api';
+import { adminFetch } from '../utils/api';
 
 export default function RecentActivity() {
   const [requests, setRequests] = useState([]);
   const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
-    const fetchRequests = () => {
+    const fetchRequests = async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      fetch(`${API_BASE_URL}/work-requests`)
-        .then(res => res.json())
-        .then(data => {
+      try {
+        const res = await adminFetch('/admin/work-requests');
+        if (res.ok) {
+          const data = await res.json();
           if (Array.isArray(data)) {
-            // Sort newest first by id or createdAt
             const sorted = [...data].reverse();
             setRequests(sorted);
           }
-        })
-        .catch(err => console.error('Failed to fetch work requests for admin activity:', err));
+        }
+      } catch (err) {
+        console.error('Failed to fetch work requests for admin activity:', err);
+      }
     };
 
     fetchRequests();
-    const interval = setInterval(fetchRequests, 30000);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchRequests();
+    }, 60000);
     const onVisibilityChange = () => {
       if (!document.hidden) fetchRequests();
     };

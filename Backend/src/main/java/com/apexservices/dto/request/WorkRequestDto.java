@@ -1,4 +1,4 @@
-package com.apexservices.dto;
+package com.apexservices.dto.request;
 
 import com.apexservices.security.SafeText;
 import jakarta.validation.constraints.NotBlank;
@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 @Data
@@ -48,11 +49,26 @@ public class WorkRequestDto {
     private String contactPhone;
 
     @NotBlank(message = "Service address is required")
-    @Size(max = 300, message = "Address cannot exceed 300 characters")
+    @Size(max = 500, message = "Address cannot exceed 500 characters")
     @SafeText
     private String serviceAddress;
 
-    @Size(max = 1000, message = "Problem description cannot exceed 1000 characters")
+    private BigDecimal latitude;
+    private BigDecimal longitude;
+
+    @Size(max = 200)
+    @SafeText
+    private String houseDetails;
+
+    @Size(max = 200)
+    @SafeText
+    private String landmark;
+
+    @Size(max = 100)
+    @SafeText
+    private String cityPostal;
+
+    @Size(max = 2000, message = "Problem description cannot exceed 2000 characters")
     @SafeText
     private String problemDescription;
 

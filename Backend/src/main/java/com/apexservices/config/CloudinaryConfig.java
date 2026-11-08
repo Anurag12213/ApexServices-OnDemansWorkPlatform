@@ -1,4 +1,5 @@
 package com.apexservices.config;
+import com.apexservices.service.media.MediaStorageService;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
@@ -13,6 +14,9 @@ public class CloudinaryConfig {
 
     private static final Logger log = LoggerFactory.getLogger(CloudinaryConfig.class);
 
+    @Value("${CLOUDINARY_URL:${cloudinary.url:}}")
+    private String cloudinaryUrl;
+
     @Value("${CLOUDINARY_CLOUD_NAME:${cloudinary.cloud-name:}}")
     private String cloudName;
 
@@ -24,6 +28,10 @@ public class CloudinaryConfig {
 
     @Bean
     public Cloudinary cloudinary() {
+        if (cloudinaryUrl != null && !cloudinaryUrl.isBlank() && cloudinaryUrl.startsWith("cloudinary://")) {
+            log.info("Initializing Cloudinary Media Provider via CLOUDINARY_URL");
+            return new Cloudinary(cloudinaryUrl.trim());
+        }
         if (cloudName != null && !cloudName.isBlank() &&
             apiKey != null && !apiKey.isBlank() &&
             apiSecret != null && !apiSecret.isBlank()) {

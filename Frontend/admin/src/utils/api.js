@@ -57,30 +57,59 @@ export const getAdminAuthHeaders = async () => {
   return headers;
 };
 
+const inFlightRequests = new Map();
+
 export const adminFetch = async (endpoint, options = {}) => {
+  const method = (options.method || 'GET').toUpperCase();
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+
+  // Deduplicate identical in-flight GET requests to eliminate duplicate network calls
+  if (method === 'GET' && inFlightRequests.has(url)) {
+    return inFlightRequests.get(url).then((res) => res.clone());
+  }
+
   let token = getAdminToken();
   if (!token) {
     token = await ensureAdminToken();
   }
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
 
-  let response = await fetch(url, {
-    ...options,
-    headers,
-  });
-
-  // If 401 Unauthorized, notify the application to route to login
-  if (response.status === 401) {
-    console.warn('[SECURITY] Admin session expired or unauthorized. Redirecting to login...');
-    localStorage.removeItem('apex_admin_auth');
-    window.dispatchEvent(new Event('apex_admin_auth_expired'));
+  if (isFormData && headers['Content-Type']) {
+    delete headers['Content-Type'];
   }
 
-  return response;
+  const fetchPromise = (async () => {
+    try {
+      let response = await fetch(url, {
+        ...options,
+        headers,
+      });
+
+      // If 401 Unauthorized, notify the application to route to login
+      if (response.status === 401) {
+        console.warn('[SECURITY] Admin session expired or unauthorized. Redirecting to login...');
+        localStorage.removeItem('apex_admin_auth');
+        window.dispatchEvent(new Event('apex_admin_auth_expired'));
+      }
+
+      return response;
+    } finally {
+      if (method === 'GET') {
+        inFlightRequests.delete(url);
+      }
+    }
+  })();
+
+  if (method === 'GET') {
+    inFlightRequests.set(url, fetchPromise);
+  }
+
+  return fetchPromise;
 };

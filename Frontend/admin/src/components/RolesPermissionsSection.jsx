@@ -281,36 +281,21 @@ export default function RolesPermissionsSection() {
       if (res.ok) {
         const added = await res.json();
         setTeamMembers((prev) => [...prev, added]);
+        setRoles((prev) =>
+          prev.map((r) =>
+            r.id === newStaff.role ? { ...r, memberCount: (r.memberCount || 0) + 1 } : r
+          )
+        );
+        toast.success(`Invitation dispatched to ${newStaff.email}`, 'Team Member Added');
+        setShowInviteModal(false);
+        setNewStaff({ name: '', email: '', role: 'OPERATIONS_MANAGER' });
       } else {
-        const fallback = {
-          id: `ADM-0${teamMembers.length + 1}`,
-          name: newStaff.name,
-          email: newStaff.email,
-          roleId: newStaff.role,
-          lastActive: 'Invitation Sent'
-        };
-        setTeamMembers((prev) => [...prev, fallback]);
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.message || 'Server rejected staff member invitation.', 'Invitation Failed');
       }
-    } catch {
-      const fallback = {
-        id: `ADM-0${teamMembers.length + 1}`,
-        name: newStaff.name,
-        email: newStaff.email,
-        roleId: newStaff.role,
-        lastActive: 'Invitation Sent'
-      };
-      setTeamMembers((prev) => [...prev, fallback]);
+    } catch (err) {
+      toast.error('Network failure while attempting to invite staff member.', 'Network Error');
     }
-
-    setRoles((prev) =>
-      prev.map((r) =>
-        r.id === newStaff.role ? { ...r, memberCount: (r.memberCount || 0) + 1 } : r
-      )
-    );
-
-    toast.success(`Invitation dispatched to ${newStaff.email}`, 'Team Member Added');
-    setShowInviteModal(false);
-    setNewStaff({ name: '', email: '', role: 'OPERATIONS_MANAGER' });
   };
 
   const handleRemoveStaff = async (id) => {

@@ -89,11 +89,11 @@ export default function SupportTicketManagementSection() {
       };
     } catch (e) {}
 
-    // Background polling every 30s (sync is instant via BroadcastChannel and onFocus)
+    // Background polling every 60s (sync is instant via BroadcastChannel and onFocus)
     const interval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchTickets(true);
-    }, 30000);
+    }, 60000);
 
     // Auto sync when admin tab regains focus or visibility
     const handleFocus = () => fetchTickets(true);

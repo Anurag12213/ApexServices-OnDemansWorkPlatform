@@ -1,6 +1,7 @@
 package com.apexservices.controller;
 
-import com.apexservices.dto.*;
+import com.apexservices.dto.request.*;
+import com.apexservices.dto.response.*;
 import com.apexservices.model.Category;
 import com.apexservices.model.Icon;
 import com.apexservices.model.PartnerProfile;
@@ -128,8 +129,19 @@ public class ContentDataController {
 
     // --- CATEGORIES CRUD WITH ICON RELATIONSHIP ---
     @GetMapping("/categories")
-    public ResponseEntity<List<Map<String, Object>>> getCategories() {
-        return ResponseEntity.ok(categoryService.getCategories());
+    public ResponseEntity<List<Map<String, Object>>> getCategories(
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        String etag = contentVersionService.getCategoryEtag();
+        if (contentVersionService.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header("Cache-Control", "public, max-age=60, must-revalidate")
+                    .build();
+        }
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header("Cache-Control", "public, max-age=60, must-revalidate")
+                .body(categoryService.getCategories());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -197,8 +209,19 @@ public class ContentDataController {
 
     // --- SLIDES CRUD ---
     @GetMapping({"/slides", "/admin/slides"})
-    public ResponseEntity<List<Map<String, Object>>> getSlides() {
-        return ResponseEntity.ok(siteContentService.getSlides());
+    public ResponseEntity<List<Map<String, Object>>> getSlides(
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch) {
+        String etag = contentVersionService.getConfigEtag();
+        if (contentVersionService.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header("Cache-Control", "public, max-age=120, must-revalidate")
+                    .build();
+        }
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header("Cache-Control", "public, max-age=120, must-revalidate")
+                .body(siteContentService.getSlides());
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -254,7 +277,7 @@ public class ContentDataController {
     }
 
     // --- WORK REQUESTS ---
-    @GetMapping("/work-requests")
+    @GetMapping({"/work-requests", "/work-requests/my"})
     public ResponseEntity<List<WorkRequestResponseDto>> getWorkRequests(
             @RequestParam(required = false) String email,
             Principal principal) {
@@ -282,6 +305,7 @@ public class ContentDataController {
         }
         String authEmail = principal != null ? principal.getName() : null;
         WorkRequestResponseDto created = workRequestService.createWorkRequest(requestDto, authEmail);
+        contentVersionService.bumpWorkRequestVersion();
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -302,9 +326,20 @@ public class ContentDataController {
     @GetMapping({"/work-requests/partner-feed", "/work-requests/partner/feed"})
     public ResponseEntity<List<WorkRequestResponseDto>> getPartnerFeed(
             @RequestParam(required = false) String category,
+            @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch,
             Principal principal) {
+        String etag = contentVersionService.getWorkRequestEtag();
+        if (contentVersionService.matches(ifNoneMatch, etag)) {
+            return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
+                    .eTag(etag)
+                    .header("Cache-Control", "private, no-cache")
+                    .build();
+        }
         String partnerEmail = principal.getName();
-        return ResponseEntity.ok(workRequestService.getPartnerFeed(partnerEmail, category));
+        return ResponseEntity.ok()
+                .eTag(etag)
+                .header("Cache-Control", "private, no-cache")
+                .body(workRequestService.getPartnerFeed(partnerEmail, category));
     }
 
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
@@ -317,6 +352,7 @@ public class ContentDataController {
         }
         String partnerEmail = principal.getName();
         WorkRequestClaimResponseDto result = workRequestService.claimWorkRequest(id, partnerEmail);
+        contentVersionService.bumpWorkRequestVersion();
         return ResponseEntity.ok(result);
     }
 
@@ -329,7 +365,9 @@ public class ContentDataController {
             return ResponseEntity.badRequest().build();
         }
         String partnerEmail = principal.getName();
-        return ResponseEntity.ok(workRequestService.rejectWorkRequest(id, partnerEmail));
+        Map<String, Object> res = workRequestService.rejectWorkRequest(id, partnerEmail);
+        contentVersionService.bumpWorkRequestVersion();
+        return ResponseEntity.ok(res);
     }
 
     @PostMapping("/work-requests/{id}/advance-stage")
@@ -340,7 +378,9 @@ public class ContentDataController {
             return ResponseEntity.badRequest().build();
         }
         String userEmail = principal != null ? principal.getName() : null;
-        return ResponseEntity.ok(workRequestService.advanceStage(id, userEmail));
+        WorkRequestResponseDto dto = workRequestService.advanceStage(id, userEmail);
+        contentVersionService.bumpWorkRequestVersion();
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/work-requests/{id}/verify-completion")
@@ -356,7 +396,9 @@ public class ContentDataController {
             otp = payload != null ? payload.get("otp") : null;
         }
         String partnerEmail = principal != null ? principal.getName() : null;
-        return ResponseEntity.ok(workRequestService.verifyCompletion(id, partnerEmail, otp));
+        WorkRequestResponseDto dto = workRequestService.verifyCompletion(id, partnerEmail, otp);
+        contentVersionService.bumpWorkRequestVersion();
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping("/work-requests/{id}/completion-otp")
@@ -444,7 +486,26 @@ public class ContentDataController {
         if (principal == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        return ResponseEntity.ok(workRequestService.cancelWorkRequest(id, principal.getName()));
+        WorkRequestResponseDto dto = workRequestService.cancelWorkRequest(id, principal.getName());
+        contentVersionService.bumpWorkRequestVersion();
+        return ResponseEntity.ok(dto);
+    }
+
+    @PostMapping("/work-requests/{id}/raise-dispute")
+    public ResponseEntity<WorkRequestResponseDto> raiseDispute(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, String> payload,
+            Principal principal) {
+        if (!InputSanitizer.isSqlSafe(id)) {
+            return ResponseEntity.badRequest().build();
+        }
+        if (principal == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        String reason = payload != null ? payload.get("reason") : "Customer dispute raised";
+        WorkRequestResponseDto dto = workRequestService.raiseDispute(id, principal.getName(), reason);
+        contentVersionService.bumpWorkRequestVersion();
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/work-requests/{id}/pay")
@@ -457,7 +518,9 @@ public class ContentDataController {
         }
         String method = payload != null && payload.get("method") != null ? String.valueOf(payload.get("method")) : "UPI";
         String userEmail = principal != null ? principal.getName() : null;
-        return ResponseEntity.ok(workRequestService.processPayment(id, method, userEmail));
+        WorkRequestResponseDto dto = workRequestService.processPayment(id, method, userEmail);
+        contentVersionService.bumpWorkRequestVersion();
+        return ResponseEntity.ok(dto);
     }
 
     @PreAuthorize("hasAnyRole('PARTNER', 'ADMIN')")
@@ -477,11 +540,5 @@ public class ContentDataController {
         res.put("available", available);
         res.put("category", category);
         return ResponseEntity.ok(res);
-    }
-
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/admin/work-requests")
-    public ResponseEntity<List<WorkRequestResponseDto>> getAdminWorkRequests() {
-        return ResponseEntity.ok(workRequestService.getWorkRequests(null));
     }
 }

@@ -1,6 +1,7 @@
 package com.apexservices.controller;
+import com.apexservices.dto.request.WorkRequestDto;
 
-import com.apexservices.dto.BootstrapDataResponseDto;
+import com.apexservices.dto.response.BootstrapDataResponseDto;
 import com.apexservices.repository.SiteSettingRepository;
 import com.apexservices.service.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -161,7 +162,7 @@ class ContentDataControllerOptimizationTest {
                 "scope", "ALL"
         ));
 
-        com.apexservices.dto.WorkRequestDto dto = new com.apexservices.dto.WorkRequestDto();
+        com.apexservices.dto.request.WorkRequestDto dto = new com.apexservices.dto.request.WorkRequestDto();
         ResponseEntity<?> response = controller.createWorkRequest(dto, null);
 
         assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());

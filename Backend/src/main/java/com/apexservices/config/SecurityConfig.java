@@ -74,11 +74,15 @@ public class SecurityConfig {
                 // WebSocket Handshake & Fallback
                 .requestMatchers("/ws/**").permitAll()
 
-                // Partner Dispatch & Verification Operations
-                .requestMatchers(HttpMethod.GET, "/api/work-requests/partner-feed").hasAnyRole("PARTNER", "ADMIN")
+                // Partner Post & Pick Operations & Dispatch
+                .requestMatchers("/api/partner/jobs/**").hasAnyRole("PARTNER", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/work-requests/partner-feed", "/api/work-requests/partner/feed").hasAnyRole("PARTNER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/claim").hasAnyRole("PARTNER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/reject").hasAnyRole("PARTNER", "ADMIN")
                 .requestMatchers("/api/partners/**").hasAnyRole("PARTNER", "ADMIN")
+
+                // Admin Work Requests Management Subsystem
+                .requestMatchers("/api/admin/work-requests/**").hasRole("ADMIN")
 
                 // Public Read Operations (Catalog, Slides, Reviews, Branding, Avatars, Presentation Data)
                 .requestMatchers(HttpMethod.GET, "/api/data", "/api/settings").permitAll()
@@ -94,7 +98,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/work-requests").permitAll()
 
                 // Authenticated Work Request Operations
-                .requestMatchers(HttpMethod.GET, "/api/work-requests").authenticated()
+                .requestMatchers(HttpMethod.GET, "/api/work-requests", "/api/work-requests/my").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/work-requests/*").authenticated()
                 .requestMatchers(HttpMethod.GET, "/api/work-requests/*/completion-otp").hasAnyRole("CUSTOMER", "ADMIN")
 
@@ -102,8 +106,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/advance-stage").hasAnyRole("PARTNER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/verify-completion").hasAnyRole("PARTNER", "ADMIN")
 
-                // Cancellation, Payment Settlement & Customer Review Operations
+                // Cancellation, Dispute, Payment Settlement & Customer Review Operations
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/cancel").hasAnyRole("CUSTOMER", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/work-requests/*/raise-dispute").hasAnyRole("CUSTOMER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/pay").hasAnyRole("CUSTOMER", "PARTNER", "ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/work-requests/*/review").hasAnyRole("CUSTOMER", "ADMIN")
 

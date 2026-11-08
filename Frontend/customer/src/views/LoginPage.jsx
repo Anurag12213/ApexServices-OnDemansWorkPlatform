@@ -6,10 +6,12 @@ import GoogleButton from '../components/GoogleButton';
 import { OtpInput } from '../components/OtpInput';
 import { sendEmailOtp, verifyEmailOtp, resendEmailOtp, resetPasswordWithGrant } from '../utils/otpApi';
 import { isSqlSafe, isXssSafe, formatPhone, formatName, formatEmail, validateEmail, validatePhone } from '../utils/inputValidator';
+import { parseOAuthRedirectParams } from '../utils/googleAuth';
 
 export const LoginPage = () => {
   const {
     loginCustomer,
+    loginWithGoogleCustomer,
     registerCustomer,
     setActivePage,
     bookingDraft,
@@ -112,6 +114,51 @@ export const LoginPage = () => {
     }
     return () => clearInterval(t);
   }, [forgotStep, forgotExpiresIn]);
+
+  // Check URL query parameters for OAuth2 redirect token or error
+  useEffect(() => {
+    const { token, error: oauthError } = parseOAuthRedirectParams();
+    if (oauthError) {
+      setError(decodeURIComponent(oauthError));
+      toast.error(decodeURIComponent(oauthError), 'Google SSO');
+    } else if (token) {
+      localStorage.setItem('apex_customer_token', token);
+      const serverUrl = (import.meta.env?.VITE_API_URL || 'http://localhost:8080/api').replace(/\/+$/, '');
+      fetch(`${serverUrl}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then((r) => r.json())
+        .then((user) => {
+          if (user && user.id) {
+            localStorage.setItem('apex_customer_user', JSON.stringify(user));
+            toast.success(`Welcome, ${user.fullName || 'Customer'}!`, 'Google Sign-In Successful');
+            setActivePage('request-work');
+          }
+        })
+        .catch(() => {
+          toast.error('Failed to retrieve user profile after Google sign-in.', 'Error');
+        });
+    }
+  }, []);
+
+  const handleGoogleSuccess = async (credential) => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await loginWithGoogleCustomer(credential);
+      if (res.success) {
+        toast.success('Signed in with Google successfully!', 'Welcome');
+      } else {
+        setError(res.error || 'Google authentication failed.');
+        toast.error(res.error || 'Google authentication failed.', 'Google Sign-In');
+      }
+    } catch (err) {
+      setError('Could not connect to authentication service.');
+      toast.error('Network error during Google sign-in.', 'Error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -746,9 +793,14 @@ export const LoginPage = () => {
 
                 {/* Google Button */}
                 <GoogleButton
-                  onClick={() => {
-                    toast.info('Google Sign-In is active. Please authenticate via your registered email/phone or connect Google SSO in system settings.', 'Google Sign-In');
+                  onSuccess={handleGoogleSuccess}
+                  onError={(err) => {
+                    setError('Google sign-in was not completed.');
+                    toast.error('Google sign-in was canceled or encountered an issue.', 'Google SSO');
                   }}
+                  portal="customer"
+                  apiBaseUrl={import.meta.env?.VITE_API_URL || 'http://localhost:8080/api'}
+                  disabled={loading}
                   label="Continue with Google"
                 />
               </div>

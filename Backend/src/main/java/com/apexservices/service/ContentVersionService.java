@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ContentVersionService {
 
     private final AtomicLong contentVersion = new AtomicLong(System.currentTimeMillis());
+    private final AtomicLong workRequestVersion = new AtomicLong(System.currentTimeMillis());
 
     public long getVersion() {
         return contentVersion.get();
@@ -20,6 +21,10 @@ public class ContentVersionService {
 
     public long bumpVersion() {
         return contentVersion.updateAndGet(curr -> Math.max(System.currentTimeMillis(), curr + 1));
+    }
+
+    public long bumpWorkRequestVersion() {
+        return workRequestVersion.updateAndGet(curr -> Math.max(System.currentTimeMillis(), curr + 1));
     }
 
     public String getDataEtag() {
@@ -32,6 +37,10 @@ public class ContentVersionService {
 
     public String getCategoryEtag() {
         return "\"cat_" + contentVersion.get() + "\"";
+    }
+
+    public String getWorkRequestEtag() {
+        return "\"wr_" + workRequestVersion.get() + "\"";
     }
 
     /**
