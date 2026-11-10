@@ -2374,28 +2374,6 @@ export const RequestWorkPage = () => {
                       </p>
                     </div>
 
-                    {/* Quick 1-Click Fast Test Dispatch Banner */}
-                    <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
-                          <Zap className="w-4 h-4 fill-current" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-amber-950">Fast Testing Mode</p>
-                          <p className="text-[11px] text-amber-700">Skip the 6-step form and dispatch a test request in 1 click.</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={isFastTesting}
-                        onClick={handleFastTestDispatch}
-                        className="w-full sm:w-auto px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
-                      >
-                        <Zap className={`w-3.5 h-3.5 fill-current ${isFastTesting ? 'animate-spin' : ''}`} />
-                        <span>{isFastTesting ? 'Dispatching...' : '⚡ 1-Click Fast Test'}</span>
-                      </button>
-                    </div>
-
                     {/* Search Field */}
                     <div className="relative">
                       <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />

@@ -67,7 +67,7 @@ const MainContent = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-between selection:bg-[#ff3b47] selection:text-white">
+    <div className="min-h-screen bg-white flex flex-col justify-between selection:bg-[#ff3b47] selection:text-white overflow-x-hidden w-full max-w-full">
       <ToastContainer toasts={toasts} onClose={dismissToast} />
       <div>
         {activePage !== 'request-work' && <TopBar />}

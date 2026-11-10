@@ -131,14 +131,15 @@ export const DataProvider = ({ children }) => {
   const [activePage, setActivePage] = useState(() => {
     if (typeof window !== 'undefined') {
       const hash = window.location.hash || '';
-      if (hash.includes('home')) return 'home';
       if (hash.includes('services')) return 'services';
       if (hash.includes('about')) return 'about';
       if (hash.includes('reviews')) return 'reviews';
       if (hash.includes('contact')) return 'contact';
       if (hash.includes('login')) return 'login';
+      if (hash.includes('request-work') || hash.includes('my-requests')) return 'request-work';
+      if (hash.includes('home')) return 'home';
     }
-    return 'request-work';
+    return 'home';
   });
   const [loading, setLoading] = useState(() => {
     const cachedEntry = readCachedBootstrap();

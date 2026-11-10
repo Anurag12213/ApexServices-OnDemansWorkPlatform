@@ -138,36 +138,42 @@ export const Navbar = () => {
   };
 
   const handleMyRequestsClick = () => {
+    if (!customerUser) {
+      toast?.info('Please sign in to view your service requests.', 'Sign In Required');
+      setActivePage('login');
+      setMobileMenuOpen(false);
+      return;
+    }
     if (setCustomerViewMode) setCustomerViewMode('history');
     setActivePage('request-work');
     setMobileMenuOpen(false);
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-100 text-slate-800 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+    <header className="sticky top-0 z-40 bg-white border-b border-slate-100 text-slate-800 shadow-xs w-full max-w-full overflow-hidden">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-20 gap-2">
           
           {/* Logo with Stylized Purple Geometric Mark */}
           <div
-            className="flex items-center cursor-pointer group space-x-2.5 shrink-0 select-none"
+            className="flex items-center cursor-pointer group space-x-2 sm:space-x-2.5 shrink-0 select-none min-w-0"
             onClick={() => handleNavClick('home')}
           >
             {logoImageUrl ? (
               <img
                 src={logoImageUrl}
                 alt={brandName}
-                className="h-8 sm:h-9 max-h-10 max-w-[150px] object-contain rounded shrink-0"
+                className="h-7 sm:h-9 max-h-10 max-w-[130px] sm:max-w-[150px] object-contain rounded shrink-0"
               />
             ) : (
-              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#5B46F6] to-[#8C7BFF] flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#5B46F6] to-[#8C7BFF] flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 fill-current">
                   <path d="M12 2L2 22h20L12 2zm0 5l6.5 13H5.5L12 7z" />
                 </svg>
               </div>
             )}
             {(siteBranding?.showBrandNameWithLogo !== false || !logoImageUrl) && (
-              <span className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 shrink-0 whitespace-nowrap">
+              <span className="text-base sm:text-2xl font-black tracking-tight text-slate-900 shrink-0 whitespace-nowrap">
                 {brandName}
               </span>
             )}
@@ -201,76 +207,74 @@ export const Navbar = () => {
             })}
           </nav>
 
-          {/* Desktop Right Actions matching Reference Image */}
+          {/* Desktop Right Actions */}
           <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
-            {/* [ My Requests ] Solid Purple Pill Button matching mockup */}
+            {/* [ My Requests ] Solid Purple Pill Button */}
             <button
               onClick={handleMyRequestsClick}
-              className="inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-[11px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
+              className="inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-[10px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
               title="View all your service requests"
             >
               <span className="whitespace-nowrap">My Requests</span>
             </button>
 
-            {/* Notification Bell Button with Red Alert Dot */}
-            <button
-              onClick={() => {
-                toast?.info('You are up to date! Real-time notifications will show here.', 'Notifications');
-              }}
-              className="hidden xs:inline-flex relative p-1.5 sm:p-2 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-              title="Notifications"
-              aria-label="View notifications"
-            >
-              <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-slate-600" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
-            </button>
-
-            {/* Customer Profile Avatar Chip with Dropdown */}
-            <div className="relative shrink-0" ref={profileDropdownRef}>
+            {/* Notification Bell Button with Red Alert Dot (visible when logged in) */}
+            {customerUser && (
               <button
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-1 sm:gap-2 p-0.5 sm:pl-1 sm:pr-2.5 sm:py-1 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+                onClick={() => {
+                  toast?.info('You are up to date! Real-time notifications will show here.', 'Notifications');
+                }}
+                className="hidden md:inline-flex relative p-1.5 sm:p-2 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                title="Notifications"
+                aria-label="View notifications"
               >
-                <img
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-                  alt={customerUser?.fullName || 'Anurag Sharma'}
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-purple-200 shadow-2xs"
-                />
-                <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[120px] truncate">
-                  {customerUser?.fullName || 'Anurag Sharma'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <Bell className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-slate-600" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
               </button>
+            )}
 
-              {/* Profile Dropdown Menu */}
-              {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <div className="px-4 py-2 border-b border-slate-100">
-                    <p className="text-xs font-bold text-slate-900 truncate">{customerUser?.fullName || 'Anurag Sharma'}</p>
-                    <p className="text-[11px] text-slate-500 truncate">{customerUser?.email || 'anurag.sharma@apexservices.com'}</p>
-                  </div>
-                  <button
-                    onClick={() => {
-                      handleMyRequestsClick();
-                      setProfileDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <ClipboardList className="w-4 h-4" />
-                    <span>My Service Requests</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleFastTestClick();
-                      setProfileDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-xs font-semibold text-amber-600 hover:bg-amber-50 flex items-center gap-2 cursor-pointer transition-colors"
-                  >
-                    <Zap className="w-4 h-4 fill-current" />
-                    <span>1-Click Test Request</span>
-                  </button>
-                  <div className="my-1 border-t border-slate-100" />
-                  {customerUser ? (
+            {/* Customer Profile Avatar Chip (ONLY when actually logged in) */}
+            {customerUser ? (
+              <div className="relative shrink-0" ref={profileDropdownRef}>
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center gap-1 sm:gap-2 p-0.5 sm:pl-1 sm:pr-2.5 sm:py-1 rounded-full border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+                >
+                  {customerUser.avatar ? (
+                    <img
+                      src={customerUser.avatar}
+                      alt={customerUser.fullName || 'Customer'}
+                      className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover border border-purple-200 shadow-2xs"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-[#6355F6] text-white flex items-center justify-center text-[11px] sm:text-xs font-black shadow-2xs">
+                      {customerUser.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                  )}
+                  <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[120px] truncate">
+                    {customerUser.fullName}
+                  </span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                </button>
+
+                {/* Profile Dropdown Menu */}
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                      <p className="text-xs font-bold text-slate-900 truncate">{customerUser.fullName || 'Valued Customer'}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{customerUser.email || customerUser.mobileNumber || ''}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        handleMyRequestsClick();
+                        setProfileDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-purple-50 hover:text-[#6355F6] flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      <span>My Service Requests</span>
+                    </button>
+                    <div className="my-1 border-t border-slate-100" />
                     <button
                       onClick={handleLogoutClick}
                       className="w-full text-left px-4 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer transition-colors"
@@ -278,21 +282,20 @@ export const Navbar = () => {
                       <LogOut className="w-4 h-4" />
                       <span>Sign Out</span>
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        handleNavClick('login');
-                        setProfileDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-xs font-semibold text-purple-600 hover:bg-purple-50 flex items-center gap-2 cursor-pointer transition-colors"
-                    >
-                      <User className="w-4 h-4" />
-                      <span>Sign In / Switch Account</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Sleek Sign In Button (When Logged Out) */
+              <button
+                onClick={() => handleNavClick('login')}
+                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-300 hover:border-[#6355F6] hover:bg-purple-50/60 text-slate-700 hover:text-[#6355F6] text-[11px] sm:text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
+                title="Sign in to your customer account"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            )}
 
             {/* Mobile Menu Toggle */}
             <button
