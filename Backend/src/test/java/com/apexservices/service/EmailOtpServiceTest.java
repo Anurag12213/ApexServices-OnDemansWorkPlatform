@@ -131,6 +131,22 @@ class EmailOtpServiceTest {
     }
 
     @Test
+    @DisplayName("Send OTP - Throws IllegalArgumentException if email is not registered during PASSWORD_RESET")
+    void testSendOtpPasswordResetFailsIfEmailNotRegistered() {
+        String email = "unregistered@example.com";
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
+
+        SendEmailOtpRequest request = SendEmailOtpRequest.builder()
+                .email(email)
+                .purpose(OtpPurpose.PASSWORD_RESET)
+                .build();
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> emailOtpService.sendEmailOtp(request, "127.0.0.1"));
+        assertTrue(ex.getMessage().contains("Please sign up first"));
+        verify(emailService, never()).sendOtpEmail(any(), any(), any(), any(), anyInt());
+    }
+
+    @Test
     @DisplayName("Send OTP - Enforces 60-second cooldown on consecutive requests")
     void testSendOtpCooldownEnforced() {
         String email = "user@example.com";

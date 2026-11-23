@@ -113,12 +113,7 @@ public class EmailOtpService {
                     );
                 }
             } else {
-                // Prevent email enumeration: return standard success response without sending email
-                return OtpApiResponse.challengeDispatched(
-                        "If an account is associated with this email, a verification code has been dispatched.",
-                        cooldownSeconds,
-                        expiryMinutes * 60
-                );
+                throw new IllegalArgumentException("No account found with this email address. Please sign up first.");
             }
         }
 
@@ -190,6 +185,10 @@ public class EmailOtpService {
         String email = normalizeEmail(request.getEmail());
         OtpPurpose purpose = request.getPurpose();
         LocalDateTime now = LocalDateTime.now();
+
+        if (purpose == OtpPurpose.PASSWORD_RESET && userRepository.findByEmail(email).isEmpty()) {
+            throw new IllegalArgumentException("No account found with this email address. Please sign up first.");
+        }
 
         // 1. Rate limiting check across 1 hour
         long challengesInWindow = otpRepository.countChallengesInWindow(email, now.minusHours(1));
