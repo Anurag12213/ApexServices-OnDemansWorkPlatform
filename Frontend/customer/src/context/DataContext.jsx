@@ -432,6 +432,14 @@ export const DataProvider = ({ children }) => {
       fetchCustomerRequests(customerUser.email);
     }
 
+    // Real-time periodic synchronization for customer work requests & live notifications (every 10s)
+    let syncInterval;
+    if (customerUser?.email) {
+      syncInterval = setInterval(() => {
+        fetchCustomerRequests(customerUser.email);
+      }, 10000);
+    }
+
     // Cross-tab real-time sync via BroadcastChannel
     let syncChannel;
     try {
@@ -483,6 +491,7 @@ export const DataProvider = ({ children }) => {
         try { abortControllerRef.current.abort(); } catch {}
       }
       clearInterval(interval);
+      if (syncInterval) clearInterval(syncInterval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('storage', handleStorage);
@@ -672,6 +681,104 @@ export const DataProvider = ({ children }) => {
     setCustomerRequestsTab(subTab);
     setActivePage('request-work');
   };
+
+  // Persistent Read Notification Tracking
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('apex_customer_read_notifications');
+        return stored ? JSON.parse(stored) : [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Dynamic Real-Time Notifications Derived from Live & Historical Requests
+  const notifications = useMemo(() => {
+    if (!customerRequests || customerRequests.length === 0) return [];
+    const list = [];
+    customerRequests.forEach((req) => {
+      const dateStr = req.updatedAt || req.createdAt || new Date().toISOString();
+      const cat = req.serviceCategory || 'Service';
+      const ticketId = req.id;
+      
+      if (req.status === 'COMPLETED') {
+        list.push({
+          id: `notif-comp-${req.id}`,
+          requestId: req.id,
+          title: 'Service Completed',
+          message: `${cat} (Ticket #${ticketId}) has been successfully completed. Invoice and receipts are available.`,
+          time: dateStr,
+          type: 'COMPLETED',
+          status: req.status,
+          read: readNotificationIds.includes(`notif-comp-${req.id}`)
+        });
+      } else if (req.status === 'IN_PROGRESS') {
+        list.push({
+          id: `notif-prog-${req.id}`,
+          requestId: req.id,
+          title: 'Work In Progress',
+          message: `${req.assignedPartnerName || 'Your assigned technician'} is actively working on ${cat}.`,
+          time: dateStr,
+          type: 'IN_PROGRESS',
+          status: req.status,
+          read: readNotificationIds.includes(`notif-prog-${req.id}`)
+        });
+      } else if (req.status === 'ASSIGNED') {
+        list.push({
+          id: `notif-assign-${req.id}`,
+          requestId: req.id,
+          title: 'Partner Assigned',
+          message: `${req.assignedPartnerName || 'A technician'} has been assigned to your ${cat} booking.`,
+          time: dateStr,
+          type: 'ASSIGNED',
+          status: req.status,
+          read: readNotificationIds.includes(`notif-assign-${req.id}`)
+        });
+      } else if (req.status === 'PENDING_DISPATCH') {
+        list.push({
+          id: `notif-disp-${req.id}`,
+          requestId: req.id,
+          title: 'Service Dispatched',
+          message: `Your ${cat} request (Ticket #${ticketId}) is active. Matching with local experts.`,
+          time: dateStr,
+          type: 'PENDING_DISPATCH',
+          status: req.status,
+          read: readNotificationIds.includes(`notif-disp-${req.id}`)
+        });
+      }
+    });
+    return list.sort((a, b) => new Date(b.time) - new Date(a.time));
+  }, [customerRequests, readNotificationIds]);
+
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter(n => !n.read).length;
+  }, [notifications]);
+
+  const markNotificationAsRead = useCallback((notifId) => {
+    setReadNotificationIds(prev => {
+      if (prev.includes(notifId)) return prev;
+      const updated = [...prev, notifId];
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('apex_customer_read_notifications', JSON.stringify(updated));
+        }
+      } catch(e) {}
+      return updated;
+    });
+  }, []);
+
+  const markAllNotificationsAsRead = useCallback(() => {
+    const allIds = notifications.map(n => n.id);
+    setReadNotificationIds(allIds);
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('apex_customer_read_notifications', JSON.stringify(allIds));
+      }
+    } catch(e) {}
+  }, [notifications]);
 
   // Launch Multi-Step Booking Workflow (Draft preserves and user can browse freely)
   const handleInitiateRequestWork = (category = '') => {
@@ -917,6 +1024,11 @@ export const DataProvider = ({ children }) => {
     handleInitiateRequestWork,
     submitWorkRequest,
     fetchCustomerRequests,
+    // Real-Time Notifications
+    notifications,
+    unreadNotificationCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
     // Toast Notifications
     toasts,
     showToast,
@@ -945,6 +1057,10 @@ export const DataProvider = ({ children }) => {
     activeTrackingRequestId,
     loginBannerMessage,
     loginSuccessNotice,
+    notifications,
+    unreadNotificationCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
     toasts,
   ]);
 
