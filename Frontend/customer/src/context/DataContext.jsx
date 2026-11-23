@@ -781,7 +781,7 @@ export const DataProvider = ({ children }) => {
   }, [notifications]);
 
   // Launch Multi-Step Booking Workflow (Draft preserves and user can browse freely)
-  const handleInitiateRequestWork = (category = '') => {
+  const handleInitiateRequestWork = (category = '', targetStep = null) => {
     setActiveTrackingRequestId(null);
     localStorage.removeItem('apex_active_tracking_id');
     setCustomerViewMode('booking');
@@ -795,9 +795,9 @@ export const DataProvider = ({ children }) => {
 
       setSelectedCategory(catName);
       updateBookingDraft({ serviceCategory: catName, serviceCategoryId: catId });
-      setActiveBookingStep(2); // Jump directly to Describe Problem
+      setActiveBookingStep(targetStep !== null ? targetStep : 2); // Jump directly to Describe Problem or chosen step
     } else {
-      setActiveBookingStep(1); // Service Selection
+      setActiveBookingStep(targetStep !== null ? targetStep : 1); // Service Selection
     }
     setActivePage('request-work');
   };

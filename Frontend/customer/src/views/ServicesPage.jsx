@@ -16,9 +16,9 @@ export const ServicesPage = () => {
       .map((c) => enrichCategory(c, currencySymbol));
   }, [rawCategories, currencySymbol]);
 
-  const handleServiceSelect = (category) => {
+  const handleServiceSelect = (category, step = 2) => {
     const catName = typeof category === 'string' ? category : category?.name;
-    handleInitiateRequestWork(catName);
+    handleInitiateRequestWork(catName, step);
   };
 
   return (
@@ -77,8 +77,8 @@ export const ServicesPage = () => {
               <ServiceCard
                 key={cat.id || cat.slug}
                 category={cat}
-                onView={handleServiceSelect}
-                onBook={handleServiceSelect}
+                onView={(c, step) => handleServiceSelect(c, step || 1)}
+                onBook={(c, step) => handleServiceSelect(c, step || 2)}
               />
             ))}
           </div>

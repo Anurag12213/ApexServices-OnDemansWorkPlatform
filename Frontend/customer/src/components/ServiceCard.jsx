@@ -43,31 +43,30 @@ export const ServiceCard = ({
   const fallbackImg = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80";
   const finalImage = !imgError && catRawImage ? catRawImage : fallbackImg;
 
-  const handleView = onView || onSelect;
-  const handleBook = onBook || onBookNow;
-
-  const handleCardClick = () => {
-    if (handleView) {
-      handleView(category || { id: catId, name: catName });
+  // Previous redirection: View Scope & Book -> Step 1 (Scope & Selection)
+  const handlePreviousRedirect = (e) => {
+    if (e) e.stopPropagation();
+    if (onView) {
+      onView(category || catName, 1);
+    } else if (onBook) {
+      onBook(catName, 1);
     }
   };
 
-  const handleViewClick = (e) => {
-    e.stopPropagation();
-    if (handleView) {
-      handleView(category || { id: catId, name: catName });
-    }
-  };
-
-  const handleBookClick = (e) => {
-    e.stopPropagation();
-    if (handleBook) {
-      handleBook(catName);
+  // Next redirection: BOOK NOW -> Step 2 (Problem Diagnosis / Direct Booking)
+  const handleNextRedirect = (e) => {
+    if (e) e.stopPropagation();
+    if (onBook) {
+      onBook(catName, 2);
+    } else if (onBookNow) {
+      onBookNow(catName, 2);
+    } else if (onView) {
+      onView(category || catName, 2);
     }
   };
 
   return (
-    <div className="service-card" onClick={handleCardClick} style={{ cursor: 'pointer' }}>
+    <div className="service-card" onClick={handleNextRedirect} style={{ cursor: 'pointer' }}>
 
       {/* Image Section */}
       <div className="service-image">
@@ -87,8 +86,8 @@ export const ServiceCard = ({
         <button 
           type="button"
           className="image-arrow"
-          onClick={handleViewClick}
-          aria-label={`View ${catName} scope and details`}
+          onClick={handleNextRedirect}
+          aria-label={`Book ${catName}`}
         >
           ↗
         </button>
@@ -112,6 +111,8 @@ export const ServiceCard = ({
             )}
           </div>
 
+          <div className="heading-divider" />
+
           <div className="service-title">
             <h2>{catName}</h2>
             <p title={subservicesText}>
@@ -120,7 +121,7 @@ export const ServiceCard = ({
           </div>
         </div>
 
-        {/* Service Information */}
+        {/* Service Information Bar with Dividers */}
         <div className="service-info">
 
           <div className="info-item rating">
@@ -129,9 +130,13 @@ export const ServiceCard = ({
             <span className="muted">({catReviews} reviews)</span>
           </div>
 
+          <div className="info-divider" />
+
           <div className="info-item price">
             {formattedPrice}
           </div>
+
+          <div className="info-divider" />
 
           <div className="info-item count">
             {catCount} services
@@ -139,12 +144,12 @@ export const ServiceCard = ({
 
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: Direct Previous & Next Redirection */}
         <div className="service-actions">
           <button 
             type="button"
             className="scope-btn"
-            onClick={handleViewClick}
+            onClick={handlePreviousRedirect}
           >
             View Scope & Book
           </button>
@@ -152,7 +157,7 @@ export const ServiceCard = ({
           <button 
             type="button"
             className="book-btn"
-            onClick={handleBookClick}
+            onClick={handleNextRedirect}
           >
             BOOK NOW <span>→</span>
           </button>
