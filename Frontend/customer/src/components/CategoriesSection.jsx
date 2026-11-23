@@ -1,15 +1,11 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { enrichCategory } from '../data/servicesData';
 import { ServiceCard } from './ServiceCard';
-import { CategoryDetailModal } from './CategoryDetailModal';
 import { ArrowRight } from 'lucide-react';
 
 export const CategoriesSection = () => {
   const { data, loading, setActivePage, handleInitiateRequestWork, siteBranding } = useData();
-
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const currencySymbol = data?.publicConfig?.currencySymbol || siteBranding?.currencySymbol || '₹';
   const rawCategories = data?.categories || [];
@@ -24,23 +20,10 @@ export const CategoriesSection = () => {
   const heading = siteBranding?.categoriesHeading || 'Featured Service Categories';
   const subtitle = siteBranding?.categoriesSubtitle || 'From custom carpentry to emergency plumbing and electrical care.';
 
-  const handleOpenModal = useCallback((category) => {
-    setSelectedCategory(category);
-    setIsModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setIsModalOpen(false);
-  }, []);
-
-  const handleBookFromModal = useCallback(
-    (category) => {
-      setIsModalOpen(false);
-      const catName = typeof category === 'string' ? category : category?.name;
-      handleInitiateRequestWork(catName);
-    },
-    [handleInitiateRequestWork]
-  );
+  const handleServiceSelect = (category) => {
+    const catName = typeof category === 'string' ? category : category?.name;
+    handleInitiateRequestWork(catName);
+  };
 
   return (
     <section className="py-12 md:py-16 bg-slate-50 border-b border-slate-200">
@@ -68,7 +51,7 @@ export const CategoriesSection = () => {
           </button>
         </div>
 
-        {/* Categories Grid or Skeleton State with New ServiceCard */}
+        {/* Categories Grid with Direct Booking Navigation */}
         {loading && activeCategories.length === 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
@@ -88,20 +71,12 @@ export const CategoriesSection = () => {
               <ServiceCard
                 key={cat.id || cat.slug}
                 category={cat}
-                onView={handleOpenModal}
-                onBook={handleInitiateRequestWork}
+                onView={handleServiceSelect}
+                onBook={handleServiceSelect}
               />
             ))}
           </div>
         )}
-
-        {/* Dynamic Detail Modal */}
-        <CategoryDetailModal
-          category={selectedCategory}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          onBook={handleBookFromModal}
-        />
       </div>
     </section>
   );

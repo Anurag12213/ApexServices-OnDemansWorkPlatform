@@ -1,17 +1,13 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { useData } from '../context/DataContext';
 import { enrichCategory } from '../data/servicesData';
 import { ServiceCard } from '../components/ServiceCard';
-import { CategoryDetailModal } from '../components/CategoryDetailModal';
 import { ShieldCheck, Clock, ArrowRight, CheckCircle2, Sparkles, PhoneCall } from 'lucide-react';
 
 export const ServicesPage = () => {
   const { handleInitiateRequestWork, siteBranding, data, loading } = useData();
   const supportPhone = siteBranding?.supportPhone || data?.publicConfig?.supportPhone || '+91 1800 200 4567';
   const currencySymbol = data?.publicConfig?.currencySymbol || siteBranding?.currencySymbol || '₹';
-
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const rawCategories = data?.categories || [];
   const activeCategories = useMemo(() => {
@@ -20,23 +16,10 @@ export const ServicesPage = () => {
       .map((c) => enrichCategory(c, currencySymbol));
   }, [rawCategories, currencySymbol]);
 
-  const handleOpenModal = useCallback((category) => {
-    setSelectedCategory(category);
-    setIsModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setIsModalOpen(false);
-  }, []);
-
-  const handleBookFromModal = useCallback(
-    (category) => {
-      setIsModalOpen(false);
-      const catName = typeof category === 'string' ? category : category?.name;
-      handleInitiateRequestWork(catName);
-    },
-    [handleInitiateRequestWork]
-  );
+  const handleServiceSelect = (category) => {
+    const catName = typeof category === 'string' ? category : category?.name;
+    handleInitiateRequestWork(catName);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans text-left">
@@ -73,7 +56,7 @@ export const ServicesPage = () => {
         </div>
       </section>
 
-      {/* 2. Embedded Dynamic Categories Catalog with New ServiceCard */}
+      {/* 2. Embedded Dynamic Categories Catalog with Direct Booking Flow */}
       <section className="py-12 md:py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {loading && activeCategories.length === 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
@@ -94,8 +77,8 @@ export const ServicesPage = () => {
               <ServiceCard
                 key={cat.id || cat.slug}
                 category={cat}
-                onView={handleOpenModal}
-                onBook={handleInitiateRequestWork}
+                onView={handleServiceSelect}
+                onBook={handleServiceSelect}
               />
             ))}
           </div>
@@ -164,14 +147,6 @@ export const ServicesPage = () => {
           </a>
         </div>
       </section>
-
-      {/* 5. Dynamic Scope & Booking Modal */}
-      <CategoryDetailModal
-        category={selectedCategory}
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onBook={handleBookFromModal}
-      />
     </div>
   );
 };
