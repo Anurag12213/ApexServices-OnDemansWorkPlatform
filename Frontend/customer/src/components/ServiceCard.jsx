@@ -115,9 +115,6 @@ export const ServiceCard = ({
 
           <div className="service-title">
             <h2>{catName}</h2>
-            <p title={subservicesText}>
-              {subservicesText}
-            </p>
           </div>
         </div>
 
