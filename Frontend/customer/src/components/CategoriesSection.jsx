@@ -57,7 +57,7 @@ export const CategoriesSection = () => {
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
               <div
                 key={i}
-                className="w-full max-w-[480px] h-[480px] bg-slate-100 rounded-[22px] animate-pulse border border-slate-200"
+                className="w-full max-w-[360px] h-[410px] bg-slate-100 rounded-[24px] animate-pulse border border-slate-200"
               />
             ))}
           </div>

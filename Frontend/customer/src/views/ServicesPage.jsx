@@ -59,11 +59,11 @@ export const ServicesPage = () => {
       {/* 2. Embedded Dynamic Categories Catalog with Direct Booking Flow */}
       <section className="py-12 md:py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {loading && activeCategories.length === 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center">
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
               <div
                 key={i}
-                className="w-full max-w-[480px] h-[480px] bg-slate-100 rounded-[22px] animate-pulse border border-slate-200"
+                className="w-full max-w-[360px] h-[410px] bg-slate-100 rounded-[24px] animate-pulse border border-slate-200"
               />
             ))}
           </div>
@@ -72,7 +72,7 @@ export const ServicesPage = () => {
             No service categories available at this time.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 justify-items-center">
             {activeCategories.map((cat) => (
               <ServiceCard
                 key={cat.id || cat.slug}

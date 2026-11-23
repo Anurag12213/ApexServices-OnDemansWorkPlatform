@@ -34,10 +34,10 @@ export const ServiceCard = ({
       : `From ₹${rawPrice}`;
   const catCount = serviceCount !== undefined ? serviceCount : (category?.serviceCount || (category?.subservices ? category.subservices.length : 14));
 
-  // Subservices / description preview
+  // Subservices preview line (e.g. Furniture Assembly & Joinery • Door Hanging • More)
   const subservicesText = category?.subservices && category.subservices.length > 0
     ? category.subservices.slice(0, 3).map((s) => s.name).join(" • ") + (category.subservices.length > 3 ? " • More" : "")
-    : (description || category?.description || "Furniture Assembly & Joinery • Door Hanging • More");
+    : "Furniture Assembly & Joinery • Door Hanging • More";
 
   const [imgError, setImgError] = useState(false);
   const fallbackImg = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80";
@@ -105,8 +105,8 @@ export const ServiceCard = ({
                 icon={category?.icon}
                 iconName={category?.iconName}
                 iconValue={category?.icon?.iconValue || category?.iconValue}
-                className="w-7 h-7 text-white"
-                imgClassName="w-7 h-7 object-contain"
+                className="w-5 h-5 text-white"
+                imgClassName="w-5 h-5 object-contain"
               />
             )}
           </div>
@@ -115,6 +115,11 @@ export const ServiceCard = ({
 
           <div className="service-title">
             <h2>{catName}</h2>
+            {subservicesText && (
+              <p title={subservicesText}>
+                {subservicesText}
+              </p>
+            )}
           </div>
         </div>
 
