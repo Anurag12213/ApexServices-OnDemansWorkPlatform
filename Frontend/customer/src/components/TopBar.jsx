@@ -14,19 +14,23 @@ export const TopBar = () => {
   const supportEmail = siteBranding?.supportEmail || publicConfig?.supportEmail || 'support@apexservices.com';
 
   return (
-    <div className="bg-[#0A2540] text-slate-300 text-xs py-1.5 sm:py-2 px-2.5 sm:px-6 lg:px-8 border-b border-slate-800/80 overflow-hidden w-full max-w-full">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+    <div className="bg-[#0A2540] text-slate-300 text-xs py-1 sm:py-2 px-2 sm:px-6 lg:px-8 border-b border-slate-800/80 overflow-hidden w-full max-w-full">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2">
         
         {/* Left: Timing & Operating Hours */}
-        <div className="flex items-center space-x-1.5 text-slate-300 font-medium min-w-0 overflow-hidden">
+        <div className="flex items-center space-x-1 sm:space-x-1.5 text-slate-300 font-medium min-w-0 overflow-hidden">
           <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" style={{ color: brandDotColor }} />
           {/* Detailed text on desktop/tablet (>= 768px) */}
           <span className="hidden md:inline tracking-tight sm:tracking-wide text-xs truncate">
             {operatingHours}
           </span>
-          {/* Concise text on mobile (< 768px) */}
-          <span className="md:hidden text-[10px] sm:text-[11px] tracking-tight truncate font-medium">
+          {/* Intermediate text on tablet/larger mobile (480px - 767px) */}
+          <span className="hidden sm:inline md:hidden text-[10px] sm:text-[11px] tracking-tight truncate font-medium">
             Mon - Sat: 7am - 9pm | 24/7 Dispatch
+          </span>
+          {/* Concise text on compact mobile (< 640px) */}
+          <span className="sm:hidden text-[9px] sm:text-[10px] tracking-tight truncate font-medium">
+            24/7 Dispatch
           </span>
         </div>
 

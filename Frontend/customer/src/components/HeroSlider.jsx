@@ -53,8 +53,8 @@ export const HeroSlider = () => {
         </button>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[460px] py-8 sm:py-12 md:py-16">
+      <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[460px] py-6 sm:py-12 md:py-16">
           
           {/* Left Column: Coral Tag, Big Black Title, Paragraph, Solid Red Button */}
           <div className="lg:col-span-6 text-left space-y-4 sm:space-y-6 z-10 pl-0 lg:pl-6">
@@ -68,12 +68,12 @@ export const HeroSlider = () => {
             </div>
 
             {/* Big Bold Headline matching reference image */}
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight break-words">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 leading-tight tracking-tight break-words">
               {currentSlide.title}
             </h1>
 
             {/* Subtitle */}
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed max-w-xl font-normal">
+            <p className="text-slate-600 text-xs sm:text-base leading-relaxed max-w-xl font-normal">
               {currentSlide.subtitle}
             </p>
 
@@ -81,7 +81,7 @@ export const HeroSlider = () => {
             <div className="pt-2">
               <button
                 onClick={() => handleInitiateRequestWork()}
-                className="w-full sm:w-auto text-center font-bold px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl text-xs sm:text-sm uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer inline-flex items-center justify-center hover:opacity-90"
+                className="w-full sm:w-auto text-center font-bold px-4 sm:px-8 py-2.5 sm:py-3.5 rounded-xl text-xs sm:text-sm uppercase tracking-wider shadow-md hover:shadow-lg transition-all cursor-pointer inline-flex items-center justify-center hover:opacity-90"
                 style={{ backgroundColor: brandDotColor }}
               >
                 {currentSlide.buttonText || 'OUR SERVICES'}

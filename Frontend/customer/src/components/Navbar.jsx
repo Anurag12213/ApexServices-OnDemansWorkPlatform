@@ -151,29 +151,29 @@ export const Navbar = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-100 text-slate-800 shadow-xs w-full max-w-full overflow-hidden">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-20 gap-2">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-20 gap-1.5 sm:gap-2">
           
           {/* Logo with Stylized Purple Geometric Mark */}
           <div
-            className="flex items-center cursor-pointer group space-x-2 sm:space-x-2.5 shrink-0 select-none min-w-0"
+            className="flex items-center cursor-pointer group space-x-1.5 sm:space-x-2.5 shrink-0 select-none min-w-0"
             onClick={() => handleNavClick('home')}
           >
             {logoImageUrl ? (
               <img
                 src={logoImageUrl}
                 alt={brandName}
-                className="h-7 sm:h-9 max-h-10 max-w-[130px] sm:max-w-[150px] object-contain rounded shrink-0"
+                className="h-7 sm:h-9 max-h-10 max-w-[110px] sm:max-w-[150px] object-contain rounded shrink-0"
               />
             ) : (
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#5B46F6] to-[#8C7BFF] flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 sm:w-5 sm:h-5 fill-current">
+              <div className="w-7 h-7 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-[#5B46F6] to-[#8C7BFF] flex items-center justify-center text-white shadow-md shadow-indigo-200 shrink-0">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-current">
                   <path d="M12 2L2 22h20L12 2zm0 5l6.5 13H5.5L12 7z" />
                 </svg>
               </div>
             )}
             {(siteBranding?.showBrandNameWithLogo !== false || !logoImageUrl) && (
-              <span className="text-base sm:text-2xl font-black tracking-tight text-slate-900 shrink-0 whitespace-nowrap">
+              <span className="text-sm sm:text-2xl font-black tracking-tight text-slate-900 shrink-0 whitespace-nowrap">
                 {brandName}
               </span>
             )}
@@ -208,15 +208,17 @@ export const Navbar = () => {
           </nav>
 
           {/* Desktop Right Actions */}
-          <div className="flex items-center space-x-1.5 sm:space-x-3 shrink-0">
-            {/* [ My Requests ] Solid Purple Pill Button */}
-            <button
-              onClick={handleMyRequestsClick}
-              className="inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-[10px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
-              title="View all your service requests"
-            >
-              <span className="whitespace-nowrap">My Requests</span>
-            </button>
+          <div className="flex items-center space-x-1 sm:space-x-2.5 shrink-0">
+            {/* [ My Requests ] Solid Purple Pill Button - hidden on mobile screens, shown on tablet/desktop */}
+            {activePage !== 'request-work' && (
+              <button
+                onClick={handleMyRequestsClick}
+                className="hidden sm:inline-flex items-center px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[#6355F6] hover:bg-[#5244E8] text-white text-[10px] sm:text-xs font-bold transition-all cursor-pointer shadow-xs shrink-0"
+                title="View all your service requests"
+              >
+                <span className="whitespace-nowrap">My Requests</span>
+              </button>
+            )}
 
             {/* Notification Bell Button with Red Alert Dot (visible when logged in) */}
             {customerUser && (
@@ -289,21 +291,21 @@ export const Navbar = () => {
               /* Sleek Sign In Button (When Logged Out) */
               <button
                 onClick={() => handleNavClick('login')}
-                className="inline-flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-300 hover:border-[#6355F6] hover:bg-purple-50/60 text-slate-700 hover:text-[#6355F6] text-[11px] sm:text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
+                className="inline-flex items-center gap-1 px-2 sm:px-3.5 py-1 sm:py-2 rounded-full border border-slate-300 hover:border-[#6355F6] hover:bg-purple-50/60 text-slate-700 hover:text-[#6355F6] text-[10px] sm:text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
                 title="Sign in to your customer account"
               >
-                <User className="w-3.5 h-3.5" />
-                <span>Sign In</span>
+                <User className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <span className="hidden xs:inline">Sign In</span>
               </button>
             )}
 
             {/* Mobile Menu Toggle */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
+              className="lg:hidden p-1 sm:p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer shrink-0"
               aria-label="Toggle navigation menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5 text-slate-900" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5 text-slate-900" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
           </div>
 
