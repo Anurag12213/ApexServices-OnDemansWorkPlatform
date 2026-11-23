@@ -180,7 +180,7 @@ export const Navbar = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-100 text-slate-800 shadow-xs w-full max-w-full overflow-hidden">
+    <header className="sticky top-0 z-50 bg-white border-b border-slate-100 text-slate-800 shadow-xs w-full">
       <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14 sm:h-20 gap-1.5 sm:gap-2">
           
@@ -273,7 +273,7 @@ export const Navbar = () => {
                 </button>
 
                 {notificationsOpen && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-[100] ring-1 ring-black/5 animate-in fade-in duration-150">
                     <div className="px-4 py-3 bg-gradient-to-r from-purple-50/80 to-indigo-50/80 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-slate-900">Notifications</span>
@@ -392,7 +392,7 @@ export const Navbar = () => {
 
                 {/* Profile Dashboard Menu with Live Requests, History & Logout */}
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-[100] ring-1 ring-black/5 animate-in fade-in duration-150">
                     {/* User Header */}
                     <div className="px-4 py-3 bg-gradient-to-r from-purple-50/80 via-slate-50 to-indigo-50/80 border-b border-slate-100">
                       <div className="flex items-center gap-2.5">
