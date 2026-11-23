@@ -2,9 +2,11 @@ package com.apexservices.config;
 
 import com.apexservices.model.AuthProvider;
 import com.apexservices.model.Category;
+import com.apexservices.model.Icon;
 import com.apexservices.model.Role;
 import com.apexservices.model.User;
 import com.apexservices.repository.CategoryRepository;
+import com.apexservices.repository.IconRepository;
 import com.apexservices.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ public class SecurityDataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final IconRepository iconRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Value("${security.seed.admin-password:admin123}")
@@ -37,11 +40,66 @@ public class SecurityDataInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        initCategoriesAndIcons();
         initAdminUser();
         initPartnerUser();
         initCustomerUser();
         initDeactivatedUser();
         initMultipleCustomersAndPartners();
+    }
+
+    private void initCategoriesAndIcons() {
+        if (categoryRepository.count() > 0) {
+            log.info("[DATA SEED] Categories already seeded (count: {}). Skipping initialization.", categoryRepository.count());
+            return;
+        }
+
+        log.info("[DATA SEED] Empty database detected. Seeding 8 core trade categories and icons...");
+
+        Object[][] categoryData = new Object[][]{
+            {"Custom Carpentry", "Hammer", "Custom cabinets, door installation, furniture repair, and precision wood craftsmanship.", "Popular", "https://res.cloudinary.com/tadfkray/image/upload/v1793900793/apexservices/categories/cat_1_custom_carpentry.jpg"},
+            {"Emergency Plumbing", "Wrench", "Pipe leak fixes, drain cleaning, tap replacement, and complete bathroom fitting.", "24/7 Service", "https://res.cloudinary.com/tadfkray/image/upload/v1793900794/apexservices/categories/cat_2_emergency_plumbing.jpg"},
+            {"Electrical Maintenance", "Zap", "Short circuit repair, wiring, light installations, and circuit breaker upgrades.", "Certified", "https://res.cloudinary.com/tadfkray/image/upload/v1793900795/apexservices/categories/cat_3_electrical_maintenance.jpg"},
+            {"Painting & Decor", "Paintbrush", "Interior wall painting, texture finish, weatherproof exterior coatings.", "Premium", "https://res.cloudinary.com/tadfkray/image/upload/v1793900796/apexservices/categories/cat_4_painting_decor.jpg"},
+            {"HVAC & AC Service", "Fan", "AC installation, chemical cleaning, gas refill, and heating system tune-ups.", "Cooling Specialist", "https://res.cloudinary.com/tadfkray/image/upload/v1793900797/apexservices/categories/cat_5_hvac_ac_service.jpg"},
+            {"Appliance Care", "Tv", "Washing machine, refrigerator, oven, and microwave diagnostics and repair.", "Fast Turnaround", "https://res.cloudinary.com/tadfkray/image/upload/v1793900798/apexservices/categories/cat_6_appliance_care.jpg"},
+            {"Deep Cleaning", "Sparkles", "Comprehensive residential and commercial sanitization, scrubbing, and carpet care.", "Popular", "https://res.cloudinary.com/tadfkray/image/upload/v1793900798/apexservices/categories/cat_7_deep_cleaning.jpg"},
+            {"Pest Control", "Bug", "Eco-friendly pest management, termite inspection, and fumigation treatments.", "Certified", "https://res.cloudinary.com/tadfkray/image/upload/v1793900800/apexservices/categories/cat_8_pest_control.jpg"}
+        };
+
+        for (Object[] cat : categoryData) {
+            String name = (String) cat[0];
+            String iconName = (String) cat[1];
+            String description = (String) cat[2];
+            String tag = (String) cat[3];
+            String imageUrl = (String) cat[4];
+
+            Icon icon = iconRepository.findByIconValue(iconName).orElseGet(() -> {
+                Icon newIcon = Icon.builder()
+                        .name(name + " Icon")
+                        .iconType("SYSTEM")
+                        .iconValue(iconName)
+                        .createdAt(LocalDateTime.now())
+                        .updatedAt(LocalDateTime.now())
+                        .build();
+                return iconRepository.save(newIcon);
+            });
+
+            Category category = Category.builder()
+                    .name(name)
+                    .slug(name.trim().toLowerCase().replaceAll("[^a-z0-9]+", "-"))
+                    .description(description)
+                    .tag(tag)
+                    .bannerImageUrl(imageUrl)
+                    .icon(icon)
+                    .active(true)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            categoryRepository.save(category);
+            log.info("[DATA SEED] Seeded Category: {}", name);
+        }
     }
 
     private void initAdminUser() {
