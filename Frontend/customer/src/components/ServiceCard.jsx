@@ -105,21 +105,14 @@ export const ServiceCard = ({
                 icon={category?.icon}
                 iconName={category?.iconName}
                 iconValue={category?.icon?.iconValue || category?.iconValue}
-                className="w-5 h-5 text-white"
-                imgClassName="w-5 h-5 object-contain"
+                className="w-6 h-6 text-white"
+                imgClassName="w-6 h-6 object-contain"
               />
             )}
           </div>
 
-          <div className="heading-divider" />
-
           <div className="service-title">
             <h2>{catName}</h2>
-            {subservicesText && (
-              <p title={subservicesText}>
-                {subservicesText}
-              </p>
-            )}
           </div>
         </div>
 
