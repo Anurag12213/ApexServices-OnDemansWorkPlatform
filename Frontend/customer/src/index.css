@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./components/ServiceCard.css";
 
 @layer base {
   html,

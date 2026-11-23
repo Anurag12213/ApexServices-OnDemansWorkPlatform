@@ -1,0 +1,265 @@
+/* ==========================================================================
+   Service Card Design System (Custom Production Specification)
+   ========================================================================== */
+
+.service-card {
+  width: 100%;
+  max-width: 480px;
+  background: #ffffff;
+  border: 1px solid #e5eaf2;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 12px 35px rgba(15, 23, 42, 0.08);
+  font-family: Arial, sans-serif;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.service-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.13);
+}
+
+/* Image */
+
+.service-image {
+  height: 230px;
+  position: relative;
+  overflow: hidden;
+  background: #e8edf3;
+}
+
+.service-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+
+.service-card:hover .service-image img {
+  transform: scale(1.05);
+}
+
+.popular-badge {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  background: #ffb21c;
+  color: #111827;
+  padding: 9px 15px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 800;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.image-arrow {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #172554;
+  font-size: 23px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.image-arrow:hover {
+  background: #ffffff;
+  transform: scale(1.08);
+}
+
+/* Content */
+
+.service-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.service-heading {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.service-icon {
+  min-width: 54px;
+  width: 54px;
+  height: 54px;
+  background: #2563eb;
+  color: white;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.service-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.service-title h2 {
+  margin: 0 0 7px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #101c38;
+}
+
+.service-title p {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+/* Information */
+
+.service-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 17px 12px;
+  background: #f5f7fa;
+  border-radius: 14px;
+}
+
+.info-item {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.rating {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.star {
+  color: #fbbf24;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.rating strong {
+  color: #172554;
+  font-size: 15px;
+}
+
+.muted {
+  color: #64748b;
+}
+
+.price {
+  color: #07865b;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.count {
+  color: #64748b;
+}
+
+/* Actions */
+
+.service-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+.service-actions button {
+  flex: 1;
+  padding: 14px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.scope-btn {
+  background: white;
+  color: #172554;
+  border: 1px solid #172554;
+}
+
+.scope-btn:hover {
+  background: #f1f5f9;
+}
+
+.book-btn {
+  background: #101f43;
+  color: white;
+  border: 1px solid #101f43;
+}
+
+.book-btn:hover {
+  background: #1e40af;
+}
+
+.book-btn span {
+  margin-left: 6px;
+  font-size: 17px;
+}
+
+/* Responsive */
+
+@media (max-width: 480px) {
+  .service-image {
+    height: 190px;
+  }
+
+  .service-content {
+    padding: 17px;
+  }
+
+  .service-title h2 {
+    font-size: 18px;
+  }
+
+  .service-title p {
+    font-size: 11px;
+  }
+
+  .service-info {
+    gap: 6px;
+    padding: 14px 8px;
+  }
+
+  .info-item {
+    font-size: 11px;
+  }
+
+  .price {
+    font-size: 12px;
+  }
+
+  .service-actions {
+    gap: 8px;
+  }
+
+  .service-actions button {
+    font-size: 11px;
+    padding: 13px 5px;
+  }
+}
