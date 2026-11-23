@@ -6,7 +6,6 @@ export const ServiceCard = ({
   category,
   id,
   name,
-  description,
   image,
   icon,
   popular,
@@ -33,11 +32,6 @@ export const ServiceCard = ({
       ? `From ${rawPrice}` 
       : `From ₹${rawPrice}`;
   const catCount = serviceCount !== undefined ? serviceCount : (category?.serviceCount || (category?.subservices ? category.subservices.length : 14));
-
-  // Subservices preview line (e.g. Furniture Assembly & Joinery • Door Hanging • More)
-  const subservicesText = category?.subservices && category.subservices.length > 0
-    ? category.subservices.slice(0, 3).map((s) => s.name).join(" • ") + (category.subservices.length > 3 ? " • More" : "")
-    : "Furniture Assembly & Joinery • Door Hanging • More";
 
   const [imgError, setImgError] = useState(false);
   const fallbackImg = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80";

@@ -34,9 +34,6 @@ export const ServicesPage = () => {
             <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
               Certified Home Repairs & Master Craftsmanship
             </h1>
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-              Explore our full catalog of residential maintenance services. Every technician is background-checked, insured, and verified under the Apex Quality Guarantee.
-            </p>
 
             <div className="pt-2 flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
               <button
@@ -57,22 +54,22 @@ export const ServicesPage = () => {
       </section>
 
       {/* 2. Embedded Dynamic Categories Catalog with Direct Booking Flow */}
-      <section className="py-12 md:py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-10 md:py-14 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {loading && activeCategories.length === 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch w-full">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div
                 key={i}
-                className="w-full max-w-[390px] h-[440px] bg-slate-100 rounded-[24px] animate-pulse border border-slate-200"
+                className="w-full max-w-[400px] mx-auto h-[430px] bg-slate-100 rounded-[24px] animate-pulse border border-slate-200"
               />
             ))}
           </div>
         ) : activeCategories.length === 0 ? (
-          <div className="bg-white border border-slate-200 text-slate-500 p-12 rounded-2xl text-center text-sm shadow-xs max-w-6xl mx-auto">
+          <div className="bg-white border border-slate-200 text-slate-500 p-12 rounded-2xl text-center text-sm shadow-xs w-full">
             No service categories available at this time.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 justify-items-center max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 items-stretch w-full">
             {activeCategories.map((cat) => (
               <ServiceCard
                 key={cat.id || cat.slug}

@@ -1,10 +1,12 @@
 /* ==========================================================================
-   Service Card Design System (Faithful to Small-Screen Spec, Non-Scattered)
+   Service Card Design System (Symmetrical Alignment & Fully Responsive)
    ========================================================================== */
 
 .service-card {
   width: 100%;
-  max-width: 390px;
+  max-width: 400px;
+  margin: 0 auto;
+  height: 100%;
   background: #ffffff;
   border: 1px solid #eef2f6;
   border-radius: 24px;
@@ -25,7 +27,7 @@
 /* Image */
 
 .service-image {
-  height: 210px;
+  height: 200px;
   position: relative;
   overflow: hidden;
   background: #f1f5f9;
@@ -92,22 +94,24 @@
 /* Content */
 
 .service-content {
-  padding: 20px 18px 20px 18px;
+  padding: 20px 18px 18px 18px;
   display: flex;
   flex-direction: column;
   flex: 1;
 }
 
+/* Headings Alignment: Uniform min-height eliminates scattered look across all cards */
 .service-heading {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-height: 52px;
 }
 
 .service-icon {
-  min-width: 50px;
-  width: 50px;
-  height: 50px;
+  min-width: 48px;
+  width: 48px;
+  height: 48px;
   background: #2563eb;
   color: white;
   border-radius: 14px;
@@ -121,33 +125,40 @@
 .service-title {
   min-width: 0;
   flex: 1;
+  display: flex;
+  align-items: center;
 }
 
 .service-title h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   color: #0a192f;
   letter-spacing: -0.2px;
   line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* Information Bar */
+/* Information Bar: Anchored to consistent baseline via margin-top: auto */
 
 .service-info {
+  margin-top: auto;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 18px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 11px 12px;
   background: #f8fafc;
   border: 1px solid #f1f5f9;
   border-radius: 14px;
 }
 
 .info-item {
-  font-size: 12.5px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -172,40 +183,40 @@
 
 .rating strong {
   color: #0f172a;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 800;
 }
 
 .muted {
   color: #64748b;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 .price {
   color: #059669;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .count {
   color: #64748b;
   font-weight: 500;
-  font-size: 12px;
+  font-size: 11.5px;
 }
 
 /* Actions */
 
 .service-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 18px;
+  gap: 10px;
+  margin-top: 0;
 }
 
 .service-actions button {
   flex: 1;
   padding: 12px 8px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 12.5px;
   cursor: pointer;
   white-space: nowrap;
   display: inline-flex;
@@ -244,7 +255,7 @@
   line-height: 1;
 }
 
-/* Responsive */
+/* Responsive across all breakpoints */
 
 @media (max-width: 480px) {
   .service-card {
@@ -252,19 +263,77 @@
   }
 
   .service-image {
-    height: 185px;
+    height: 180px;
   }
 
   .service-content {
-    padding: 16px 14px;
+    padding: 16px 14px 14px 14px;
+  }
+
+  .service-heading {
+    min-height: 48px;
+    gap: 12px;
+  }
+
+  .service-icon {
+    min-width: 44px;
+    width: 44px;
+    height: 44px;
   }
 
   .service-title h2 {
-    font-size: 18px;
+    font-size: 17px;
+  }
+
+  .service-info {
+    padding: 10px 8px;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .info-item {
+    font-size: 11.5px;
+  }
+
+  .rating strong {
+    font-size: 13px;
+  }
+
+  .price {
+    font-size: 13px;
+  }
+
+  .count {
+    font-size: 11px;
   }
 
   .service-actions button {
     font-size: 12px;
     padding: 11px 6px;
+  }
+}
+
+@media (max-width: 360px) {
+  .service-content {
+    padding: 14px 10px 12px 10px;
+  }
+
+  .service-info {
+    padding: 8px 6px;
+    gap: 3px;
+  }
+
+  .info-item {
+    font-size: 11px;
+  }
+
+  .rating strong,
+  .price {
+    font-size: 12px;
+  }
+
+  .service-actions button {
+    font-size: 11px;
+    padding: 10px 4px;
   }
 }
